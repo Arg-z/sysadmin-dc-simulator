@@ -1,0 +1,511 @@
+--!strict
+--[[
+	DataPersistenceManager (ModuleScript, ServerScriptService/Gameplay)
+	AGENT C - Fase 1.
+
+	DataStore "NetSimDC_v1", key "lab_"..UserId. Every DataStore access is
+	wrapped in pcall; if GetDataStore itself fails, a session-independent flag
+	is set and a warning is emitted once - persistence silently disables
+	itself instead of ever breaking a session.
+
+	Reset flow (contract Section 6): MainServer owns ResetDataRemote. On reset
+	it calls DataPersistenceManager.WipeSave(player), then deletes and rebuilds
+	the session via SessionManager.CreateSession + WorldAndAssetBuilder.
+	PlayerRemoving is likewise handled by MainServer calling Save(session);
+	this module only provides the autosave loop (Start, every 120s).
+
+	Saved payload:
+	  balance, reputation,
+	  devices  = array over session.devices EXCEPT "isp_uplink":
+	             { id, itemId, freeform, posX, posZ, rotY, rackId, uSlot, ip,
+	               gateway, subnetMask, osInstalled, isPowered,
+	               ports = { [portId] = { peer, peerPort, color } } (connected only),
+	               vms = { VMData... } }
+	             "bench_1" saves PORTS ONLY (the workbench payload covers the
+	             node itself; ports must survive for the link pass).
+	  workbench = WorkbenchBuilderSystem.Serialize(session)
+	  tickets   = Active tickets: { id, category, title, description,
+	              rewardPayout, requirements (cpu/ram/disk or nil), status,
+	              requirementsText, clientName }
+
+	Apply(session, data):
+	  loadedFromSave = true FIRST (suppresses AutoCable during restore) ->
+	  balance/reputation -> starter device config (bm_starter_1, sw_main_1,
+	  isp_router_1: ip/gateway/mask/os/power/vms + vmIpCounter rebuild) ->
+	  freeform devices re-placed via PlacementSystem.PlaceDevice(config) ->
+	  workbench.ApplyState (so bench_1 exists before cables) -> link pass
+	  (graph.ConnectPorts per saved peer, deduped by sorted "dev|port" pair,
+	  covers starter + bench + placed links) -> tickets restore (Available stays
+	  Available, Active stays Active) -> loadedFromSave = false ->
+	  graph.UpdateDeviceLED for all devices -> ForceSync snapshot.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local NetworkTypes = require(ReplicatedStorage.Shared.NetworkTypes)
+local PlotConstants = require(ReplicatedStorage.Shared.PlotConstants)
+
+local DataPersistenceManager = {}
+
+type SessionLike = any
+
+-- ShiftAndEconomyManager lives next to this module; used only for the final
+-- ForceSync after Apply so the client immediately receives the restored state.
+local Economy: any = nil
+do
+	local ok, mod = pcall(require, script.Parent.ShiftAndEconomyManager)
+	if ok then
+		Economy = mod
+	end
+end
+
+local DATASTORE_NAME = "NetSimDC_v1"
+local KEY_PREFIX = "lab_"
+local AUTOSAVE_SECONDS = 120
+
+-- Session-independent DataStore availability flag (set once in Init).
+local store: any = nil
+local storeOk = false
+local storeUnavailableWarned = false
+
+local sessions: any = nil
+local graph: any = nil
+local constants: any = PlotConstants
+local placement: any = nil
+local workbench: any = nil
+
+local STARTER_IDS = { "bm_starter_1", "sw_main_1", "isp_router_1" }
+local ISP_ID = "isp_uplink"
+local BENCH_ID = "bench_1"
+
+local function warnStoreUnavailableOnce()
+	if not storeUnavailableWarned then
+		storeUnavailableWarned = true
+		warn("[DataPersistenceManager] DataStore unavailable - saving/loading disabled for this server.")
+	end
+end
+
+function DataPersistenceManager.Init(deps: { [string]: any })
+	sessions = deps.sessions
+	graph = deps.graph
+	constants = deps.constants or PlotConstants
+	placement = deps.placement
+	workbench = deps.workbench
+
+	local ok, result = pcall(function()
+		return game:GetService("DataStoreService"):GetDataStore(DATASTORE_NAME)
+	end)
+	if ok then
+		store = result
+		storeOk = true
+	else
+		store = nil
+		storeOk = false
+		warnStoreUnavailableOnce()
+	end
+end
+
+--[[ Load the saved payload for a player, nil when nothing/failure. ]]
+function DataPersistenceManager.Load(player: Player): any?
+	if not storeOk then
+		warnStoreUnavailableOnce()
+		return nil
+	end
+	local ok, data = pcall(function()
+		return store:GetAsync(KEY_PREFIX .. tostring(player.UserId))
+	end)
+	if not ok then
+		warn("[DataPersistenceManager] LoadAsync failed for userId " .. tostring(player.UserId) .. ": " .. tostring(data))
+		return nil
+	end
+	return data
+end
+
+--[[ Serialize one VMData row (plain, DataStore-safe). ]]
+local function serializeVM(vm: any): { [string]: any }
+	return {
+		name = vm.name,
+		cpu = vm.cpu,
+		ram = vm.ram,
+		disk = vm.disk,
+		assignedIp = vm.assignedIp,
+		cpuThrottlePercent = vm.cpuThrottlePercent,
+		currentLoadPercent = vm.currentLoadPercent,
+		status = vm.status,
+	}
+end
+
+--[[ requirements reduced to the persistable cpu/ram/disk triple (or nil). ]]
+local function serializeRequirements(req: any): { [string]: number }?
+	if type(req) == "table" and req.cpu ~= nil then
+		return { cpu = req.cpu, ram = req.ram, disk = req.disk }
+	end
+	return nil
+end
+
+--[[ Save one session (balance, reputation, devices, workbench, active tickets). ]]
+function DataPersistenceManager.Save(session: SessionLike)
+	if not storeOk then
+		warnStoreUnavailableOnce()
+		return
+	end
+	if type(session) ~= "table" or session.player == nil then
+		return
+	end
+
+	local devices: { any } = {}
+	for id, node in pairs(session.devices) do
+		if id == ISP_ID then
+			continue -- ISP uplink is rebuilt fresh by BuildFacility every join
+		end
+
+		-- ports: only currently connected links are persisted
+		local ports: { [string]: { [string]: any } } = {}
+		for portId, port in pairs(node.ports) do
+			if port.connectedToDeviceId ~= nil then
+				ports[portId] = {
+					peer = port.connectedToDeviceId,
+					peerPort = port.connectedToPortId,
+					color = port.cableColor,
+				}
+			end
+		end
+
+		if id == BENCH_ID then
+			-- bench_1 node data is covered by the workbench payload; keep its
+			-- cables only so the link pass can restore them.
+			if next(ports) ~= nil then
+				table.insert(devices, { id = BENCH_ID, ports = ports })
+			end
+			continue
+		end
+
+		local vms: { any } = {}
+		for _, vm in pairs(node.vms) do
+			table.insert(vms, serializeVM(vm))
+		end
+
+		table.insert(devices, {
+			id = id,
+			itemId = node.itemId,
+			freeform = node.freeform == true,
+			posX = node.posX,
+			posZ = node.posZ,
+			rotY = node.rotY,
+			rackId = node.rackId,
+			uSlot = node.uSlot,
+			ip = node.ip,
+			gateway = node.gateway,
+			subnetMask = node.subnetMask,
+			osInstalled = node.osInstalled,
+			isPowered = node.isPowered == true,
+			ports = ports,
+			vms = vms,
+		})
+	end
+
+	local tickets: { any } = {}
+	for _, t in ipairs(session.tickets or {}) do
+		if t.status == "Active" then
+			table.insert(tickets, {
+				id = t.id,
+				category = t.category,
+				clientName = t.clientName,
+				title = t.title,
+				description = t.description,
+				rewardPayout = t.rewardPayout,
+				requirements = serializeRequirements(t.requirements),
+				status = t.status,
+				requirementsText = t.requirementsText,
+			})
+		end
+	end
+
+	local payload: { [string]: any } = {
+		balance = session.balance,
+		reputation = session.reputation,
+		devices = devices,
+		workbench = (workbench ~= nil and type(workbench.Serialize) == "function") and workbench.Serialize(session) or nil,
+		tickets = tickets,
+	}
+
+	local key = KEY_PREFIX .. tostring(session.player.UserId)
+	local ok, err = pcall(function()
+		store:SetAsync(key, payload)
+	end)
+	if not ok then
+		-- Warn once per session so a broken DataStore does not spam the output.
+		if not session.noSaveWarned then
+			session.noSaveWarned = true
+			warn("[DataPersistenceManager] Save failed for userId " .. tostring(session.player.UserId) .. ": " .. tostring(err))
+		end
+	end
+end
+
+--[[ Rebuild VM tables onto a node; returns the highest used 10.0.0.x octet
+	 (base 1 when none) so vmIpCounter can continue after the restored VMs
+	 without colliding with any restored IP. ]]
+local function restoreVMs(session: SessionLike, node: any, hostNewId: string, vmArray: any): number
+	local maxOctet = 1
+	if type(vmArray) == "table" then
+		for _, v in ipairs(vmArray) do
+			if type(v) == "table" and type(v.name) == "string" and #v.name > 0 then
+				local vm = {
+					name = v.name,
+					cpu = tonumber(v.cpu) or 1,
+					ram = tonumber(v.ram) or 1,
+					disk = tonumber(v.disk) or 5,
+					assignedIp = (type(v.assignedIp) == "string") and v.assignedIp or nil,
+					cpuThrottlePercent = tonumber(v.cpuThrottlePercent) or 0,
+					currentLoadPercent = tonumber(v.currentLoadPercent) or 0,
+					status = if v.status == "throttled" or v.status == "stopped" then v.status else "running",
+				}
+				node.vms[vm.name] = vm
+				if vm.assignedIp ~= nil then
+					local octet = tonumber(string.match(vm.assignedIp, "^10%.0%.0%.(%d+)$"))
+					if octet ~= nil and octet > maxOctet then
+						maxOctet = octet
+					end
+				end
+			end
+		end
+	end
+	session.vmIpCounter[hostNewId] = maxOctet + 1
+	return maxOctet
+end
+
+--[[ Sorted-pair dedupe key for a cable connection ("devA|portA>devB|portB"). ]]
+local function pairKey(devA: string, portA: string, devB: string, portB: string): string
+	local left = devA .. "|" .. portA
+	local right = devB .. "|" .. portB
+	return if left <= right then left .. ">" .. right else right .. ">" .. left
+end
+
+--[[ Restore a saved payload onto a freshly built session. ]]
+function DataPersistenceManager.Apply(session: SessionLike, data: any)
+	if type(data) ~= "table" then
+		return
+	end
+
+	-- Must be set before any placement so AutoCable stays suppressed.
+	session.loadedFromSave = true
+
+	if tonumber(data.balance) ~= nil then
+		session.balance = tonumber(data.balance) :: number
+	end
+	if tonumber(data.reputation) ~= nil then
+		session.reputation = tonumber(data.reputation) :: number
+	end
+
+	-- saved device id -> live device id (starters keep their fixed ids)
+	local restoredIds: { [string]: string } = {
+		[ISP_ID] = ISP_ID,
+		["isp_router_1"] = "isp_router_1",
+		["sw_main_1"] = "sw_main_1",
+		["bm_starter_1"] = "bm_starter_1",
+		[BENCH_ID] = BENCH_ID,
+	}
+	local starterSet: { [string]: boolean } = {
+		["bm_starter_1"] = true,
+		["sw_main_1"] = true,
+		["isp_router_1"] = true,
+	}
+
+	local savedDevices: { any } = if type(data.devices) == "table" then data.devices else {}
+
+	-- 1) Starter device config + freeform device re-placement.
+	for _, entry in ipairs(savedDevices) do
+		if type(entry) ~= "table" or type(entry.id) ~= "string" then
+			continue
+		end
+		local savedId = entry.id
+		if savedId == BENCH_ID then
+			continue -- node comes from workbench.ApplyState; ports link later
+		end
+
+		if starterSet[savedId] then
+			local node = session.devices[savedId]
+			if node ~= nil then
+				restoredIds[savedId] = savedId
+				if entry.ip ~= nil then
+					node.ip = entry.ip
+				end
+				if entry.gateway ~= nil then
+					node.gateway = entry.gateway
+				end
+				if entry.subnetMask ~= nil then
+					node.subnetMask = entry.subnetMask
+				end
+				node.osInstalled = entry.osInstalled
+				if entry.isPowered ~= nil then
+					node.isPowered = entry.isPowered == true
+				end
+				node.vms = {}
+				restoreVMs(session, node, savedId, entry.vms)
+			end
+		elseif entry.freeform == true and type(entry.itemId) == "string" and placement ~= nil then
+			local posX = tonumber(entry.posX) or 0
+			local posZ = tonumber(entry.posZ) or 0
+			local rotY = tonumber(entry.rotY) or 0
+			local floorY = constants.ROOM.floorTopY
+
+			local vms: { any } = {}
+			local maxOctet = 1
+			if type(entry.vms) == "table" then
+				for _, v in ipairs(entry.vms) do
+					if type(v) == "table" and type(v.name) == "string" and #v.name > 0 then
+						table.insert(vms, {
+							name = v.name,
+							cpu = tonumber(v.cpu) or 1,
+							ram = tonumber(v.ram) or 1,
+							disk = tonumber(v.disk) or 5,
+							assignedIp = (type(v.assignedIp) == "string") and v.assignedIp or nil,
+							cpuThrottlePercent = tonumber(v.cpuThrottlePercent) or 0,
+							currentLoadPercent = tonumber(v.currentLoadPercent) or 0,
+							status = if v.status == "throttled" or v.status == "stopped" then v.status else "running",
+						})
+						if type(v.assignedIp) == "string" then
+							local octet = tonumber(string.match(v.assignedIp, "^10%.0%.0%.(%d+)$"))
+							if octet ~= nil and octet > maxOctet then
+								maxOctet = octet
+							end
+						end
+					end
+				end
+			end
+
+			local ok, newId = pcall(function()
+				return placement.PlaceDevice(session, entry.itemId :: string,
+					CFrame.new(Vector3.new(posX, floorY, posZ)), rotY, {
+						ip = entry.ip,
+						gateway = entry.gateway,
+						subnetMask = entry.subnetMask,
+						osInstalled = entry.osInstalled,
+						isPowered = if entry.isPowered ~= nil then entry.isPowered == true else nil,
+						vms = vms,
+					})
+			end)
+			if ok and type(newId) == "string" then
+				restoredIds[savedId] = newId
+				session.vmIpCounter[newId] = maxOctet + 1
+			else
+				warn("[DataPersistenceManager] could not restore device '" .. savedId .. "' (" .. tostring(entry.itemId) .. ")")
+			end
+		else
+			-- Rack-mounted non-starter devices cannot be re-mounted in Fase 1
+			-- (carry & mount is Fase 2); recorded as a known limitation.
+			warn("[DataPersistenceManager] skipping non-restorable device '" .. savedId .. "'")
+		end
+	end
+
+	-- 2) Workbench state BEFORE the link pass so bench_1 exists for bench cables.
+	if workbench ~= nil and type(workbench.ApplyState) == "function" and type(data.workbench) == "table" then
+		local ok, err = pcall(workbench.ApplyState, session, data.workbench)
+		if not ok then
+			warn("[DataPersistenceManager] workbench.ApplyState failed: " .. tostring(err))
+		end
+	end
+
+	-- 3) Link pass: restore every recorded cable, deduped by sorted pair key.
+	local linked: { [string]: boolean } = {}
+	for _, entry in ipairs(savedDevices) do
+		if type(entry) ~= "table" or type(entry.id) ~= "string" or type(entry.ports) ~= "table" then
+			continue
+		end
+		local devA = restoredIds[entry.id]
+		if devA == nil then
+			continue
+		end
+		for portA, conn in pairs(entry.ports :: { [string]: any }) do
+			if type(conn) ~= "table" or type(conn.peer) ~= "string" or type(conn.peerPort) ~= "string" or type(portA) ~= "string" then
+				continue
+			end
+			local devB = restoredIds[conn.peer]
+			if devB == nil then
+				continue
+			end
+			local key = pairKey(devA, portA, devB, conn.peerPort)
+			if not linked[key] then
+				linked[key] = true
+				local color = if type(conn.color) == "string" then conn.color else "LAN_Blue"
+				local ok, err = graph.ConnectPorts(session, devA, portA, devB, conn.peerPort, color)
+				if not ok then
+					-- Mostly benign: pre-wired starter links (wan1<->isp_uplink)
+					-- already exist from BuildFacility and are rejected here.
+					_ = err
+				end
+			end
+		end
+	end
+
+	-- 4) Tickets restore: Available stays Available, Active stays Active.
+	if type(data.tickets) == "table" then
+		for _, t in ipairs(data.tickets) do
+			if type(t) == "table" and type(t.id) == "string" and type(t.title) == "string" then
+				table.insert(session.tickets, {
+					id = t.id,
+					category = if t.category == "CustomBuild" then "CustomBuild" else "CloudVPS",
+					clientName = if type(t.clientName) == "string" then t.clientName else "Klien",
+					title = t.title,
+					description = if type(t.description) == "string" then t.description else "",
+					requirements = if type(t.requirements) == "table" then t.requirements else {},
+					rewardPayout = tonumber(t.rewardPayout) or 120,
+					status = if t.status == "Active" then "Active" else "Available",
+					requirementsText = if type(t.requirementsText) == "string" then t.requirementsText else "",
+				})
+			end
+		end
+	end
+
+	-- 5) Restore done: re-enable normal placement behavior and refresh visuals.
+	session.loadedFromSave = false
+	if graph ~= nil and type(graph.UpdateDeviceLED) == "function" then
+		for deviceId in pairs(session.devices) do
+			pcall(graph.UpdateDeviceLED, session, deviceId)
+		end
+	end
+
+	-- 6) Push the restored state to the client immediately.
+	if Economy ~= nil and type(Economy.ForceSync) == "function" then
+		pcall(Economy.ForceSync, session)
+	end
+end
+
+--[[ Remove a player's save (Reset flow; MainServer then rebuilds the session). ]]
+function DataPersistenceManager.WipeSave(player: Player)
+	if not storeOk then
+		warnStoreUnavailableOnce()
+		return
+	end
+	local ok, err = pcall(function()
+		store:RemoveAsync(KEY_PREFIX .. tostring(player.UserId))
+	end)
+	if not ok then
+		warn("[DataPersistenceManager] RemoveAsync failed for userId " .. tostring(player.UserId) .. ": " .. tostring(err))
+	end
+end
+
+--[[ Save every live session (autosave / shutdown). ]]
+function DataPersistenceManager.SaveAll()
+	if sessions == nil then
+		return
+	end
+	for _, session in pairs(sessions.GetAllSessions()) do
+		local ok, err = pcall(DataPersistenceManager.Save, session)
+		if not ok then
+			warn("[DataPersistenceManager] SaveAll error: " .. tostring(err))
+		end
+	end
+end
+
+--[[ Autosave loop (PlayerRemoving save is handled by MainServer -> Save). ]]
+function DataPersistenceManager.Start()
+	task.spawn(function()
+		while true do
+			task.wait(AUTOSAVE_SECONDS)
+			DataPersistenceManager.SaveAll()
+		end
+	end)
+end
+
+return DataPersistenceManager
