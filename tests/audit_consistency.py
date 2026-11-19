@@ -326,6 +326,8 @@ def audit_cli():
         "help", "clear", "ping", "traceroute", "ip", "ssh", "exit", "top", "vm",
         "install-os", "stress-test", "ship", "cable", "vlan", "switch", "mount",
         "incident", "ddos", "drive", "shift",
+        "sensors", "smartctl", "journalctl", "iftop", "uptime", "df", "free",
+        "uname", "systemctl",
     ]:
         check(f"G: command '{c}' dispatched", re.search(r'cmd == "' + re.escape(c) + r'"', text) is not None)
     for sub in ['"a"', '"addr"', '"set"']:
@@ -392,7 +394,7 @@ def audit_fase3():
     constants = read("ReplicatedStorage/Shared/PlotConstants.luau")
     check("F3: PlotConstants.SHIFT defined", "PlotConstants.SHIFT" in constants)
     check("F3: PlotConstants.INCIDENTS defined", "PlotConstants.INCIDENTS" in constants)
-    for itype in ["CableFault", "DDoSFlood", "NoisyNeighbor", "DriveFailure"]:
+    for itype in ["CableFault", "DDoSFlood", "NoisyNeighbor", "DriveFailure", "ServiceCrash"]:
         check(f"F3: incident type '{itype}' in PlotConstants", f'"{itype}"' in constants)
 
     graph = read("ServerScriptService/Core/NetworkGraph.luau")
@@ -419,8 +421,10 @@ def audit_fase3():
           "shiftClockMinutes" in persistence and "spareParts" in persistence)
 
     audio = read("StarterPlayer/StarterPlayerScripts/AudioAndEffectsClient.client.luau")
-    check("F3: AudioAndEffectsClient klaxon + fan hum + typing pose",
-          "klaxon" in audio and "attachFanHum" in audio and "bindTypingPose" in audio)
+    check("F3: AudioAndEffectsClient klaxon + spatial layers + typing pose",
+          "klaxon" in audio and "attachLayers" in audio and "bindTypingPose" in audio)
+    check("F4: audio spatial layers (room/AC/rack) + keystroke sounds",
+          all(s in audio for s in ["NetSimRoomLayer", "NetSimACLayer", "NetSimRackLayer", "onTypingTextChanged"]))
 
     main_srv = read("ServerScriptService/MainServer.server.luau")
     check("F3: MainServer initializes Roblox leaderstats", "ensureLeaderstats" in main_srv)

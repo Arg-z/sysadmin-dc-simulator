@@ -227,6 +227,13 @@ local function cmdHelp(): { string }
 	table.insert(lines, "  " .. g("install-os <os>") .. gr("              ubuntu-22.04 | debian-12 | rocky-9"))
 	table.insert(lines, "  " .. g("stress-test") .. gr("                   5-second thermal burn-in validation"))
 	table.insert(lines, "  " .. g("ship") .. gr("                          ship custom workbench server to dock"))
+	table.insert(lines, b("-- Observability & Ops --"))
+	table.insert(lines, "  " .. g("sensors") .. gr("                      CPU temp, fan RPM, thermal status"))
+	table.insert(lines, "  " .. g("smartctl") .. gr("                     drive SMART health & predictive wear"))
+	table.insert(lines, "  " .. g("journalctl [-n N]") .. gr("            system log (link events, incidents, ops)"))
+	table.insert(lines, "  " .. g("iftop") .. gr("                        live interface traffic (rx/tx Mbps)"))
+	table.insert(lines, "  " .. g("systemctl [restart <svc>]") .. gr("    service states; restart crashed units"))
+	table.insert(lines, "  " .. g("uptime | df | free | uname") .. gr("   load, disk, memory, kernel info"))
 	table.insert(lines, b("-- Virtual Machines --"))
 	table.insert(lines, "  " .. g("vm create --name <n> --cpu <n> --ram <n> --disk <n>"))
 	table.insert(lines, "  " .. g("vm list") .. gr("                       list VMs on active host"))
@@ -836,6 +843,7 @@ local function cmdInstallOs(player: Player, session: any, tokens: { string }): {
 		end
 		liveSession.flags["installing_" .. deviceId] = nil
 		liveNode.osInstalled = osName
+		Graph.Journal(liveSession, "info", "installer", liveNode.name .. ": OS installed (" .. osName .. ")")
 		pushLines(player, {
 			g("[ ok ] OS installed: " .. osName .. " on " .. liveNode.name),
 			gr("Next: vm create --name <n> --cpu <n> --ram <n> --disk <n>"),
@@ -1319,6 +1327,11 @@ local function cmdDrive(player: Player, session: any, tokens: { string }): { str
 	session.spareParts.hdd = spares - 1
 	node.hasDegradedDrive = false
 	node.degradedBayIndex = nil
+	node.smartReallocated = 0
+	node.smartPending = 0
+	node.smartHealth = 100
+	node.smartWarned = false
+	Graph.Journal(session, "info", "smartd", node.name .. ": bay " .. tostring(bay) .. " replaced - array healthy")
 	if Graph ~= nil then
 		Graph.UpdateDeviceLED(session, node.id)
 	end
@@ -1352,6 +1365,241 @@ local function cmdShift(session: any): { string }
 		table.insert(lines, gr("  Last Settle : " .. shift.lastSettlementText))
 	end
 	table.insert(lines, gr("Shift runs 08:00-18:00; daily settlement runs at 18:00."))
+	return lines
+end
+
+---------------------------------------------------------------------
+-- Sysadmin telemetry & operations commands (real-world CLI surface)
+---------------------------------------------------------------------
+
+local function fmtUptime(sec: number): string
+	local d = math.floor(sec / 86400)
+	local h = math.floor((sec % 86400) / 3600)
+	local m = math.floor((sec % 3600) / 60)
+	if d > 0 then
+		return string.format("%d day%s, %d:%02d", d, if d == 1 then "" else "s", h, m)
+	end
+	return string.format("%d:%02d", h, m)
+end
+
+local function cmdSensors(session: any, _tokens: { string }): { string }
+	local node, err = requireDevice(session, "sensors")
+	if err ~= nil then
+		return { r(err) }
+	end
+	local temp = node.temperatureC or 30
+	local status = if temp >= 80 then r("CRITICAL - thermal throttling") elseif temp >= 65 then r("WARM - check airflow") else g("OPTIMAL")
+	local lines: { string } = {
+		b("=== SENSORS - " .. node.name .. " ==="),
+		"coretemp-isa-0000",
+		string.format("  Package id 0:  +%.1f C  (high = +80.0 C, crit = +95.0 C)", temp),
+		string.format("  fan1:        %d RPM  (min 2800, max 9000)", node.fanRpm or 0),
+		string.format("  fan2:        %d RPM", math.floor((node.fanRpm or 0) * 0.94)),
+		"  Thermal status: " .. status,
+	}
+	if node.isUnderDDoS == true then
+		table.insert(lines, r("  NOTE: load pinned at 100% by inbound flood traffic"))
+	end
+	return lines
+end
+
+local function cmdSmartctl(session: any, _tokens: { string }): { string }
+	local node, err = requireDevice(session, "smartctl")
+	if err ~= nil then
+		return { r(err) }
+	end
+	if node.deviceType ~= "BareMetal" and node.deviceType ~= "ColocationServer" then
+		return { r("smartctl: no SMART-capable drives on " .. node.name) }
+	end
+	local lines: { string } = { b("=== SMART - " .. node.name .. " ===") }
+	local failedBay = node.degradedBayIndex
+	for bay = 1, 4 do
+		if failedBay ~= nil and bay == failedBay then
+			table.insert(lines, r(string.format("  Bay %d: FAILED    reallocated=%d pending=%d health=%d%%", bay, node.smartReallocated or 0, node.smartPending or 0, node.smartHealth or 0)))
+		else
+			table.insert(lines, g(string.format("  Bay %d: HEALTHY   reallocated=0 pending=0 health=100%%", bay)))
+		end
+	end
+	local health = node.smartHealth or 100
+	if failedBay ~= nil then
+		table.insert(lines, r("  Overall: DEGRADED - replace bay " .. tostring(failedBay) .. " (buy replacement_hdd + 'drive replace " .. tostring(failedBay) .. "')"))
+	elseif health < 70 then
+		table.insert(lines, r(string.format("  Overall: FAILING (%d%% health) - predictive warning: schedule replacement now", health)))
+	elseif health < 90 then
+		table.insert(lines, gr(string.format("  Overall: WEAR (%d%% health) - reallocated sectors accumulating", health)))
+	else
+		table.insert(lines, g("  Overall: HEALTHY"))
+	end
+	return lines
+end
+
+local function cmdJournalctl(session: any, tokens: { string }): { string }
+	local count = 15
+	if tokens[2] == "-n" then
+		count = math.clamp(tonumber(tokens[3]) or 15, 1, 60)
+	end
+	local journal = session.journal or {}
+	local lines: { string } = { b(string.format("=== JOURNALCTL - last %d of %d entries ===", math.min(count, #journal), #journal)) }
+	local start = math.max(1, #journal - count + 1)
+	for i = start, #journal do
+		local e = journal[i]
+		local body = string.format("%s %-7s %s: %s", e.t or "--:--", e.level or "info", e.unit or "kernel", e.msg or "")
+		if e.level == "warning" or e.level == "err" then
+			table.insert(lines, r(body))
+		else
+			table.insert(lines, gr(body))
+		end
+	end
+	if #journal == 0 then
+		table.insert(lines, gr("  (no entries yet)"))
+	end
+	return lines
+end
+
+local function cmdIftop(session: any, _tokens: { string }): { string }
+	local node, err = requireDevice(session, "iftop")
+	if err ~= nil then
+		return { r(err) }
+	end
+	local lines: { string } = {
+		b("=== IFTOP - " .. node.name .. " ==="),
+		string.format("  total rx: %8.1f Mbps   tx: %8.1f Mbps", node.trafficInMbps or 0, node.trafficOutMbps or 0),
+	}
+	local portIds = {}
+	for portId in pairs(node.ports) do
+		table.insert(portIds, portId)
+	end
+	table.sort(portIds)
+	for _, portId in ipairs(portIds) do
+		local port = node.ports[portId]
+		if port.portType ~= "Console" then
+			local state = if port.linkUp then g("UP  ") else gr("DOWN")
+			local bar = string.rep("|", math.clamp(math.floor((port.trafficLoadMbps or 0) / 40), 0, 10))
+			table.insert(lines, string.format("  %-6s %s %6.1f Mbps  [%-10s]", portId, state, port.trafficLoadMbps or 0, bar))
+		end
+	end
+	if node.isUnderDDoS == true then
+		table.insert(lines, r("  WARNING: flood from " .. tostring(node.ddosAttackerIp) .. " - mitigate with 'ddos block " .. tostring(node.ddosAttackerIp) .. "' on the router"))
+	end
+	return lines
+end
+
+local function cmdUptime(session: any, _tokens: { string }): { string }
+	local node, err = requireDevice(session, "uptime")
+	if err ~= nil then
+		return { r(err) }
+	end
+	local load = (node.loadPercent or 0) / 100 * math.max(1, (node.specs and node.specs.cpu) or 1)
+	local clock = if session.shift ~= nil then session.shift.clockMinutes else 0
+	return {
+		string.format(" %02d:%02d:01 up %s,  1 user,  load average: %.2f, %.2f, %.2f",
+			math.floor(clock / 60) % 24, math.floor(clock % 60), fmtUptime(node.uptimeSec or 0), load, load * 0.92, load * 0.85),
+	}
+end
+
+local function cmdDf(session: any, _tokens: { string }): { string }
+	local node, err = requireDevice(session, "df")
+	if err ~= nil then
+		return { r(err) }
+	end
+	local total = (node.specs and node.specs.disk) or 0
+	if total <= 0 then
+		return { r("df: no storage on " .. node.name) }
+	end
+	local used = 8 -- base OS footprint
+	for _, vm in pairs(node.vms) do
+		used += vm.disk or 0
+	end
+	used = math.min(used, total)
+	local pct = math.floor(used / total * 100)
+	local ramHalf = math.max(1, math.floor(((node.specs and node.specs.ram) or 1) / 2))
+	return {
+		b("Filesystem      Size  Used Avail Use% Mounted on"),
+		string.format("/dev/sda1       %4dG %4dG %4dG %3d%% /", total, used, total - used, pct),
+		string.format("tmpfs           %4dG    0G %4dG   0%% /dev/shm", ramHalf, ramHalf),
+	}
+end
+
+local function cmdFree(session: any, _tokens: { string }): { string }
+	local node, err = requireDevice(session, "free")
+	if err ~= nil then
+		return { r(err) }
+	end
+	local total = (node.specs and node.specs.ram) or 0
+	local used = 1
+	for _, vm in pairs(node.vms) do
+		used += vm.ram or 0
+	end
+	used = math.min(used, total)
+	local swap = math.max(1, math.floor(total / 4))
+	return {
+		b("               total        used        free      shared  buff/cache   available"),
+		string.format("Mem:           %5dGi     %5dGi     %5dGi       0Gi     %5dGi     %5dGi", total, used, total - used, math.min(1, total), math.max(0, total - used - 1)),
+		string.format("Swap:          %5dGi        0Gi     %5dGi", swap, swap),
+	}
+end
+
+local function cmdUname(session: any, _tokens: { string }): { string }
+	local node, err = requireDevice(session, "uname")
+	if err ~= nil then
+		return { r(err) }
+	end
+	local os = node.osInstalled
+	if os == nil then
+		return { r("uname: no OS installed (run 'install-os <os>')") }
+	end
+	local kernel = if os == "ubuntu-22.04" then "5.15.0-91-generic #101-Ubuntu SMP" elseif os == "debian-12" then "6.1.0-17-amd64 #1 SMP Debian" else "5.14.0-362.el9.x86_64 #1 SMP Rocky"
+	return { "Linux " .. string.lower(node.name) .. " " .. kernel .. " x86_64 GNU/Linux" }
+end
+
+local function cmdSystemctl(player: Player, session: any, tokens: { string }): { string }
+	local node, err = requireDevice(session, "systemctl")
+	if err ~= nil then
+		return { r(err) }
+	end
+	if node.osInstalled == nil then
+		return { r("systemctl: no OS installed (run 'install-os <os>')") }
+	end
+	if node.services == nil or next(node.services) == nil then
+		node.services = { sshd = "running", nginx = "running", cron = "running", node_exporter = "running" }
+	end
+	local sub = string.lower(tokens[2] or "status")
+	local svc = tokens[3]
+	if sub == "restart" then
+		if svc == nil then
+			return { r("systemctl restart: usage: systemctl restart <service>") }
+		end
+		svc = string.lower(svc)
+		local state = node.services[svc]
+		if state == nil then
+			return { r("systemctl: unit " .. svc .. ".service not found") }
+		end
+		if state == "crashed" then
+			node.services[svc] = "running"
+			Graph.Journal(session, "info", "systemctl", node.name .. ": " .. svc .. ".service restarted successfully")
+			playSfx(player, "plug")
+			return { g("[ ok ] " .. svc .. ".service restarted - active (running)") }
+		end
+		return { gr(svc .. ".service is already active (running)") }
+	end
+	if svc ~= nil and node.services[string.lower(svc)] == nil then
+		return { r("systemctl: unit " .. tostring(svc) .. ".service not found") }
+	end
+	local lines: { string } = { b("=== SYSTEMCTL - " .. node.name .. " ===") }
+	local names = {}
+	for name in pairs(node.services) do
+		table.insert(names, name)
+	end
+	table.sort(names)
+	for _, name in ipairs(names) do
+		if svc == nil or string.lower(svc) == name then
+			if node.services[name] == "crashed" then
+				table.insert(lines, r(string.format("  %-16s CRASHED (failed) - 'systemctl restart %s'", name .. ".service", name)))
+			else
+				table.insert(lines, g(string.format("  %-16s active (running)", name .. ".service")))
+			end
+		end
+	end
 	return lines
 end
 
@@ -1401,6 +1649,24 @@ local function dispatch(player: Player, session: any, tokens: { string }): { str
 		return cmdDrive(player, session, tokens)
 	elseif cmd == "shift" then
 		return cmdShift(session)
+	elseif cmd == "sensors" then
+		return cmdSensors(session, tokens)
+	elseif cmd == "smartctl" then
+		return cmdSmartctl(session, tokens)
+	elseif cmd == "journalctl" then
+		return cmdJournalctl(session, tokens)
+	elseif cmd == "iftop" then
+		return cmdIftop(session, tokens)
+	elseif cmd == "uptime" then
+		return cmdUptime(session, tokens)
+	elseif cmd == "df" then
+		return cmdDf(session, tokens)
+	elseif cmd == "free" then
+		return cmdFree(session, tokens)
+	elseif cmd == "uname" then
+		return cmdUname(session, tokens)
+	elseif cmd == "systemctl" then
+		return cmdSystemctl(player, session, tokens)
 	end
 	return { r("command not found: " .. cmd) .. gr("  (type 'help')") }
 end

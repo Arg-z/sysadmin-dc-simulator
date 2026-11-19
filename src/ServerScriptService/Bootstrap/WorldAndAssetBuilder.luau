@@ -81,40 +81,40 @@ function WorldAndAssetBuilder.SetupLighting()
 	pcall(function()
 		Lighting.Technology = Enum.Technology.Future
 	end)
-	Lighting.Brightness = 2.4
-	Lighting.Ambient = Color3.fromRGB(135, 148, 168)
-	Lighting.OutdoorAmbient = Color3.fromRGB(145, 160, 185)
-	Lighting.EnvironmentDiffuseScale = 0.85
-	Lighting.EnvironmentSpecularScale = 0.5
+	Lighting.Brightness = 1.25
+	Lighting.Ambient = Color3.fromRGB(72, 80, 96)
+	Lighting.OutdoorAmbient = Color3.fromRGB(96, 106, 126)
+	Lighting.EnvironmentDiffuseScale = 0.4
+	Lighting.EnvironmentSpecularScale = 0.8
 	Lighting.ClockTime = 11.5
 	Lighting.GlobalShadows = true
-	Lighting.ShadowSoftness = 0.4
+	Lighting.ShadowSoftness = 0.25
 
 	if Lighting:FindFirstChild("DCBloom") == nil then
 		local bloom = Instance.new("BloomEffect")
 		bloom.Name = "DCBloom"
-		bloom.Intensity = 0.22
+		bloom.Intensity = 0.3
 		bloom.Size = 18
-		bloom.Threshold = 1.4
+		bloom.Threshold = 1.1
 		bloom.Parent = Lighting
 	end
 	if Lighting:FindFirstChild("DCColor") == nil then
 		local cc = Instance.new("ColorCorrectionEffect")
 		cc.Name = "DCColor"
-		cc.Brightness = 0.04
-		cc.Contrast = 0.06
-		cc.Saturation = 0.12
+		cc.Brightness = 0.0
+		cc.Contrast = 0.12
+		cc.Saturation = -0.02
 		cc.Parent = Lighting
 	end
 	if Lighting:FindFirstChild("DCAtmosphere") == nil then
 		local atmo = Instance.new("Atmosphere")
 		atmo.Name = "DCAtmosphere"
-		atmo.Density = 0.22
-		atmo.Offset = 0.15
+		atmo.Density = 0.1
+		atmo.Offset = 0.1
 		atmo.Color = Color3.fromRGB(205, 222, 242)
 		atmo.Decay = Color3.fromRGB(170, 195, 225)
-		atmo.Glare = 0.15
-		atmo.Haze = 0.6
+		atmo.Glare = 0.05
+		atmo.Haze = 0.35
 		atmo.Parent = Lighting
 	end
 end
@@ -254,7 +254,8 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 	local doorH = PlotConstants.ROOM.doorHeight -- 10
 	local wainscotH = 3.5 -- lower architectural wall band height (waist/desk level)
 
-	-- Anti-static light raised floor slab (top at y = floorTopY = 0.5).
+	-- Anti-static epoxy raised floor slab (top at y = floorTopY = 0.5) with a
+	-- subtle sheen: real DC floors are sealed epoxy that reflects the fixtures.
 	local floor = newPart({
 		name = "RoomFloor",
 		size = Vector3.new(fullW, floorTopY, fullD),
@@ -262,6 +263,7 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		color = colors.floor,
 		material = Enum.Material.SmoothPlastic,
 	})
+	floor.Reflectance = 0.12
 	floor.Parent = facility
 
 	-- Decorative raised-floor tile grid lines (non-collidable, non-queryable).
@@ -288,12 +290,12 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		}).Parent = facility
 	end
 
-	-- Central cold-aisle walkway + cyan LED guide rails from entrance to center.
+	-- Central cold-aisle walkway: dark anti-static runner mat + LED guide rails.
 	newPart({
 		name = "WalkwayMat",
 		size = Vector3.new(8.5, 0.03, 46),
 		cf = plotCF(0, floorTopY + 0.015, 9),
-		color = Color3.fromRGB(168, 184, 204),
+		color = Color3.fromRGB(88, 94, 102),
 		canCollide = false,
 		canQuery = false,
 		castShadow = false,
@@ -317,22 +319,22 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 			name = "ZonePad_Rack",
 			pos = Vector3.new(-21, floorTopY + 0.018, -22),
 			size = Vector3.new(15, 0.03, 15),
-			color = Color3.fromRGB(184, 208, 232),
-			border = Color3.fromRGB(56, 152, 236),
+			color = Color3.fromRGB(140, 150, 164),
+			border = Color3.fromRGB(222, 178, 40),
 		},
 		{
 			name = "ZonePad_Workbench",
 			pos = Vector3.new(18, floorTopY + 0.018, -12),
 			size = Vector3.new(14, 0.03, 11),
-			color = Color3.fromRGB(228, 214, 192),
-			border = Color3.fromRGB(235, 168, 52),
+			color = Color3.fromRGB(150, 144, 132),
+			border = Color3.fromRGB(222, 178, 40),
 		},
 		{
 			name = "ZonePad_NOC",
 			pos = Vector3.new(18, floorTopY + 0.018, 16),
 			size = Vector3.new(17, 0.03, 12),
-			color = Color3.fromRGB(178, 194, 216),
-			border = Color3.fromRGB(72, 130, 224),
+			color = Color3.fromRGB(140, 150, 164),
+			border = Color3.fromRGB(222, 178, 40),
 		},
 	}
 	for _, zp in ipairs(zonePads) do
@@ -345,20 +347,20 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 			canQuery = false,
 			castShadow = false,
 		}).Parent = facility
-		-- crisp front accent bar on each zone pad
+		-- crisp front safety-tape accent bar on each zone pad (paint, not neon)
 		newPart({
 			name = zp.name .. "_Trim",
 			size = Vector3.new(zp.size.X, 0.04, 0.25),
 			cf = plotCF(zp.pos.X, floorTopY + 0.025, zp.pos.Z + zp.size.Z / 2),
 			color = zp.border,
-			material = Enum.Material.Neon,
+			material = Enum.Material.SmoothPlastic,
 			canCollide = false,
 			canQuery = false,
 			castShadow = false,
 		}).Parent = facility
 	end
 
-	-- Helper: builds a two-tone solid wall section (wainscot + silver dado + upper white).
+	-- Helper: builds a two-tone solid wall section (steel wainscot + dado + painted upper).
 	local function addSolidWall(namePrefix: string, sizeX: number, sizeZ: number, cx: number, cz: number, yLow: number, yHigh: number)
 		local lowerTop = math.clamp(wainscotH, yLow, yHigh)
 		if yLow < lowerTop then
@@ -368,6 +370,7 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 				size = Vector3.new(sizeX, h, sizeZ),
 				cf = plotCF(cx, yLow + h / 2, cz),
 				color = colors.wallLower,
+				material = Enum.Material.Metal,
 			}).Parent = facility
 		end
 		if yHigh > lowerTop then
@@ -377,6 +380,7 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 				size = Vector3.new(sizeX, h, sizeZ),
 				cf = plotCF(cx, lowerTop + h / 2, cz),
 				color = colors.wall,
+				material = Enum.Material.Concrete,
 			}).Parent = facility
 		end
 	end
@@ -427,9 +431,9 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		name = "Window_Left_Glass",
 		size = Vector3.new(0.25, 9, 36),
 		cf = plotCF(lx, 8.0, 0),
-		color = colors.glass,
+		color = Color3.fromRGB(120, 150, 170),
 		material = Enum.Material.Glass,
-		transparency = 0.65,
+		transparency = 0.4,
 		castShadow = false,
 	}).Parent = facility
 	-- Window frame mullions (horizontal sill/top + vertical dividers).
@@ -465,9 +469,9 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 			name = "Window_Front_Glass_" .. tag,
 			size = Vector3.new(14, 7, 0.25),
 			cf = plotCF(dir * 18, 7.0, fz),
-			color = colors.glass,
+			color = Color3.fromRGB(120, 150, 170),
 			material = Enum.Material.Glass,
-			transparency = 0.65,
+			transparency = 0.4,
 			castShadow = false,
 		}).Parent = facility
 		for _, wy in ipairs({ 3.65, 10.35 }) do
@@ -536,9 +540,19 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 			name = "Ceiling_" .. tostring(i),
 			size = cdef.size,
 			cf = plotCF(cdef.x, roomH + 0.3, cdef.z),
-			color = colors.wall,
+			color = Color3.fromRGB(74, 78, 86),
+			material = Enum.Material.Metal,
 		}).Parent = facility
 	end
+	-- Solid roof deck above the skylight: machine halls take no direct sun;
+	-- the glass reads as a dark architectural panel and fixtures do the work.
+	newPart({
+		name = "SkylightDeck",
+		size = Vector3.new(skyHalf * 2 + 1, 0.4, skyHalf * 2 + 1),
+		cf = plotCF(0, roomH + 0.9, 0),
+		color = Color3.fromRGB(58, 62, 70),
+		material = Enum.Material.Metal,
+	}).Parent = facility
 	-- Skylight glass pane + architectural crossbeams.
 	newPart({
 		name = "SkylightGlass",
@@ -585,6 +599,33 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		}).Parent = facility
 	end
 
+	-- Loaded cable bundles in the overhead trays (blue LAN, yellow WAN/fiber,
+	-- red management, black power) so the trays read as live infrastructure.
+	local bundleColors = {
+		Color3.fromRGB(40, 90, 180),
+		Color3.fromRGB(222, 178, 40),
+		Color3.fromRGB(180, 50, 44),
+		Color3.fromRGB(30, 32, 36),
+	}
+	for bi, bc in ipairs(bundleColors) do
+		newPart({
+			name = "TrunkCable_" .. bi,
+			size = Vector3.new(43.5, 0.14, 0.16),
+			cf = plotCF(-2, trayY + 0.18, -20.7 + (bi - 1) * 0.42),
+			color = bc,
+			canCollide = false,
+			castShadow = false,
+		}).Parent = facility
+		newPart({
+			name = "BranchCable_" .. bi,
+			size = Vector3.new(0.16, 0.14, 35.5),
+			cf = plotCF(17.3 + (bi - 1) * 0.42, trayY + 0.18, -2),
+			color = bc,
+			canCollide = false,
+			castShadow = false,
+		}).Parent = facility
+	end
+
 	-- 6 high-output ceiling LED fixtures with wide SurfaceLight + PointLight fill.
 	for _, lx in ipairs({ -20, 0, 20 }) do
 		for _, lz in ipairs({ -18, 18 }) do
@@ -609,14 +650,15 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 			panel.Parent = facility
 			local light = Instance.new("SurfaceLight")
 			light.Face = Enum.NormalId.Bottom
-			light.Range = 48
-			light.Brightness = 2.2
-			light.Angle = 150
+			light.Range = 36
+			light.Brightness = 2.6
+			light.Angle = 115
+			light.Shadows = true
 			light.Color = Color3.fromRGB(242, 248, 255)
 			light.Parent = panel
 			local fill = Instance.new("PointLight")
-			fill.Range = 44
-			fill.Brightness = 0.85
+			fill.Range = 26
+			fill.Brightness = 0.5
 			fill.Color = Color3.fromRGB(236, 244, 255)
 			fill.Shadows = false
 			fill.Parent = panel

@@ -71,7 +71,7 @@ local incidentCounter = 0
 local LED_RED = Color3.fromRGB(255, 80, 80)
 local LED_OFF = Color3.fromRGB(70, 70, 70)
 local BEACON_RED = Color3.fromRGB(220, 40, 40)
-local ALARM_SOUND_ID = "rbxasset://sounds/electronicpingshort.wav"
+local ALARM_SOUND_ID = "rbxassetid://4530741431" -- emergency siren loop (16s)
 
 -- Eight invented global client names for contract flavor.
 local CLIENT_NAMES = {
@@ -373,6 +373,32 @@ local function findDriveTarget(session: SessionLike): any?
 	return randomChoice(pool)
 end
 
+--[[ Pick a powered OS-installed host with a running service and no crash. ]]
+local function findServiceTarget(session: SessionLike): any?
+	local pool: { any } = {}
+	for _, node in pairs(session.devices) do
+		if node.isPowered and node.osInstalled ~= nil and node.services ~= nil then
+			local hasRunning = false
+			local hasCrashed = false
+			for _, state in pairs(node.services) do
+				if state == "running" then
+					hasRunning = true
+				end
+				if state == "crashed" then
+					hasCrashed = true
+				end
+			end
+			if hasRunning and not hasCrashed then
+				table.insert(pool, node)
+			end
+		end
+	end
+	if #pool == 0 then
+		return nil
+	end
+	return randomChoice(pool)
+end
+
 --[[ Build the Active incident ticket row + instruction text. ]]
 local function makeIncidentTicket(incidentType: string, data: any): TicketRow
 	local cfg = constants.INCIDENTS
@@ -405,7 +431,7 @@ local function makeIncidentTicket(incidentType: string, data: any): TicketRow
 		)
 		requirementsText = string.format("vm throttle %s --limit %d (or vm delete %s)", data.vmName, data.limit, data.vmName)
 		validationText = "Noisy neighbor ignoring CPU limit"
-	else
+	elseif incidentType == "DriveFailure" then
 		title = "INCIDENT: Drive Failure"
 		description = string.format(
 			"Remote hands reported failed drive bay %d on %s. Buy replacement_hdd in Store > Component, then run 'drive replace %d' on the server console. SLA %d seconds.",
@@ -413,6 +439,14 @@ local function makeIncidentTicket(incidentType: string, data: any): TicketRow
 		)
 		requirementsText = string.format("Buy replacement_hdd + 'drive replace %d' on %s", data.bay, data.deviceName)
 		validationText = string.format("Drive bay %d failed", data.bay)
+	else
+		title = "INCIDENT: Service Crash"
+		description = string.format(
+			"%s on %s: %s.service entered failed state (core dumped). Host income is paused until the unit is back up. Run 'systemctl restart %s' on the server console. SLA %d seconds.",
+			data.service, data.deviceName, data.service, data.service, cfg.slaSeconds
+		)
+		requirementsText = string.format("systemctl restart %s on %s", data.service, data.deviceName)
+		validationText = string.format("%s.service crashed", data.service)
 	end
 
 	local ticket: TicketRow = {
@@ -511,7 +545,7 @@ local function spawnIncident(session: SessionLike, incidentType: string): boolea
 			vmName = vm.name,
 			limit = cfg.noisyThrottleLimit,
 		}
-	else
+	elseif incidentType == "DriveFailure" then
 		local node = findDriveTarget(session)
 		if node == nil then
 			return false
@@ -519,15 +553,43 @@ local function spawnIncident(session: SessionLike, incidentType: string): boolea
 		local bay = rng:NextInteger(1, 4)
 		node.hasDegradedDrive = true
 		node.degradedBayIndex = bay
+		-- Seed SMART counters so 'smartctl' tells the failure story.
+		node.smartReallocated = rng:NextInteger(48, 96)
+		node.smartPending = rng:NextInteger(4, 16)
+		node.smartHealth = math.max(4, 100 - math.floor(node.smartReallocated / 12))
 		data = {
 			deviceId = node.id,
 			deviceName = node.name,
 			bay = bay,
 		}
+	else -- ServiceCrash
+		local node = findServiceTarget(session)
+		if node == nil then
+			return false
+		end
+		local candidates: { string } = {}
+		for name, state in pairs(node.services) do
+			if state == "running" and name ~= "sshd" then
+				table.insert(candidates, name)
+			end
+		end
+		if #candidates == 0 then
+			return false
+		end
+		local svc = randomChoice(candidates)
+		node.services[svc] = "crashed"
+		data = {
+			deviceId = node.id,
+			deviceName = node.name,
+			service = svc,
+		}
 	end
 
 	local ticket = makeIncidentTicket(incidentType, data)
 	table.insert(session.tickets, ticket)
+	if graph ~= nil and type(graph.Journal) == "function" then
+		graph.Journal(session, "err", "incidentd", ticket.title .. " - " .. tostring(data.deviceName or data.aName or "lab"))
+	end
 	playSFX(session, "klaxon")
 	sendHint(session, string.format("%s - SLA %ds. Check TicketMonitor or type 'incident'.", ticket.title, cfg.slaSeconds))
 	return true
@@ -568,6 +630,9 @@ local function clearIncidentEffect(session: SessionLike, ticket: any)
 				graph.UpdateDeviceLED(session, data.deviceId)
 			end
 		end
+	elseif incidentType == "ServiceCrash" then
+		-- A crashed service stays failed until the admin restarts it, even
+		-- when the SLA expires; the reputation hit is the penalty.
 	end
 end
 
@@ -614,12 +679,24 @@ local function checkIncidentResolved(session: SessionLike, ticket: any): (boolea
 			return true, "Replacement drive installed"
 		end
 		return false, string.format("Drive bay %d failed - 'drive replace %d' (+ replacement_hdd)", data.bay, data.bay)
+	elseif incidentType == "ServiceCrash" then
+		local node = session.devices[data.deviceId]
+		if node == nil then
+			return true, "Host removed"
+		end
+		if node.services == nil or node.services[data.service] ~= "crashed" then
+			return true, data.service .. ".service restarted"
+		end
+		return false, string.format("%s.service crashed - 'systemctl restart %s'", data.service, data.service)
 	end
 	return true, "Unknown incident"
 end
 
 local function resolveIncident(session: SessionLike, ticket: any, note: string)
 	clearIncidentEffect(session, ticket)
+	if graph ~= nil and type(graph.Journal) == "function" then
+		graph.Journal(session, "info", "incidentd", "Resolved: " .. ticket.title .. " (" .. note .. ")")
+	end
 	ticket.status = "Completed"
 	ticket.validationText = note
 	session.balance += ticket.rewardPayout
@@ -634,6 +711,9 @@ end
 
 local function failIncident(session: SessionLike, ticket: any, reason: string)
 	clearIncidentEffect(session, ticket)
+	if graph ~= nil and type(graph.Journal) == "function" then
+		graph.Journal(session, "warning", "incidentd", "SLA failed: " .. ticket.title .. " (" .. reason .. ")")
+	end
 	ticket.status = "Failed"
 	ticket.validationText = reason
 	session.reputation = math.max(0, session.reputation - 2)
@@ -983,8 +1063,8 @@ local function ensureAlarmSound(lens: BasePart): Sound?
 	sound.Name = "AlarmKlaxon"
 	sound.SoundId = ALARM_SOUND_ID
 	sound.Looped = true
-	sound.PlaybackSpeed = 0.45
-	sound.Volume = 0.35
+	sound.PlaybackSpeed = 1.0
+	sound.Volume = 0.5
 	sound.RollOffMinDistance = 8
 	sound.RollOffMaxDistance = 80
 	sound.Parent = lens

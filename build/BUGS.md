@@ -94,3 +94,52 @@ coordinator action or is informational only.
 - BUG-001 [P0]: FIXED by coordinator at integration. SessionManager.luau workbench table now includes `cpuCores = 0` (line 79). Re-compiled (luau-compile OK) and rbxlx regenerated (296,034 bytes, validations 5/5 PASS).
 - BUG-002 [P2]: ACCEPTED as-is (4 valid-UTF-8 display glyphs; harmless in Roblox).
 - BUG-003 [P2]: Deferred to Fase 2 (mask contiguity validation) per contract scope.
+
+---
+
+## RUNTIME PLAYTEST (Roblox Studio MCP) — Fase 1+2+3 live verification
+
+Date: 2026-11-19. Method: Roblox Studio built-in MCP server (execute_luau on
+Client/Server datamodels, user_keyboard_input, real remote calls). Static QA
+re-run before playtest: audit 194/194, catalog 294/294, build 7/7 PASS.
+
+### BUG-004 — ProximityPrompt.UIOffset assigned a Vector3 (P0, FIXED)
+
+- **File:** `src/ReplicatedStorage/Shared/ModelFactory.luau:376`
+- **Symptom:** `Unable to assign property UIOffset. Vector2 expected, got Vector3`
+  thrown in `BuildDeviceModel` → `mountStarter` → `BuildFacility` →
+  `MainServer.buildSession`. The FIRST starter device (router) crashes the whole
+  session build: Workspace contains only Baseplate/SpawnLocation, no lab, no
+  devices, no hotbar tools. Blocks all gameplay. Invisible to static QA (valid
+  Luau; wrong Roblox API type).
+- **Fix:** `prompt.UIOffset = Vector2.new(0, 44)`.
+- **Verified:** live playtest — full lab built (Facility + ISP_Uplink, Edge
+  Router, Gigabit Switch, Bare-Metal Starter), zero MessageError in LogService.
+
+### BUG-005 — Laptop bridge self-ping rejected (P2, FIXED)
+
+- **File:** `src/ServerScriptService/Core/NetworkGraph.luau:728-730` (`CanReachIP`)
+- **Symptom:** `ping 192.168.1.254` from the laptop shell returned "Destination
+  Host Unreachable (own laptop bridge)". CONTRACT.md and the function header
+  both specify "ping to self = 0.1ms"; the device branch honored it, the laptop
+  branch contradicted it.
+- **Fix:** return `true, 0.1, ""` when targetIP == LAPTOP_BRIDGE_IP.
+- **Verified:** live playtest — 4/4 received, ~0.1 ms.
+
+### Flows exercised live (all PASS)
+
+- World build, leaderstats (Cash/Reputation), TechnicianLaptop + WireCutter hotbar.
+- CLI: help, ip a, ping, vlan list, shift, incident, exit; ssh correctly refused
+  while a DDoS incident was active on the router (flag cleared on SLA expiry).
+- Workbench: chassis→mobo→cpu→ram→nvme→psu (BUG-001 regression OK), WorkbenchRemote
+  "register", console attach via E prompt, install-os ubuntu-22.04 (async push),
+  stress-test PASS, ship → crate at Loading Dock + payout.
+- Bare-metal console: install-os debian-12, ip set 192.168.1.10/24, vm create
+  (IP 10.0.0.2), vm list, vm throttle 50%, top.
+- Drive flow: replacement_hdd purchase → spareParts.hdd +1 (no proximity needed),
+  drive status / drive replace guards correct.
+- Incident engine: CableFault + DriveFailure + DDoS spawned during peak hours;
+  failIncident → clearIncidentEffect resets node flags as designed.
+- Shift clock 30 real-seconds/game-hour (5-minute shift) is per PlotConstants —
+  incidents appearing minutes after join are BY DESIGN, not a bug.
+- "DataStore unavailable" warning in Studio is expected (no API access enabled).

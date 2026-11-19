@@ -29,6 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local NetworkTypes = require(ReplicatedStorage.Shared.NetworkTypes)
 local PlotConstants = require(ReplicatedStorage.Shared.PlotConstants)
+local NetworkGraph = require(script.Parent.Parent.Core.NetworkGraph)
 
 local ShiftAndEconomyManager = {}
 
@@ -181,6 +182,58 @@ local function applyLoadAndThermal(session: SessionLike)
 		node.loadPercent = loadPercent
 		node.temperatureC = BASE_TEMP_C + loadPercent * 0.45
 
+		-- Telemetry: fan curve, interface traffic, SMART wear, uptime, services.
+		if node.isPowered then
+			node.uptimeSec = (node.uptimeSec or 0) + constants.ECONOMY.tickSeconds
+			local targetRpm = 2800 + loadPercent * 60 + math.max(0, node.temperatureC - 55) * 80
+			local currentRpm = node.fanRpm or targetRpm
+			node.fanRpm = math.floor(currentRpm + (targetRpm - currentRpm) * 0.4)
+			local mbps = 0
+			for _, vm: VMLike in pairs(node.vms) do
+				if vm.status ~= "stopped" then
+					mbps += vm.cpu * 8 * (vm.currentLoadPercent or 50) / 100
+				end
+			end
+			if node.isUnderDDoS == true then
+				mbps += 850 + rng:NextInteger(0, 150)
+			end
+			node.trafficInMbps = math.floor(mbps * (0.85 + rng:NextNumber() * 0.3))
+			node.trafficOutMbps = math.floor(mbps * 0.6 * (0.85 + rng:NextNumber() * 0.3))
+			local activePorts = 0
+			for _, port in pairs(node.ports) do
+				if port.linkUp and port.portType ~= "Console" then
+					activePorts += 1
+				end
+			end
+			if activePorts > 0 then
+				for _, port in pairs(node.ports) do
+					if port.linkUp and port.portType ~= "Console" then
+						port.trafficLoadMbps = math.floor(node.trafficInMbps / activePorts)
+					end
+				end
+			end
+			if node.deviceType == "BareMetal" or node.deviceType == "ColocationServer" then
+				if node.hasDegradedDrive == true then
+					node.smartReallocated = (node.smartReallocated or 0) + rng:NextInteger(2, 9)
+					node.smartPending = (node.smartPending or 0) + rng:NextInteger(0, 3)
+				elseif rng:NextNumber() < 0.25 then
+					node.smartReallocated = (node.smartReallocated or 0) + 1
+				end
+				node.smartHealth = math.max(4, 100 - math.floor((node.smartReallocated or 0) / 12))
+				if node.smartHealth < 70 and node.hasDegradedDrive ~= true and node.smartWarned ~= true then
+					node.smartWarned = true
+					NetworkGraph.Journal(session, "warning", "smartd", node.name .. ": reallocated sectors rising - schedule drive replacement")
+				end
+			end
+			if node.osInstalled ~= nil and (node.services == nil or next(node.services) == nil) then
+				node.services = { sshd = "running", nginx = "running", cron = "running", node_exporter = "running" }
+			end
+		else
+			node.fanRpm = 0
+			node.trafficInMbps = 0
+			node.trafficOutMbps = 0
+		end
+
 		if model ~= nil then
 			local smoking = node.temperatureC >= SMOKE_TEMP_C
 			for _, desc in ipairs(model:GetDescendants()) do
@@ -206,7 +259,16 @@ local function payVpsIncome(session: SessionLike)
 	local economy = constants.ECONOMY
 	local income = 0
 	for _, node in pairs(session.devices) do
-		if node.isPowered and node.ip ~= nil and node.isUnderDDoS ~= true and node.hasDegradedDrive ~= true then
+		local crashed = false
+		if node.services ~= nil then
+			for _, state in pairs(node.services) do
+				if state == "crashed" then
+					crashed = true
+					break
+				end
+			end
+		end
+		if node.isPowered and node.ip ~= nil and node.isUnderDDoS ~= true and node.hasDegradedDrive ~= true and not crashed then
 			for _, vm: VMLike in pairs(node.vms) do
 				if vm.noisy ~= true and vm.status ~= "stopped" then
 					income += vm.cpu * economy.vpsCpuRatePerPayout

@@ -155,6 +155,15 @@ function NetworkGraph.DefaultNode(id: string, name: string, itemId: string): any
 		osInstalled = nil,
 		isPowered = false,
 		temperatureC = 32,
+		fanRpm = 0,
+		smartReallocated = 0,
+		smartPending = 0,
+		smartHealth = 100,
+		smartWarned = false,
+		trafficInMbps = 0,
+		trafficOutMbps = 0,
+		uptimeSec = 0,
+		services = {},
 		hasDegradedDrive = false,
 		degradedBayIndex = nil,
 		isUnderDDoS = false,
@@ -167,6 +176,29 @@ function NetworkGraph.DefaultNode(id: string, name: string, itemId: string): any
 end
 
 ---------------------------------------------------------------------
+-- System journal (syslog-style ring buffer of operational events)
+---------------------------------------------------------------------
+
+--[[ Journal(session, level, unit, msg): append a timestamped entry keyed to
+	 the in-game shift clock. Capped at 240 entries; 'journalctl' reads it. ]]
+function NetworkGraph.Journal(session: any, level: string, unit: string, msg: string)
+	if session.journal == nil then
+		session.journal = {}
+	end
+	local clock = if session.shift ~= nil then session.shift.clockMinutes else 0
+	local entry = {
+		t = string.format("%02d:%02d", math.floor(clock / 60) % 24, math.floor(clock % 60)),
+		level = level,
+		unit = unit,
+		msg = msg,
+	}
+	table.insert(session.journal, entry)
+	if #session.journal > 240 then
+		table.remove(session.journal, 1)
+	end
+end
+
+---------------------------------------------------------------------
 -- Registration & LEDs
 ---------------------------------------------------------------------
 
@@ -176,6 +208,7 @@ function NetworkGraph.RegisterDevice(session: any, node: any, model: Model?)
 	if model ~= nil then
 		session.deviceModels[node.id] = model
 	end
+	NetworkGraph.Journal(session, "info", "systemd", "Registered device " .. node.name .. " (" .. node.id .. ")")
 	NetworkGraph.UpdateDeviceLED(session, node.id)
 end
 
@@ -378,6 +411,7 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 		session.incidentFaults[NetworkGraph.LinkKey(devAId, portAId, devBId, portBId)] = nil
 	end
 
+	NetworkGraph.Journal(session, "info", "kernel", string.format("%s:%s link up (%s)", devAId, portAId, cableColor))
 	NetworkGraph.UpdateDeviceLED(session, devAId)
 	NetworkGraph.UpdateDeviceLED(session, devBId)
 	return true, ""
@@ -428,6 +462,7 @@ function NetworkGraph.DisconnectPort(session: any, deviceId: string, portId: str
 		end
 		NetworkGraph.UpdateDeviceLED(session, peerId)
 	end
+	NetworkGraph.Journal(session, "warning", "kernel", string.format("%s:%s link down", deviceId, portId))
 	NetworkGraph.UpdateDeviceLED(session, deviceId)
 	return true
 end
@@ -726,7 +761,7 @@ function NetworkGraph.CanReachIP(session: any, sourceDeviceId: string, targetIP:
 	-- Laptop management bridge (Disconnected terminal mode)
 	if sourceDeviceId == "__laptop__" then
 		if targetIP == PlotConstants.LAPTOP_BRIDGE_IP then
-			return false, 0, "Destination Host Unreachable (own laptop bridge)"
+			return true, 0.1, "" -- ping to self (contract: 0.1 ms)
 		end
 		local target = NetworkGraph.FindDeviceByIP(session, targetIP)
 		if target ~= nil then

@@ -17,18 +17,22 @@ local ModelFactory = {}
 
 local C = PlotConstants.COLORS
 
--- Shared bright industrial palette for multi-part hardware detailing
-local ALU_LIGHT = Color3.fromRGB(204, 212, 224)
-local ALU_MID = Color3.fromRGB(162, 174, 190)
-local SLATE_TRIM = Color3.fromRGB(72, 86, 106)
-local NAVY_PANEL = Color3.fromRGB(48, 64, 88)
-local FACE_LIGHT = Color3.fromRGB(230, 236, 244)
-local PORT_SOCKET = Color3.fromRGB(52, 62, 76)
+-- Shared industrial palette for multi-part hardware detailing. Real data-center
+-- hardware is dark powder-coated steel with brushed aluminum accents; bright
+-- colors are reserved for LEDs, safety markings and port coding.
+local ALU_LIGHT = Color3.fromRGB(178, 186, 198)
+local ALU_MID = Color3.fromRGB(138, 148, 162)
+local SLATE_TRIM = Color3.fromRGB(52, 60, 72)
+local NAVY_PANEL = Color3.fromRGB(38, 46, 58)
+local FACE_LIGHT = Color3.fromRGB(196, 202, 210)
+local FACE_DARK = Color3.fromRGB(52, 56, 64)
+local CHASSIS_DARK = Color3.fromRGB(28, 30, 36)
+local PORT_SOCKET = Color3.fromRGB(24, 28, 34)
 local GOLD_PIN = Color3.fromRGB(240, 196, 62)
-local SAFETY_YELLOW = Color3.fromRGB(245, 196, 48)
-local CYAN_ACCENT = Color3.fromRGB(56, 189, 248)
-local ESD_BLUE = Color3.fromRGB(64, 134, 198)
-local OAK_WOOD = Color3.fromRGB(204, 164, 118)
+local SAFETY_YELLOW = Color3.fromRGB(222, 178, 40)
+local CYAN_ACCENT = Color3.fromRGB(44, 156, 208)
+local ESD_BLUE = Color3.fromRGB(52, 108, 160)
+local OAK_WOOD = Color3.fromRGB(176, 140, 100)
 
 type PortRef = {
 	portId: string,
@@ -109,42 +113,89 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 	local model = Instance.new("Model")
 	model.Name = defv.name
 
-	-- Main powder-coated chassis
+	-- Main powder-coated steel chassis (dark gunmetal, metallic sheen)
 	local chassis = newPart({
 		name = "Chassis",
 		size = Vector3.new(width, height, depth),
 		cf = CFrame.new(0, height / 2, 0),
-		color = defv.visualColor,
-		material = Enum.Material.SmoothPlastic,
+		color = defv.visualColor:Lerp(CHASSIS_DARK, 0.6),
+		material = Enum.Material.Metal,
 	})
 	chassis.Parent = model
 
-	-- Silver top airflow panel
+	-- Silver top airflow panel with perforated vent strips
 	newPart({
 		name = "TopGrille",
 		size = Vector3.new(width - 0.5, 0.04, depth - 0.6),
 		cf = CFrame.new(0, height + 0.02, -0.08),
-		color = ALU_LIGHT,
+		color = ALU_MID,
+		material = Enum.Material.Metal,
 	}).Parent = model
+	for vi = 1, 5 do
+		newPart({
+			name = "TopVent_" .. vi,
+			size = Vector3.new(width - 1.0, 0.02, 0.1),
+			cf = CFrame.new(0, height + 0.045, -depth / 2 + 0.45 + (vi - 1) * 0.42),
+			color = PORT_SOCKET,
+			canCollide = false,
+		}).Parent = model
+	end
 
-	-- Rack-mount ears (brushed silver flanges on left & right)
+	-- Asset label sticker on the lid (real servers carry ID labels on top)
+	local label = newPart({
+		name = "AssetLabel",
+		size = Vector3.new(1.7, 0.02, 0.6),
+		cf = CFrame.new(-width / 2 + 1.15, height + 0.05, depth / 2 - 0.55),
+		color = Color3.fromRGB(235, 238, 242),
+		canCollide = false,
+	})
+	label.Parent = model
+	local labelGui = Instance.new("SurfaceGui")
+	labelGui.Name = "LabelGui"
+	labelGui.Face = Enum.NormalId.Top
+	labelGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	labelGui.PixelsPerStud = 60
+	labelGui.LightInfluence = 0.4
+	labelGui.Parent = label
+	local labelText = Instance.new("TextLabel")
+	labelText.Name = "LabelText"
+	labelText.Size = UDim2.fromScale(1, 1)
+	labelText.BackgroundTransparency = 1
+	labelText.Font = Enum.Font.Code
+	labelText.TextColor3 = Color3.fromRGB(30, 34, 40)
+	labelText.TextScaled = true
+	labelText.Text = defv.name .. "  [" .. deviceId .. "]"
+	labelText.Parent = labelGui
+
+	-- Rack-mount ears (brushed aluminum flanges on left & right)
 	for _, side in ipairs({ -1, 1 }) do
 		newPart({
 			name = "RackEar",
 			size = Vector3.new(0.22, height - 0.06, 0.12),
 			cf = CFrame.new(side * (width / 2 + 0.09), height / 2, depth / 2 - 0.05),
 			color = ALU_LIGHT,
+			material = Enum.Material.Metal,
 		}).Parent = model
 	end
 
-	-- Contrasting front faceplate bezel
-	local faceplateColor = if isServer then FACE_LIGHT else NAVY_PANEL
+	-- Dark front faceplate bezel with recessed side vent cheeks
 	newPart({
 		name = "Faceplate",
 		size = Vector3.new(width - 0.14, height - 0.08, 0.06),
 		cf = CFrame.new(0, height / 2, depth / 2 + 0.02),
-		color = faceplateColor,
+		color = FACE_DARK,
 	}).Parent = model
+	for _, side in ipairs({ -1, 1 }) do
+		for vi = 1, 3 do
+			newPart({
+				name = "FaceVent",
+				size = Vector3.new(0.05, height * 0.55, 0.02),
+				cf = CFrame.new(side * (width / 2 - 0.24 - (vi - 1) * 0.09), height / 2, depth / 2 + 0.055),
+				color = PORT_SOCKET,
+				canCollide = false,
+			}).Parent = model
+		end
+	end
 
 	-- Category-specific front detailing
 	if isServer then
@@ -164,7 +215,14 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 				name = "DriveLatch_" .. i,
 				size = Vector3.new(0.11, bayH - 0.08, 0.1),
 				cf = CFrame.new(bx + bayW / 2 - 0.09, bayH / 2 + 0.14, depth / 2 + 0.07),
-				color = CYAN_ACCENT,
+				color = SLATE_TRIM,
+			}).Parent = model
+			-- Per-bay activity LED (blinks with disk traffic via UpdateDeviceLED)
+			neon({
+				name = "BayLED_" .. i,
+				size = Vector3.new(0.05, 0.05, 0.03),
+				cf = CFrame.new(bx - bayW / 2 + 0.07, bayH / 2 + 0.14 + bayH * 0.28, depth / 2 + 0.105),
+				color = C.ledGreen,
 			}).Parent = model
 		end
 		newPart({
@@ -172,6 +230,21 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 			size = Vector3.new(width - 0.35, 0.07, 0.08),
 			cf = CFrame.new(0, height - 0.1, depth / 2 + 0.06),
 			color = if itemId == "bm_enterprise" then GOLD_PIN else CYAN_ACCENT,
+		}).Parent = model
+		-- Power button with illuminated ring (front-left, clear of bays/ports)
+		newPart({
+			name = "PowerButton",
+			size = Vector3.new(0.05, 0.16, 0.16),
+			cf = CFrame.new(-width / 2 + 0.35, height * 0.3, depth / 2 + 0.06) * CFrame.Angles(0, math.rad(90), 0),
+			color = PORT_SOCKET,
+			shape = "Cylinder",
+		}).Parent = model
+		neon({
+			name = "PowerRing",
+			size = Vector3.new(0.03, 0.07, 0.07),
+			cf = CFrame.new(-width / 2 + 0.35, height * 0.3, depth / 2 + 0.09) * CFrame.Angles(0, math.rad(90), 0),
+			color = C.ledGreen,
+			shape = "Cylinder",
 		}).Parent = model
 	else
 		local stripeColor = if itemId == "router_edge" then SAFETY_YELLOW else CYAN_ACCENT
@@ -373,9 +446,35 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 	prompt.HoldDuration = 0
 	-- Small close-range card, lifted so it does not cover RJ45 clicks.
 	prompt.MaxActivationDistance = 7
-	prompt.UIOffset = Vector3.new(0, 44, 0)
+	prompt.UIOffset = Vector2.new(0, 44)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = consolePart
+
+	-- Rear detail: PSU block with status LED + twin exhaust fans (servers only)
+	if isServer then
+		newPart({
+			name = "PSU_Block",
+			size = Vector3.new(1.1, height * 0.62, 0.12),
+			cf = CFrame.new(-width / 2 + 0.75, height * 0.45, -depth / 2 - 0.02),
+			color = SLATE_TRIM,
+			material = Enum.Material.Metal,
+		}).Parent = model
+		neon({
+			name = "PSULed",
+			size = Vector3.new(0.08, 0.08, 0.03),
+			cf = CFrame.new(-width / 2 + 1.2, height * 0.62, -depth / 2 - 0.09),
+			color = C.ledGreen,
+		}).Parent = model
+		for fi = 1, 2 do
+			newPart({
+				name = "ExhaustFan_" .. fi,
+				size = Vector3.new(0.1, height * 0.7, height * 0.7),
+				cf = CFrame.new(width / 2 - 0.5 - (fi - 1) * (height * 0.8), height / 2, -depth / 2 - 0.02) * CFrame.Angles(0, math.rad(90), 0),
+				color = PORT_SOCKET,
+				shape = "Cylinder",
+			}).Parent = model
+		end
+	end
 
 	model:SetAttribute("DeviceId", deviceId)
 	model:SetAttribute("ItemId", itemId)
@@ -414,16 +513,26 @@ function ModelFactory.BuildRack(itemId: string, rackId: string): (Model, { [numb
 		canCollide = true,
 	}).Parent = model
 
-	-- Back panel (clean slate blue-grey)
+	-- Back panel (dark sheet steel) with rear exhaust vent slots
 	newPart({
 		name = "BackPanel",
 		size = Vector3.new(w - 0.35, bodyH - baseH * 0.5, 0.16),
 		cf = CFrame.new(0, bodyH / 2 + 0.15, -d / 2 + 0.08),
-		color = defv.visualColor,
+		color = defv.visualColor:Lerp(CHASSIS_DARK, 0.55),
+		material = Enum.Material.Metal,
 		canCollide = true,
 	}).Parent = model
+	for vi = 1, 6 do
+		newPart({
+			name = "RearVent",
+			size = Vector3.new(0.5, bodyH - baseH - 0.8, 0.04),
+			cf = CFrame.new(-w / 2 + 0.7 + (vi - 1) * 0.85, bodyH / 2 + 0.15, -d / 2 - 0.01),
+			color = PORT_SOCKET,
+			canCollide = false,
+		}).Parent = model
+	end
 
-	-- 4 vertical corner posts + brushed silver front U-rails + side braces
+	-- 4 vertical corner posts + brushed aluminum front U-rails + side panels
 	for sx = -1, 1, 2 do
 		for sz = -1, 1, 2 do
 			newPart({
@@ -431,15 +540,35 @@ function ModelFactory.BuildRack(itemId: string, rackId: string): (Model, { [numb
 				size = Vector3.new(0.32, bodyH, 0.32),
 				cf = CFrame.new(sx * (w / 2 - 0.18), bodyH / 2, sz * (d / 2 - 0.18)),
 				color = SLATE_TRIM,
+				material = Enum.Material.Metal,
 				canCollide = true,
 			}).Parent = model
 		end
-		-- Brushed aluminum front U-mounting rail
+		-- Brushed aluminum front U-mounting rail with per-U mounting ticks
 		newPart({
 			name = "FrontRail",
 			size = Vector3.new(0.16, bodyH - baseH, 0.14),
 			cf = CFrame.new(sx * (w / 2 - 0.44), baseH + (bodyH - baseH) / 2, d / 2 - 0.22),
 			color = ALU_LIGHT,
+			material = Enum.Material.Metal,
+		}).Parent = model
+		for u = 1, maxU do
+			newPart({
+				name = "UTick",
+				size = Vector3.new(0.18, 0.03, 0.02),
+				cf = CFrame.new(sx * (w / 2 - 0.44), baseH + (u - 0.5) * slotH, d / 2 - 0.14),
+				color = Color3.fromRGB(228, 232, 238),
+				canCollide = false,
+			}).Parent = model
+		end
+		-- Solid sheet-steel side panel: reads as a cabinet, not an open frame
+		newPart({
+			name = "SidePanel",
+			size = Vector3.new(0.08, bodyH - baseH * 0.6, d - 0.3),
+			cf = CFrame.new(sx * (w / 2 - 0.06), baseH * 0.5 + (bodyH - baseH * 0.6) / 2, 0),
+			color = defv.visualColor:Lerp(CHASSIS_DARK, 0.55),
+			material = Enum.Material.Metal,
+			canCollide = true,
 		}).Parent = model
 		-- Side horizontal cross-braces
 		for _, frac in ipairs({ 0.36, 0.72 }) do
@@ -458,6 +587,7 @@ function ModelFactory.BuildRack(itemId: string, rackId: string): (Model, { [numb
 		size = Vector3.new(w + 0.16, 0.36, d + 0.16),
 		cf = CFrame.new(0, bodyH + 0.18, 0),
 		color = SLATE_TRIM,
+		material = Enum.Material.Metal,
 		canCollide = true,
 	}).Parent = model
 	neon({

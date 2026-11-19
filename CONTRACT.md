@@ -283,3 +283,71 @@ VLAN commands (`switch port ... vlan ...`), manual color-coded cable spools purc
 carry/rack-mount from dock, hot-swap HDD, incidents (Cable Fault/DDoS/Noisy Neighbor/
 Drive Failure), shift clock day settlement, SLA timers, broadcast storm LED flashing
 (flag+message only). Structure may reference them in comments only.
+
+## 10. Fase 4 — Realism & sysadmin depth (additive, 2026-11-19)
+
+Visual/audio overhaul + a real-ops telemetry layer. All additions are additive:
+Fase 1-3 contracts above remain in force (catalog ids/prices/specs, 10 remotes,
+20 facility ref keys, session fields, CLI dispatch all unchanged).
+
+### 10.1 Telemetry (NetworkGraph.DefaultNode + Economy tick)
+
+New dynamic node fields: `fanRpm`, `smartReallocated`, `smartPending`,
+`smartHealth`, `smartWarned`, `trafficInMbps`, `trafficOutMbps`, `uptimeSec`,
+`services: {[string]: string}` (sshd/nginx/cron/node_exporter, seeded on first
+tick after OS install; states "running" | "crashed").
+- Fan curve: 2800 + load%*60 + max(0, temp-55)*80 RPM, smoothed 0.4/tick.
+- Traffic: sum(vm.cpu * 8 Mbps * load%) + 850-1000 Mbps while DDoSed; split
+  evenly across linkUp non-Console ports (port.trafficLoadMbps).
+- SMART: degraded drives gain 2-9 reallocated + 0-3 pending sectors/tick;
+  healthy servers gain 1 sector at 25%/tick (wear). health = 100 - floor(realloc/12),
+  floor 4. smartd journal warning once when health < 70 (predictive maintenance).
+- DriveFailure spawn seeds reallocated 48-96 / pending 4-16; 'drive replace'
+  resets all SMART counters and journals the replacement.
+- Session field `journal: {any}` (ring buffer, cap 240). NetworkGraph.Journal(
+  session, level, unit, msg) timestamps entries with the shift clock. Emitters:
+  RegisterDevice (systemd), ConnectPorts/DisconnectPort (kernel link up/down),
+  install-os (installer), drive replace (smartd), incident spawn/resolve/fail
+  (incidentd), systemctl restart (systemctl), smartd wear warning.
+
+### 10.2 New CLI commands (CommandExecutor, device context unless noted)
+
+`sensors` (temp/fan RPM/thermal status), `smartctl` (per-bay SMART + overall
+HEALTHY/WEAR/FAILING/DEGRADED), `journalctl [-n N]` (session-wide, works from
+laptop too; default 15, max 60), `iftop` (rx/tx totals + per-port bars + DDoS
+warning), `uptime`, `df`, `free`, `uname` (kernel string per OS), `systemctl
+[status <svc>] | restart <svc>` (restart heals crashed units; a crashed service
+pauses host VPS income until restarted). All listed in `help` under
+"Observability & Ops".
+
+### 10.3 ServiceCrash incident (5th type)
+
+PlotConstants.INCIDENTS.types += "ServiceCrash" (reward 170, same SLA/cooldown).
+Target: powered OS-installed host with a running non-sshd service and no crash.
+Effect: services[svc] = "crashed" (income paused). Resolution: 'systemctl
+restart <svc>'. On SLA failure the service STAYS crashed (manual restart still
+required; reputation penalty applies). clearIncidentEffect is a documented no-op
+for this type.
+
+### 10.4 Audio (AudioAndEffectsClient + server klaxon)
+
+Creator Store assets (free, verified loadable): SFX plug 9119730203, key
+4724430129, error 16903690359, cash 1319346243, drive 122348903689986, klaxon
+4530741431. Spatial client-only loops: room 9112825488 (RoomFloor, rolloff
+10-60), AC 329997777 (ACFan, 4-30), rack fan whir 140319299279554 (per Server
+Rack model, 3-20). Per-keystroke mechanical typing on InputBox text change
+(throttle 45ms, random pitch/volume). SoundService.AmbientReverb = Room.
+Server AlarmKlaxon uses 4530741431 at speed 1.0 / volume 0.5. PlaySFXRemote
+protocol and names unchanged.
+
+### 10.5 Visuals
+
+Industrial palette (PlotConstants.COLORS + ModelFactory constants): dark
+gunmetal chassis/faceplates (Metal material), brushed-aluminum rails/ears,
+dark ceiling deck, epoxy floor Reflectance 0.12, safety-yellow zone tape
+(paint, not neon). Device detail: top vent strips, asset-label SurfaceGui on
+the lid, face vent cheeks, per-bay activity LEDs, power button + ring, rear
+PSU block + exhaust fans. Rack: solid side panels, per-U rail ticks, rear
+exhaust vents. Room: skylight roof deck (no direct sun), loaded cable bundles
+in overhead trays, tuned Future lighting (Brightness 1.25, Ambient 72/80/96,
+diffuse 0.4, specular 0.8, fixture SurfaceLights cast shadows).

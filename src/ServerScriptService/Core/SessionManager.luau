@@ -129,6 +129,7 @@ function SessionManager.CreateSession(player: Player, plotIndex: number): any
 		incidentCooldownSec = 0,
 		incidentRotationIndex = 0,
 		spareParts = { hdd = 0 },
+		journal = {},
 		stormLit = false,
 	}
 	Sessions[player] = session

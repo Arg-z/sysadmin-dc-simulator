@@ -66,6 +66,15 @@ export type DeviceNode = {
 	isPowered: boolean,
 	temperatureC: number,
 	loadPercent: number,
+	fanRpm: number,
+	smartReallocated: number,
+	smartPending: number,
+	smartHealth: number,
+	smartWarned: boolean,
+	trafficInMbps: number,
+	trafficOutMbps: number,
+	uptimeSec: number,
+	services: { [string]: string },
 	hasDegradedDrive: boolean,
 	degradedBayIndex: number?,
 	isUnderDDoS: boolean,
@@ -234,6 +243,7 @@ export type Session = {
 	incidentCooldownSec: number,
 	incidentRotationIndex: number,
 	spareParts: { [string]: number },
+	journal: { any },
 	stormLit: boolean,
 }
 
