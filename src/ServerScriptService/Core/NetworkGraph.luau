@@ -343,17 +343,40 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 	pb.cableColor = cableColor
 	pb.linkUp = true
 
-	-- Beam visual with realistic droop
+	-- Beam visual with realistic patch-cord slack: the run leaves each port,
+	-- dips to a slack point in front of the devices and rises back. The dip
+	-- stands off along the ports' outward direction so cables arch in front of
+	-- shelves and rack frames instead of clipping straight through them.
 	local partA = findPortPart(session, devAId, portAId)
 	local partB = findPortPart(session, devBId, portBId)
 	local attachA = if partA ~= nil then partA:FindFirstChild("PortAttach") else nil
 	local attachB = if partB ~= nil then partB:FindFirstChild("PortAttach") else nil
 	local beam: Beam? = nil
 	local sheath: Beam? = nil
+	local beam2: Beam? = nil
+	local sheath2: Beam? = nil
+	local anchor: BasePart? = nil
 	if attachA ~= nil and attachB ~= nil and attachA:IsA("Attachment") and attachB:IsA("Attachment") then
-		-- Sag scales with run length so long runs droop naturally.
-		local dist = (attachA.WorldPosition - attachB.WorldPosition).Magnitude
-		local droop = -math.clamp(dist * 0.06, 0.4, 1.4)
+		local posA = attachA.WorldPosition
+		local posB = attachB.WorldPosition
+		local dist = (posA - posB).Magnitude
+		-- Slack scales with run length; longer runs dip deeper.
+		local sag = math.clamp(1.0 + dist * 0.10, 1.0, 2.4)
+		local forward = partA.CFrame.LookVector + partB.CFrame.LookVector
+		if forward.Magnitude < 0.1 then
+			forward = Vector3.new(0, 0, 1)
+		else
+			forward = forward.Unit
+		end
+		local slackPos = (posA + posB) / 2 - Vector3.new(0, sag, 0)
+			+ forward * math.clamp(0.5 + dist * 0.06, 0.5, 1.4)
+		-- Cross-depth runs (e.g. rack front port to a wall demark box) swing
+		-- wide of the device bodies: shift the slack point toward the far end.
+		local runXZ = Vector3.new(posB.X - posA.X, 0, posB.Z - posA.Z)
+		if runXZ.Magnitude > 5 then
+			slackPos += runXZ.Unit * math.min(runXZ.Magnitude * 0.25, 2.2)
+		end
+		slackPos = Vector3.new(slackPos.X, math.max(slackPos.Y, 1.2), slackPos.Z)
 		local facility = session.facility
 		local cablesFolder = if facility ~= nil then facility.cables else nil
 		local cableParent = cablesFolder
@@ -363,35 +386,71 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 			cableParent = session.deviceModels[devAId]
 		end
 		if cableParent ~= nil then
-			-- Outer braided jacket (wider, darker, more transparent)
-			sheath = Instance.new("Beam")
-			sheath.Name = "CableSheath_" .. cableId
-			sheath.Attachment0 = attachA
-			sheath.Attachment1 = attachB
-			sheath.Color = ColorSequence.new(BEAM_SHEATH_COLORS[cableColor])
-			sheath.Transparency = NumberSequence.new(0.3)
-			sheath.Width0 = 0.26
-			sheath.Width1 = 0.26
-			sheath.CurveSize0 = droop
-			sheath.CurveSize1 = droop
-			sheath.Segments = 16
-			sheath.FaceCamera = true
-			sheath.Parent = cableParent
+			-- Invisible anchored part holding the shared slack attachment.
+			anchor = Instance.new("Part")
+			anchor.Name = "CableAnchor_" .. cableId
+			anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+			anchor.CFrame = CFrame.new(slackPos)
+			anchor.Anchored = true
+			anchor.CanCollide = false
+			anchor.CanQuery = false
+			anchor.CanTouch = false
+			anchor.CastShadow = false
+			anchor.Transparency = 1
+			local mid = Instance.new("Attachment")
+			mid.Name = "Mid"
+			mid.Parent = anchor
+			anchor.Parent = cableParent
 
-			-- Inner coloured core on top
-			beam = Instance.new("Beam")
-			beam.Name = "Cable_" .. cableId
-			beam.Attachment0 = attachA
-			beam.Attachment1 = attachB
-			beam.Color = BEAM_COLORS[cableColor] :: ColorSequence
-			beam.Transparency = NumberSequence.new(0.05)
-			beam.Width0 = 0.14
-			beam.Width1 = 0.14
-			beam.CurveSize0 = droop
-			beam.CurveSize1 = droop
-			beam.Segments = 16
-			beam.FaceCamera = true
-			beam.Parent = cableParent
+			-- CurveSize offsets only along an attachment's local Y; convert the
+			-- world-down drop into local units and skip the arc when the port's
+			-- Y axis is too horizontal to express it.
+			local function dropCurve(attach: Attachment, drop: number): number
+				local yAxisY = attach.CFrame.YVector.Y
+				if math.abs(yAxisY) < 0.35 then
+					return 0
+				end
+				return -drop / yAxisY
+			end
+			local dropA = math.max(0.1, posA.Y - slackPos.Y)
+			local dropB = math.max(0.1, posB.Y - slackPos.Y)
+			local curveMid = -sag * 0.15
+
+			-- Segment helper: dark braided jacket under the coloured core so the
+			-- lead reads as a round two-tone cable, not a flat ribbon.
+			local function cableSegment(a0: Attachment, a1: Attachment, c0: number, c1: number, name: string)
+				local segSheath = Instance.new("Beam")
+				segSheath.Name = "CableSheath_" .. name
+				segSheath.Attachment0 = a0
+				segSheath.Attachment1 = a1
+				segSheath.Color = ColorSequence.new(BEAM_SHEATH_COLORS[cableColor])
+				segSheath.Transparency = NumberSequence.new(0.25)
+				segSheath.Width0 = 0.30
+				segSheath.Width1 = 0.30
+				segSheath.CurveSize0 = c0
+				segSheath.CurveSize1 = c1
+				segSheath.Segments = 16
+				segSheath.FaceCamera = true
+				segSheath.Parent = cableParent
+
+				local segCore = Instance.new("Beam")
+				segCore.Name = "Cable_" .. name
+				segCore.Attachment0 = a0
+				segCore.Attachment1 = a1
+				segCore.Color = BEAM_COLORS[cableColor] :: ColorSequence
+				segCore.Transparency = NumberSequence.new(0.02)
+				segCore.Width0 = 0.15
+				segCore.Width1 = 0.15
+				segCore.CurveSize0 = c0
+				segCore.CurveSize1 = c1
+				segCore.Segments = 16
+				segCore.FaceCamera = true
+				segCore.Parent = cableParent
+				return segSheath, segCore
+			end
+
+			sheath, beam = cableSegment(attachA, mid, dropCurve(attachA, dropA), curveMid, cableId .. "_a")
+			sheath2, beam2 = cableSegment(mid, attachB, curveMid, dropCurve(attachB, dropB), cableId .. "_b")
 		end
 	end
 
@@ -404,6 +463,9 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 		color = cableColor,
 		beam = beam,
 		sheath = sheath,
+		beam2 = beam2,
+		sheath2 = sheath2,
+		anchor = anchor,
 	}
 
 	-- A fresh cable on this exact pair repairs an active Cable Fault incident.
@@ -436,11 +498,10 @@ function NetworkGraph.DisconnectPort(session: any, deviceId: string, portId: str
 		local match = (cable.aDeviceId == deviceId and cable.aPortId == portId)
 			or (cable.bDeviceId == deviceId and cable.bPortId == portId)
 		if match then
-			if cable.beam ~= nil then
-				cable.beam:Destroy()
-			end
-			if cable.sheath ~= nil then
-				cable.sheath:Destroy()
+			for _, visual in ipairs({ cable.beam, cable.sheath, cable.beam2, cable.sheath2, cable.anchor }) do
+				if visual ~= nil then
+					visual:Destroy()
+				end
 			end
 			session.cables[cableId] = nil
 			break
