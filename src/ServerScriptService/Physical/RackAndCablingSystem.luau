@@ -151,10 +151,10 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 		if port.connectedToDeviceId ~= nil then
 			Graph.DisconnectPort(session, deviceId, portId)
 			playSFX(player, "plug")
-			hint(player, "Kabel dipotong dengan WireCutter.")
+			hint(player, "Cable cut with WireCutter.")
 		else
 			playSFX(player, "error")
-			hint(player, "WireCutter: klik port yang tersambung untuk memotong kabel.")
+			hint(player, "WireCutter: click a connected port to cut its cable.")
 		end
 		return
 	end
@@ -171,7 +171,7 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 		local color = cableColorFor(session, port)
 		if spoolCount(session, color) <= 0 then
 			playSFX(player, "error")
-			hint(player, "Spool " .. color .. " habis. Beli di Store > Cable (1 spool = 5 kabel).")
+			hint(player, "Out of " .. color .. " cable spool. Buy more in Store > Cable (1 spool = 5 cables).")
 			return
 		end
 		session.pendingCableDeviceId = deviceId
@@ -216,7 +216,7 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 	clearPendingCable(session)
 	if spoolCount(session, color) <= 0 then
 		playSFX(player, "error")
-		hint(player, "Spool " .. color .. " habis. Beli di Store > Cable.")
+		hint(player, "Out of " .. color .. " cable spool. Buy more in Store > Cable.")
 		return
 	end
 	local ok, err = Graph.ConnectPorts(session, fromDev, fromPort, deviceId, portId, color)
@@ -260,7 +260,7 @@ function RackAndCablingSystem.AttachConsole(player: Player, session: any, device
 	local laptop = if char ~= nil then char:FindFirstChild("TechnicianLaptop") else nil
 	if laptop == nil then
 		playSFX(player, "error")
-		openTerminal(player, { action = "hint", message = "Equip TechnicianLaptop dulu (slot 1) untuk menyambung kabel console." })
+		openTerminal(player, { action = "hint", message = "Equip TechnicianLaptop first (hotbar slot 1) to attach a console cable." })
 		return
 	end
 

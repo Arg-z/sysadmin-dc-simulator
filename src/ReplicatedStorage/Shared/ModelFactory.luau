@@ -256,23 +256,81 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 			elseif spec.portType == "SFP" then
 				collarColor = CYAN_ACCENT
 			end
-			newPart({
-				name = "PortFrame_" .. spec.id,
-				size = Vector3.new(portW + 0.07, portH + 0.07, 0.12),
-				cf = CFrame.new(px, py, depth / 2 + 0.06),
-				color = collarColor,
-			}).Parent = model
+			local isCopper = spec.portType == "RJ45" or spec.portType == "WAN"
 
-			local portPart = newPart({
+			-- Every visible port sub-part carries the port attributes and a
+			-- ClickDetector so the whole socket (not just the jack) is a
+			-- valid click target. RackAndCablingSystem.HookDevice binds any
+			-- ClickDetector named "Click" whose parent has PortId/DeviceId.
+			local function tagPort(part: BasePart): BasePart
+				part:SetAttribute("PortId", spec.id)
+				part:SetAttribute("PortType", spec.portType)
+				part:SetAttribute("DeviceId", deviceId)
+				local cd = Instance.new("ClickDetector")
+				cd.Name = "Click"
+				cd.MaxActivationDistance = 45
+				cd.Parent = part
+				return part
+			end
+
+			-- Socket jack: dark recess created first so PortId lookups and the
+			-- pending-cable SelectionBox resolve to the socket itself. It also
+			-- carries the PortAttach used as the cable beam anchor.
+			local portPart = tagPort(newPart({
 				name = "Port_" .. spec.id,
-				size = Vector3.new(portW, portH, 0.18),
-				cf = CFrame.new(px, py, depth / 2 + 0.1),
+				size = Vector3.new(portW, portH, 0.16),
+				cf = CFrame.new(px, py, depth / 2 + 0.09),
 				color = PORT_SOCKET,
-			})
-			portPart:SetAttribute("PortId", spec.id)
-			portPart:SetAttribute("PortType", spec.portType)
-			portPart:SetAttribute("DeviceId", deviceId)
+			}))
 			portPart.Parent = model
+
+			local attach = Instance.new("Attachment")
+			attach.Name = "PortAttach"
+			attach.CFrame = CFrame.new(0, 0, 0.11)
+			attach.Parent = portPart
+
+			-- Collar bezel behind the jack (clickable -> same port)
+			local framePart = tagPort(newPart({
+				name = "PortFrame_" .. spec.id,
+				size = Vector3.new(portW + 0.08, portH + 0.08, 0.08),
+				cf = CFrame.new(px, py, depth / 2 + 0.04),
+				color = collarColor,
+			}))
+			framePart.Parent = model
+
+			-- Connector mouth detail: RJ45/WAN get a recessed tongue with gold
+			-- pins; SFP gets a smaller cage with a cyan latch slot.
+			if isCopper then
+				local mouth = tagPort(newPart({
+					name = "PortMouth_" .. spec.id,
+					size = Vector3.new(portW * 0.78, portH * 0.52, 0.05),
+					cf = CFrame.new(px, py, depth / 2 + 0.145),
+					color = Color3.fromRGB(34, 42, 54),
+				}))
+				mouth.Parent = model
+				local pins = tagPort(newPart({
+					name = "PortPins_" .. spec.id,
+					size = Vector3.new(portW * 0.72, 0.03, 0.02),
+					cf = CFrame.new(px, py - portH * 0.24, depth / 2 + 0.172),
+					color = GOLD_PIN,
+				}))
+				pins.Parent = model
+			else
+				local cage = tagPort(newPart({
+					name = "PortCage_" .. spec.id,
+					size = Vector3.new(portW * 0.72, portH * 0.72, 0.06),
+					cf = CFrame.new(px, py, depth / 2 + 0.14),
+					color = Color3.fromRGB(30, 36, 48),
+				}))
+				cage.Parent = model
+				local slot = tagPort(newPart({
+					name = "PortSlot_" .. spec.id,
+					size = Vector3.new(portW * 0.5, 0.02, 0.02),
+					cf = CFrame.new(px, py, depth / 2 + 0.172),
+					color = CYAN_ACCENT,
+				}))
+				slot.Parent = model
+			end
 
 			local portLed = neon({
 				name = "PortLED_" .. spec.id,
@@ -283,16 +341,6 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 			portLed:SetAttribute("PortId", spec.id)
 			portLed:SetAttribute("DeviceId", deviceId)
 			portLed.Parent = model
-
-			local attach = Instance.new("Attachment")
-			attach.Name = "PortAttach"
-			attach.CFrame = CFrame.new(0, 0, 0.11)
-			attach.Parent = portPart
-
-			local click = Instance.new("ClickDetector")
-			click.Name = "Click"
-			click.MaxActivationDistance = 45
-			click.Parent = portPart
 
 			ports[spec.id] = { portId = spec.id, portType = spec.portType, part = portPart, attachment = attach, led = portLed }
 		end
@@ -757,8 +805,8 @@ function ModelFactory.BuildNOCDesk(): (Model, { [string]: Part })
 		color = Color3.fromRGB(56, 178, 172),
 	}).Parent = model
 
-	-- Ergonomic swivel office chair tucked slightly aside (non-colliding so walking is smooth)
-	local chairCF = CFrame.new(-2.8, 0, 3.1) * CFrame.Angles(0, math.rad(20), 0)
+	-- Ergonomic swivel office chair centered in front of the 3 monitors
+	local chairCF = CFrame.new(0, 0, 2.75)
 	newPart({
 		name = "ChairBase",
 		shape = "Cylinder",
@@ -785,6 +833,17 @@ function ModelFactory.BuildNOCDesk(): (Model, { [string]: Part })
 		cf = chairCF * CFrame.new(0, 2.6, 0.82) * CFrame.Angles(math.rad(-8), 0, 0),
 		color = Color3.fromRGB(56, 98, 168),
 	}).Parent = model
+
+	-- [E] ProximityPrompt to focus camera directly in front of the 3 NOC monitors
+	local stationPrompt = Instance.new("ProximityPrompt")
+	stationPrompt.Name = "NOCStationPrompt"
+	stationPrompt.ActionText = "Access NOC Workstation"
+	stationPrompt.ObjectText = "NOC Command Center (3 Monitors)"
+	stationPrompt.KeyboardKeyCode = Enum.KeyCode.E
+	stationPrompt.HoldDuration = 0
+	stationPrompt.MaxActivationDistance = 12
+	stationPrompt.RequiresLineOfSight = false
+	stationPrompt.Parent = top
 
 	model.WorldPivot = CFrame.new(0, 0, 0)
 	return model, monitors
@@ -928,10 +987,33 @@ function ModelFactory.BuildISPUplink(deviceId: string): (Model, Attachment, Part
 	attach.CFrame = CFrame.new(0, 0, 0.12)
 	attach.Parent = wanPart
 
-	local click = Instance.new("ClickDetector")
-	click.Name = "Click"
-	click.MaxActivationDistance = 45
-	click.Parent = wanPart
+	local function tagUplink(part: BasePart): BasePart
+		part:SetAttribute("PortId", "wan1")
+		part:SetAttribute("PortType", "WAN")
+		part:SetAttribute("DeviceId", deviceId)
+		local cd = Instance.new("ClickDetector")
+		cd.Name = "Click"
+		cd.MaxActivationDistance = 45
+		cd.Parent = part
+		return part
+	end
+	tagUplink(wanPart)
+
+	-- Connector mouth + gold pins, matching the device port styling
+	local uplinkMouth = tagUplink(newPart({
+		name = "PortMouth_wan1",
+		size = Vector3.new(0.36, 0.2, 0.05),
+		cf = CFrame.new(0, 3.55, 0.85),
+		color = Color3.fromRGB(34, 42, 54),
+	}))
+	uplinkMouth.Parent = model
+	local uplinkPins = tagUplink(newPart({
+		name = "PortPins_wan1",
+		size = Vector3.new(0.3, 0.03, 0.02),
+		cf = CFrame.new(0, 3.44, 0.878),
+		color = GOLD_PIN,
+	}))
+	uplinkPins.Parent = model
 
 	model:SetAttribute("DeviceId", deviceId)
 	model.WorldPivot = CFrame.new(0, 0, 0)
@@ -1070,7 +1152,7 @@ end
 function ModelFactory.BuildLaptop(): Tool
 	local tool = Instance.new("Tool")
 	tool.Name = "TechnicianLaptop"
-	tool.ToolTip = "Klik = Terminal SSH | Dekati device = console"
+	tool.ToolTip = "Click = SSH Terminal | Approach device + [E] = Console"
 	tool.CanBeDropped = false
 
 	local handle = newPart({
@@ -1135,7 +1217,7 @@ function ModelFactory.BuildLaptop(): Tool
 	label.Font = Enum.Font.RobotoMono
 	label.TextScaled = true
 	label.TextColor3 = Color3.fromRGB(0, 255, 128)
-	label.Text = "[TECHNICIAN LAPTOP]\nKlik = Terminal\nDekati device = Console"
+	label.Text = "[TECHNICIAN LAPTOP]\nClick = Terminal\nApproach + [E] = Console"
 	label.Parent = root
 
 	local serialAttach = Instance.new("Attachment")
@@ -1167,7 +1249,7 @@ end
 function ModelFactory.BuildWireCutter(): Tool
 	local tool = Instance.new("Tool")
 	tool.Name = "WireCutter"
-	tool.ToolTip = "Klik port tersambung untuk memotong kabel"
+	tool.ToolTip = "Click a connected port to cut the cable"
 	tool.CanBeDropped = false
 
 	local handle = newPart({
@@ -1388,6 +1470,483 @@ function ModelFactory.BuildBenchComponentVisual(componentId: string): Model
 		})
 	end
 	main.Parent = model
+	model.WorldPivot = CFrame.new(0, 0, 0)
+	return model
+end
+
+---------------------------------------------------------------------
+-- Decorative 3D Data-Center Interior Props
+---------------------------------------------------------------------
+
+--[[
+	BuildUPSBank: industrial Uninterruptible Power Supply battery bank +
+	power distribution cabinet with glowing green battery level bars,
+	high-voltage warning badge, and orange power conduits.
+]]
+function ModelFactory.BuildUPSBank(): Model
+	local model = Instance.new("Model")
+	model.Name = "UPS_BatteryBank"
+
+	-- Twin cabinet bays
+	for i = 0, 1 do
+		local cx = -2.1 + i * 4.2
+		newPart({
+			name = "UPSBase_" .. i,
+			size = Vector3.new(3.9, 0.35, 2.4),
+			cf = CFrame.new(cx, 0.175, 0),
+			color = SLATE_TRIM,
+			canCollide = true,
+		}).Parent = model
+		newPart({
+			name = "UPSCabinet_" .. i,
+			size = Vector3.new(3.8, 6.4, 2.2),
+			cf = CFrame.new(cx, 3.55, 0),
+			color = NAVY_PANEL,
+			canCollide = true,
+		}).Parent = model
+		newPart({
+			name = "UPSDoor_" .. i,
+			size = Vector3.new(3.4, 5.8, 0.12),
+			cf = CFrame.new(cx, 3.55, 1.12),
+			color = Color3.fromRGB(64, 82, 108),
+		}).Parent = model
+		-- 4 glowing green battery charge bars per cabinet
+		for b = 1, 4 do
+			neon({
+				name = "BatteryBar_" .. i .. "_" .. b,
+				size = Vector3.new(1.1, 0.16, 0.08),
+				cf = CFrame.new(cx - 0.8, 2.2 + b * 0.48, 1.2),
+				color = C.ledGreen,
+			}).Parent = model
+		end
+		-- High-voltage yellow warning badge
+		newPart({
+			name = "VoltageBadge_" .. i,
+			size = Vector3.new(0.65, 0.65, 0.08),
+			cf = CFrame.new(cx + 0.85, 5.2, 1.2),
+			color = SAFETY_YELLOW,
+		}).Parent = model
+		-- Orange power conduit rising to overhead cable tray
+		newPart({
+			name = "PowerConduit_" .. i,
+			shape = "Cylinder",
+			size = Vector3.new(8.5, 0.36, 0.36),
+			cf = CFrame.new(cx, 11.0, -0.5) * CFrame.Angles(0, 0, math.rad(90)),
+			color = Color3.fromRGB(238, 118, 48),
+		}).Parent = model
+	end
+
+	-- Digital telemetry readout on left bay
+	local disp = newPart({
+		name = "UPSDisplay",
+		size = Vector3.new(1.4, 0.85, 0.1),
+		cf = CFrame.new(-1.15, 5.2, 1.2),
+		color = Color3.fromRGB(14, 20, 28),
+	})
+	disp.Parent = model
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Back
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+	gui.CanvasSize = Vector2.new(200, 120)
+	gui.Parent = disp
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -12, 1, -12)
+	lbl.Position = UDim2.new(0, 6, 0, 6)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.RobotoMono
+	lbl.TextScaled = true
+	lbl.TextColor3 = Color3.fromRGB(60, 245, 115)
+	lbl.Text = "UPS BANK A+B\n480V ONLINE\nCHRG: 100%"
+	lbl.Parent = gui
+
+	model.WorldPivot = CFrame.new(0, 0, 0)
+	return model
+end
+
+--[[
+	BuildFireSuppression: FM-200 clean-agent fire suppression twin cylinders
+	with brass valves, manifold piping, alarm release box, and wall extinguisher.
+]]
+function ModelFactory.BuildFireSuppression(): Model
+	local model = Instance.new("Model")
+	model.Name = "FM200_FireSuppression"
+
+	-- Wall mounting backplate
+	newPart({
+		name = "Backplate",
+		size = Vector3.new(5.4, 5.8, 0.18),
+		cf = CFrame.new(0, 3.2, -0.55),
+		color = ALU_MID,
+	}).Parent = model
+
+	-- Twin crimson FM-200 gas cylinders
+	for i, cx in ipairs({ -1.35, 0.15 }) do
+		newPart({
+			name = "GasTank_" .. i,
+			shape = "Cylinder",
+			size = Vector3.new(4.2, 1.15, 1.15),
+			cf = CFrame.new(cx, 2.1, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			color = Color3.fromRGB(208, 42, 46),
+			canCollide = true,
+		}).Parent = model
+		newPart({
+			name = "TankDome_" .. i,
+			shape = "Cylinder",
+			size = Vector3.new(0.45, 0.85, 0.85),
+			cf = CFrame.new(cx, 4.35, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			color = Color3.fromRGB(185, 34, 38),
+		}).Parent = model
+		newPart({
+			name = "BrassValve_" .. i,
+			shape = "Cylinder",
+			size = Vector3.new(0.55, 0.32, 0.32),
+			cf = CFrame.new(cx, 4.78, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			color = GOLD_PIN,
+		}).Parent = model
+		newPart({
+			name = "TankLabel_" .. i,
+			size = Vector3.new(0.85, 1.1, 0.08),
+			cf = CFrame.new(cx, 2.6, 0.56),
+			color = FACE_LIGHT,
+		}).Parent = model
+	end
+
+	-- Horizontal retaining strap + overhead discharge manifold
+	newPart({
+		name = "RetainingStrap",
+		size = Vector3.new(3.1, 0.22, 1.26),
+		cf = CFrame.new(-0.6, 2.4, 0),
+		color = SLATE_TRIM,
+	}).Parent = model
+	newPart({
+		name = "ManifoldPipe",
+		shape = "Cylinder",
+		size = Vector3.new(3.2, 0.24, 0.24),
+		cf = CFrame.new(-0.6, 5.1, 0),
+		color = ALU_LIGHT,
+	}).Parent = model
+
+	-- FM-200 release control panel on right side
+	local ctrl = newPart({
+		name = "ReleasePanel",
+		size = Vector3.new(1.5, 1.9, 0.42),
+		cf = CFrame.new(1.8, 3.6, -0.25),
+		color = Color3.fromRGB(210, 46, 48),
+	})
+	ctrl.Parent = model
+	neon({
+		name = "ArmedLED",
+		size = Vector3.new(0.24, 0.14, 0.08),
+		cf = CFrame.new(1.8, 4.25, 0.0),
+		color = C.ledGreen,
+	}).Parent = model
+
+	model.WorldPivot = CFrame.new(0, 0, 0)
+	return model
+end
+
+--[[
+	BuildStorageRack: 4-tier industrial shelving loaded with colorful cable
+	spools, boxed spare hardware, and component organizer bins.
+]]
+function ModelFactory.BuildStorageRack(): Model
+	local model = Instance.new("Model")
+	model.Name = "HardwareStorageRack"
+
+	local w = 7.4
+	local d = 2.2
+	local h = 6.2
+
+	-- 4 vertical corner posts
+	for sx = -1, 1, 2 do
+		for sz = -1, 1, 2 do
+			newPart({
+				name = "ShelfPost",
+				size = Vector3.new(0.24, h, 0.24),
+				cf = CFrame.new(sx * (w / 2 - 0.14), h / 2, sz * (d / 2 - 0.14)),
+				color = SLATE_TRIM,
+				canCollide = true,
+			}).Parent = model
+		end
+	end
+
+	-- 4 shelf decks
+	local shelfHeights = { 0.45, 2.2, 3.95, 5.7 }
+	for i, sy in ipairs(shelfHeights) do
+		newPart({
+			name = "ShelfDeck_" .. i,
+			size = Vector3.new(w, 0.16, d),
+			cf = CFrame.new(0, sy, 0),
+			color = ALU_LIGHT,
+			canCollide = true,
+		}).Parent = model
+	end
+
+	-- Shelf 1 (bottom): wooden & cardboard shipping boxes
+	for i, bx in ipairs({ -2.2, 0.1, 2.3 }) do
+		newPart({
+			name = "SpareBox_" .. i,
+			size = Vector3.new(1.75, 1.3, 1.65),
+			cf = CFrame.new(bx, 1.18, 0),
+			color = if i == 2 then ALU_MID else OAK_WOOD,
+			material = if i == 2 then Enum.Material.SmoothPlastic else Enum.Material.Wood,
+		}).Parent = model
+	end
+
+	-- Shelf 2 (middle-low): colorful cable spools (Blue LAN, Yellow WAN, Red Mgmt)
+	local spoolColors = {
+		Color3.fromRGB(70, 130, 255),
+		Color3.fromRGB(70, 130, 255),
+		SAFETY_YELLOW,
+		Color3.fromRGB(230, 80, 80),
+	}
+	for i, col in ipairs(spoolColors) do
+		local sx = -2.55 + (i - 1) * 1.7
+		newPart({
+			name = "CableSpool_" .. i,
+			shape = "Cylinder",
+			size = Vector3.new(0.95, 1.05, 1.05),
+			cf = CFrame.new(sx, 2.82, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			color = col,
+		}).Parent = model
+	end
+
+	-- Shelf 3 (middle-high): anti-static component storage bins
+	local binColors = { ESD_BLUE, CYAN_ACCENT, ESD_BLUE, SAFETY_YELLOW, ESD_BLUE }
+	for i, col in ipairs(binColors) do
+		local bx = -2.6 + (i - 1) * 1.3
+		newPart({
+			name = "PartBin_" .. i,
+			size = Vector3.new(1.05, 0.85, 1.5),
+			cf = CFrame.new(bx, 4.46, 0.1),
+			color = col,
+		}).Parent = model
+	end
+
+	-- Shelf 4 (top): spare 1U server chassis stack
+	for i = 0, 1 do
+		newPart({
+			name = "SpareChassis_" .. i,
+			size = Vector3.new(3.8, 0.42, 1.8),
+			cf = CFrame.new(-1.1 + i * 2.4, 6.0, 0),
+			color = ALU_MID,
+		}).Parent = model
+	end
+
+	model.WorldPivot = CFrame.new(0, 0, 0)
+	return model
+end
+
+--[[
+	BuildPatchPanelWall: wall-mounted optical fiber & copper distribution
+	cabinet with glowing port LEDs and overhead trunk conduits.
+]]
+function ModelFactory.BuildPatchPanelWall(): Model
+	local model = Instance.new("Model")
+	model.Name = "FiberDistributionPanel"
+
+	newPart({
+		name = "CabinetBody",
+		size = Vector3.new(4.6, 3.8, 0.9),
+		cf = CFrame.new(0, 4.2, 0),
+		color = SLATE_TRIM,
+		canCollide = true,
+	}).Parent = model
+	newPart({
+		name = "GlassDoor",
+		size = Vector3.new(4.2, 3.4, 0.08),
+		cf = CFrame.new(0, 4.2, 0.46),
+		color = C.glass,
+		material = Enum.Material.Glass,
+		transparency = 0.55,
+	}).Parent = model
+
+	-- 3 internal horizontal patch strips with blinking green/cyan fiber LEDs
+	for r = 1, 3 do
+		local py = 2.9 + r * 0.72
+		newPart({
+			name = "PatchRow_" .. r,
+			size = Vector3.new(3.8, 0.36, 0.2),
+			cf = CFrame.new(0, py, 0.22),
+			color = NAVY_PANEL,
+		}).Parent = model
+		for c = 1, 8 do
+			neon({
+				name = "FiberLED_" .. r .. "_" .. c,
+				size = Vector3.new(0.18, 0.1, 0.06),
+				cf = CFrame.new(-1.6 + (c - 1) * 0.45, py, 0.34),
+				color = if (r + c) % 3 == 0 then CYAN_ACCENT else C.ledGreen,
+			}).Parent = model
+		end
+	end
+
+	-- Dual trunk conduits (blue LAN + yellow fiber) climbing to cable tray
+	for i, col in ipairs({ ESD_BLUE, SAFETY_YELLOW }) do
+		newPart({
+			name = "TrunkPipe_" .. i,
+			shape = "Cylinder",
+			size = Vector3.new(9.2, 0.3, 0.3),
+			cf = CFrame.new(-0.9 + (i - 1) * 1.8, 10.6, -0.1) * CFrame.Angles(0, 0, math.rad(90)),
+			color = col,
+		}).Parent = model
+	end
+
+	model.WorldPivot = CFrame.new(0, 0, 0)
+	return model
+end
+
+--[[
+	BuildWallboard: sleek widescreen NOC operations LED wallboard sign.
+]]
+function ModelFactory.BuildWallboard(): Model
+	local model = Instance.new("Model")
+	model.Name = "NOC_Wallboard"
+
+	newPart({
+		name = "BoardFrame",
+		size = Vector3.new(14.6, 3.4, 0.28),
+		cf = CFrame.new(0, 0, 0),
+		color = SLATE_TRIM,
+	}).Parent = model
+	local screen = newPart({
+		name = "BoardScreen",
+		size = Vector3.new(14.1, 2.95, 0.14),
+		cf = CFrame.new(0, 0, 0.12),
+		color = Color3.fromRGB(13, 19, 28),
+	})
+	screen.Parent = model
+	neon({
+		name = "BoardAccent",
+		size = Vector3.new(14.1, 0.1, 0.16),
+		cf = CFrame.new(0, 1.52, 0.13),
+		color = CYAN_ACCENT,
+	}).Parent = model
+
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Back
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+	gui.CanvasSize = Vector2.new(720, 150)
+	gui.Brightness = 2
+	gui.Parent = screen
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -24, 0.45, 0)
+	title.Position = UDim2.new(0, 12, 0.08, 0)
+	title.BackgroundTransparency = 1
+	title.Font = Enum.Font.GothamBold
+	title.TextScaled = true
+	title.TextColor3 = CYAN_ACCENT
+	title.Text = "TIER-IV CLOUD DATA CENTER  |  GLOBAL NOC OPERATIONS"
+	title.Parent = gui
+
+	local sub = Instance.new("TextLabel")
+	sub.Size = UDim2.new(1, -24, 0.34, 0)
+	sub.Position = UDim2.new(0, 12, 0.56, 0)
+	sub.BackgroundTransparency = 1
+	sub.Font = Enum.Font.RobotoMono
+	sub.TextScaled = true
+	sub.TextColor3 = Color3.fromRGB(60, 245, 115)
+	sub.Text = "BGP UPLINK: ONLINE   |   HVAC CRAC: OPTIMAL   |   FM-200: ARMED   |   ISO-27001"
+	sub.Parent = gui
+
+	model.WorldPivot = CFrame.new(0, 0, 0)
+	return model
+end
+
+--[[
+	BuildBreakCorner: technician staff lockers + water dispenser cooler.
+]]
+function ModelFactory.BuildBreakCorner(): Model
+	local model = Instance.new("Model")
+	model.Name = "TechnicianLockerStation"
+
+	-- 3-bay brushed aluminum staff lockers
+	for i = 0, 2 do
+		local lx = -1.6 + i * 1.6
+		newPart({
+			name = "LockerBody_" .. i,
+			size = Vector3.new(1.52, 5.6, 1.8),
+			cf = CFrame.new(lx, 2.8, 0),
+			color = ALU_MID,
+			canCollide = true,
+		}).Parent = model
+		newPart({
+			name = "LockerDoor_" .. i,
+			size = Vector3.new(1.36, 5.1, 0.1),
+			cf = CFrame.new(lx, 2.8, 0.92),
+			color = if i == 1 then ESD_BLUE else ALU_LIGHT,
+		}).Parent = model
+		newPart({
+			name = "LockerHandle_" .. i,
+			size = Vector3.new(0.12, 0.48, 0.14),
+			cf = CFrame.new(lx + 0.48, 2.8, 0.98),
+			color = SLATE_TRIM,
+		}).Parent = model
+	end
+
+	-- Water dispenser cooler + translucent blue water jug on right side
+	newPart({
+		name = "CoolerStand",
+		size = Vector3.new(1.3, 3.2, 1.3),
+		cf = CFrame.new(3.5, 1.6, 0),
+		color = FACE_LIGHT,
+		canCollide = true,
+	}).Parent = model
+	newPart({
+		name = "CoolerRecess",
+		size = Vector3.new(0.85, 0.75, 0.12),
+		cf = CFrame.new(3.5, 2.35, 0.62),
+		color = SLATE_TRIM,
+	}).Parent = model
+	newPart({
+		name = "WaterJug",
+		shape = "Cylinder",
+		size = Vector3.new(1.45, 1.05, 1.05),
+		cf = CFrame.new(3.5, 3.92, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		color = Color3.fromRGB(88, 188, 250),
+		material = Enum.Material.Glass,
+		transparency = 0.3,
+	}).Parent = model
+
+	model.WorldPivot = CFrame.new(0, 0, 0)
+	return model
+end
+
+--[[
+	BuildOfficePlanter: modern architectural planter box with lush greenery.
+]]
+function ModelFactory.BuildOfficePlanter(): Model
+	local model = Instance.new("Model")
+	model.Name = "OfficePlanter"
+
+	newPart({
+		name = "PlanterBox",
+		size = Vector3.new(2.8, 1.35, 1.4),
+		cf = CFrame.new(0, 0.675, 0),
+		color = FACE_LIGHT,
+		canCollide = true,
+	}).Parent = model
+	newPart({
+		name = "PlanterSoil",
+		size = Vector3.new(2.5, 0.14, 1.1),
+		cf = CFrame.new(0, 1.32, 0),
+		color = Color3.fromRGB(92, 68, 48),
+	}).Parent = model
+
+	local bushColors = {
+		Color3.fromRGB(58, 168, 92),
+		Color3.fromRGB(74, 188, 106),
+		Color3.fromRGB(52, 154, 84),
+	}
+	for i, bx in ipairs({ -0.8, 0, 0.8 }) do
+		newPart({
+			name = "Foliage_" .. i,
+			size = Vector3.new(0.85, 1.55 + (i % 2) * 0.35, 0.85),
+			cf = CFrame.new(bx, 2.05, 0),
+			color = bushColors[i],
+		}).Parent = model
+	end
+
 	model.WorldPivot = CFrame.new(0, 0, 0)
 	return model
 end

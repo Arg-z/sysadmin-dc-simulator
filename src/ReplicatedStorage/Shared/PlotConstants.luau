@@ -124,6 +124,43 @@ PlotConstants.COLOCATION = {
 	cleanupDelaySeconds = 15, -- client collects the server after completion
 }
 
+-- ===== Fase 3: shift clock + daily settlement =====
+-- One shift is 08:00 -> 18:00. With 30 real seconds per in-game hour the
+-- shift lasts 300s (5 minutes); peak hours 11:00-17:00 last 180s.
+PlotConstants.SHIFT = {
+	startMinutes = 8 * 60,
+	endMinutes = 18 * 60,
+	peakStartMinutes = 11 * 60,
+	peakEndMinutes = 17 * 60,
+	secondsPerGameHour = 30,
+	settlementBaseBonus = 100,
+	settlementUptimeBonusPerPercent = 2,
+	settlementPerfectBonus = 150,
+	incidentFailurePenalty = 75,
+}
+
+-- ===== Fase 3: incident engine =====
+-- Four incident types; only the 11:00-17:00 peak produces new incidents.
+PlotConstants.INCIDENTS = {
+	spawnCooldownSeconds = 30,
+	maxActive = 2,
+	slaSeconds = 100,
+	noisyThrottleLimit = 40,
+	types = { "CableFault", "DDoSFlood", "NoisyNeighbor", "DriveFailure" },
+	labels = {
+		CableFault = "Cable Fault",
+		DDoSFlood = "DDoS Flood",
+		NoisyNeighbor = "Noisy Neighbor",
+		DriveFailure = "Drive Failure",
+	},
+	rewards = {
+		CableFault = 140,
+		DDoSFlood = 180,
+		NoisyNeighbor = 160,
+		DriveFailure = 200,
+	},
+}
+
 PlotConstants.COLORS = {
 	floor = Color3.fromRGB(214, 220, 228),
 	floorGrid = Color3.fromRGB(186, 195, 208),

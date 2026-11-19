@@ -99,7 +99,7 @@ end
 function PlacementSystem.ValidatePlacement(session: any, itemId: string, cf: CFrame): (boolean, string, CFrame)
 	local def = Catalog.Get(itemId)
 	if def == nil then
-		return false, "Item tidak dikenal", cf
+		return false, "Unknown item", cf
 	end
 
 	local origin = Constants.PLOT_POSITIONS[session.plotIndex]
@@ -113,7 +113,7 @@ function PlacementSystem.ValidatePlacement(session: any, itemId: string, cf: CFr
 
 	local bounds = Constants.PLACEMENT_BOUNDS
 	if sx < bounds.minX or sx > bounds.maxX or sz < bounds.minZ or sz > bounds.maxZ then
-		return false, "Di luar area lab", cf
+		return false, "Outside lab bounds", cf
 	end
 
 	local relSnap = Vector3.new(sx, 0, sz)
@@ -122,7 +122,7 @@ function PlacementSystem.ValidatePlacement(session: any, itemId: string, cf: CFr
 		local zoneRel = Vector3.new(zone.position.X, 0, zone.position.Z)
 		local dist = (zoneRel - relSnap).Magnitude
 		if dist < zone.radius + margin then
-			return false, "Menabrak area " .. zone.name, cf
+			return false, "Overlaps " .. zone.name .. " zone", cf
 		end
 	end
 
@@ -132,7 +132,7 @@ function PlacementSystem.ValidatePlacement(session: any, itemId: string, cf: CFr
 			local otherRel = Vector3.new(node.posX - origin.X, 0, node.posZ - origin.Z)
 			local dist = (otherRel - relSnap).Magnitude
 			if dist < (halfX + otherHalfX) + (halfZ + otherHalfZ) + 0.5 then
-				return false, "Menabrak " .. node.name, cf
+				return false, "Overlaps " .. node.name, cf
 			end
 		end
 	end
@@ -217,19 +217,19 @@ end
 function PlacementSystem.MountDevice(session: any, itemId: string, rackId: string, uSlot: number, config: any?): (boolean, string)
 	local def = Catalog.Get(itemId)
 	if def == nil then
-		return false, "Item tidak dikenal"
+		return false, "Unknown item"
 	end
 	local rack = session.racks[rackId]
 	if rack == nil then
-		return false, "Rack tidak ditemukan"
+		return false, "Rack not found"
 	end
 	local nodeSize = math.max(1, math.floor(def.uSize or 1))
 	if uSlot < nodeSize or uSlot > rack.maxU then
-		return false, "Slot U di luar batas rack"
+		return false, "U slot out of rack bounds"
 	end
 	for u = uSlot - nodeSize + 1, uSlot do
 		if rack.occupiedSlots[u] ~= nil then
-			return false, "Slot U" .. tostring(uSlot) .. " sudah terpakai"
+			return false, "Slot U" .. tostring(uSlot) .. " is already occupied"
 		end
 	end
 
@@ -379,7 +379,7 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 
 	if def.category == "Cable" then
 		if action ~= "buy" then
-			hint(player, "Kabel dibeli sebagai spool: tekan BELI pada kategori Cable.")
+			hint(player, "Cables are purchased as spools: click BUY in the Cable category.")
 			return
 		end
 		local color: string? = nil
@@ -393,7 +393,7 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 			return
 		end
 		if session.balance < def.price then
-			hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
+			hint(player, "Insufficient funds for " .. def.name .. " ($" .. tostring(def.price) .. ")")
 			return
 		end
 		session.balance -= def.price
@@ -401,7 +401,7 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 		session.cableSpools[color] = current + Constants.CABLES.spoolYield
 		playSFX(player, "cash")
 		hint(player, string.format(
-			"Spool %s dibeli: +%d kabel (stok %d).",
+			"Purchased %s spool: +%d cables (stock: %d).",
 			Constants.CABLES.labels[color] or color,
 			Constants.CABLES.spoolYield,
 			session.cableSpools[color]
@@ -417,7 +417,7 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 	-- Placeable categories: Rack / Network / Server
 	if action == "prepare" then
 		if session.balance < def.price then
-			hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
+			hint(player, "Insufficient funds for " .. def.name .. " ($" .. tostring(def.price) .. ")")
 			return
 		end
 		session.pendingPlacementItemId = itemId
@@ -439,12 +439,12 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 
 		local ok, reason, snapped = PlacementSystem.ValidatePlacement(session, itemId, cf :: CFrame)
 		if not ok then
-			hint(player, "Placement ditolak: " .. reason)
+			hint(player, "Placement rejected: " .. reason)
 			playSFX(player, "error")
 			return
 		end
 		if session.balance < def.price then
-			hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
+			hint(player, "Insufficient funds for " .. def.name .. " ($" .. tostring(def.price) .. ")")
 			session.pendingPlacementItemId = nil
 			return
 		end

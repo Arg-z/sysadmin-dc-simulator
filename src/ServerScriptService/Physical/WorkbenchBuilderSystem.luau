@@ -191,7 +191,24 @@ function WorkbenchBuilderSystem.TryInstall(player: Player, session: any, itemId:
 		return -- only components install at the workbench
 	end
 	if itemId == "replacement_hdd" then
-		hint(player, "Replacement HDD dipakai untuk Remote Hands (Fase 2).")
+		-- Fase 3 Remote Hands: keep a spare in inventory; a failed server's
+		-- 'drive replace <bay>' consumes it. No workbench proximity needed.
+		if session.spareParts == nil then
+			session.spareParts = { hdd = 0 }
+		end
+		if session.balance < def.price then
+			hint(player, "Insufficient funds for " .. def.name .. " ($" .. tostring(def.price) .. ")")
+			playSFX(player, "error")
+			return
+		end
+		session.balance -= def.price
+		session.spareParts.hdd = (tonumber(session.spareParts.hdd) or 0) + 1
+		playSFX(player, "cash")
+		hint(player, string.format(
+			"Spare HDD purchased ($%d). Total in stock: %d. Run 'drive replace <bay>' on the affected server console.",
+			def.price,
+			session.spareParts.hdd
+		))
 		return
 	end
 
@@ -202,11 +219,11 @@ function WorkbenchBuilderSystem.TryInstall(player: Player, session: any, itemId:
 	local char = player.Character
 	local hrp = if char ~= nil then char:FindFirstChild("HumanoidRootPart") else nil
 	if hrp == nil or facility.workbenchModel == nil then
-		hint(player, "Dekati AssemblyWorkbench untuk memasang komponen.")
+		hint(player, "Stand near the AssemblyWorkbench to install components.")
 		return
 	end
 	if (hrp.Position - facility.workbenchModel:GetPivot().Position).Magnitude > INSTALL_RANGE then
-		hint(player, "Dekati AssemblyWorkbench untuk memasang komponen.")
+		hint(player, "Stand near the AssemblyWorkbench to install components.")
 		return
 	end
 
@@ -222,40 +239,40 @@ function WorkbenchBuilderSystem.TryInstall(player: Player, session: any, itemId:
 	local orderErr: string? = nil
 	if isChassis then
 		if wb.chassis ~= nil then
-			orderErr = "Chassis sudah terpasang di workbench."
+			orderErr = "A chassis is already installed on the workbench."
 		end
 	elseif isMobo then
 		if wb.chassis == nil then
-			orderErr = "Pasang chassis dulu."
+			orderErr = "Install a chassis first."
 		elseif wb.mobo ~= nil then
-			orderErr = "Motherboard sudah terpasang."
+			orderErr = "A motherboard is already installed."
 		end
 	elseif isCpu then
 		if wb.mobo == nil then
-			orderErr = "Pasang motherboard dulu."
+			orderErr = "Install a motherboard first."
 		elseif wb.cpuCount >= wb.cpuSockets then
-			orderErr = "Socket CPU penuh."
+			orderErr = "All CPU sockets are full."
 		end
 	elseif isRam then
 		if wb.mobo == nil then
-			orderErr = "Pasang motherboard dulu."
+			orderErr = "Install a motherboard first."
 		elseif wb.ramSlotsUsed >= wb.ramSlots then
-			orderErr = "Slot RAM penuh."
+			orderErr = "All RAM slots are full."
 		end
 	elseif isStorage then
 		if wb.mobo == nil then
-			orderErr = "Pasang motherboard dulu."
+			orderErr = "Install a motherboard first."
 		elseif wb.storageBaysUsed >= wb.storageBays then
-			orderErr = "Bay storage penuh."
+			orderErr = "All storage bays are full."
 		end
 	elseif isPsu then
 		if wb.chassis == nil or wb.mobo == nil then
-			orderErr = "Pasang chassis + motherboard dulu."
+			orderErr = "Install a chassis and motherboard first."
 		elseif wb.psu ~= nil then
-			orderErr = "PSU sudah terpasang."
+			orderErr = "A PSU is already installed."
 		end
 	else
-		orderErr = "Komponen tidak dikenal."
+		orderErr = "Unknown component."
 	end
 	if orderErr ~= nil then
 		hint(player, orderErr :: string)
@@ -265,7 +282,7 @@ function WorkbenchBuilderSystem.TryInstall(player: Player, session: any, itemId:
 
 	-- Balance.
 	if session.balance < def.price then
-		hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
+		hint(player, "Insufficient funds for " .. def.name .. " ($" .. tostring(def.price) .. ")")
 		playSFX(player, "error")
 		return
 	end
@@ -403,10 +420,10 @@ end
 function WorkbenchBuilderSystem.Ship(session: any): (boolean, string)
 	local wb = session.workbench
 	if wb.chassis == nil then
-		return false, "Belum ada build di workbench (pasang chassis dulu)."
+		return false, "No build on the workbench yet (install a chassis first)."
 	end
 	if wb.psu == nil then
-		return false, "Build belum lengkap (PSU belum terpasang)."
+		return false, "Build is incomplete (PSU is not installed yet)."
 	end
 	-- Sync OS state from the bench node (install-os writes the node directly).
 	local node = session.devices[BENCH_DEVICE_ID]
@@ -414,13 +431,13 @@ function WorkbenchBuilderSystem.Ship(session: any): (boolean, string)
 		wb.osInstalled = node.osInstalled
 	end
 	if wb.osInstalled == nil then
-		return false, "Install OS dulu di server bench (install-os)."
+		return false, "Install an OS on the bench server first ('install-os')."
 	end
 	if not wb.tested then
-		return false, "Jalankan stress-test dulu di server bench."
+		return false, "Run 'stress-test' on the bench server first."
 	end
 	if wb.shipped then
-		return false, "Build ini sudah dikirim."
+		return false, "This build has already been shipped."
 	end
 
 	wb.shipped = true

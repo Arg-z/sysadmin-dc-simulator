@@ -36,7 +36,7 @@ local NetworkUtils = require(sharedFolder:WaitForChild("NetworkUtils"))
 
 local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", 180) :: any
 if remotesFolder == nil then
-	warn("[CatalogAndBuilderClient] ReplicatedStorage.Remotes tidak ditemukan (timeout 180s)")
+	warn("[CatalogAndBuilderClient] ReplicatedStorage.Remotes not found (timeout 180s)")
 	return
 end
 
@@ -103,7 +103,7 @@ local function clearDynamicChildren(inst: Instance)
 	end
 end
 
--- Compact Indonesian spec line per item category
+-- Compact English spec line per item category
 local function specsLine(def: any): string
 	local s = def.specs or {}
 	local id = tostring(def.id)
@@ -114,15 +114,15 @@ local function specsLine(def: any): string
 	elseif def.category == "Server" then
 		return string.format("%d vCPU  -  %dGB RAM  -  %dGB Disk  -  %dW", s.cpu or 0, s.ram or 0, s.disk or 0, s.powerWatts or 0)
 	elseif def.category == "Cable" then
-		return string.format("1 spool = %d kabel  -  klik dua port untuk pasang", PlotConstants.CABLES.spoolYield)
+		return string.format("1 spool = %d cables  -  click two ports to wire", PlotConstants.CABLES.spoolYield)
 	end
 	-- Components
 	if string.sub(id, 1, 8) == "chassis_" then
-		return string.format("%dU  -  %d port", s.uSize or def.uSize or 0, s.ports or 0)
+		return string.format("%dU  -  %d ports", s.uSize or def.uSize or 0, s.ports or 0)
 	elseif string.sub(id, 1, 5) == "mobo_" then
-		return string.format("%d socket  -  %d slot RAM  -  %d bay", s.sockets or 0, s.ramSlots or 0, s.storageBays or 0)
+		return string.format("%d socket  -  %d RAM slots  -  %d bays", s.sockets or 0, s.ramSlots or 0, s.storageBays or 0)
 	elseif string.sub(id, 1, 4) == "cpu_" then
-		return string.format("%d core", s.cores or 0)
+		return string.format("%d cores", s.cores or 0)
 	elseif string.sub(id, 1, 4) == "ram_" then
 		return string.format("%d GB", s.ramGb or 0)
 	elseif string.sub(id, 1, 5) == "nvme_" or id == "replacement_hdd" then
@@ -177,7 +177,7 @@ titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.TextColor3 = COLOR_GREEN
-titleLabel.Text = "TOKO HARDWARE"
+titleLabel.Text = "HARDWARE STORE"
 titleLabel.Parent = titleBar
 
 local subLabel = Instance.new("TextLabel")
@@ -188,7 +188,7 @@ subLabel.Font = Enum.Font.Gotham
 subLabel.TextSize = 11
 subLabel.TextXAlignment = Enum.TextXAlignment.Right
 subLabel.TextColor3 = COLOR_GREY
-subLabel.Text = "tekan [B] buka / tutup"
+subLabel.Text = "press [B] to open / close"
 subLabel.Parent = titleBar
 
 local closeBtn = Instance.new("TextButton")
@@ -216,7 +216,7 @@ catHeader.Font = Enum.Font.GothamBold
 catHeader.TextSize = 11
 catHeader.TextXAlignment = Enum.TextXAlignment.Left
 catHeader.TextColor3 = COLOR_GREY
-catHeader.Text = "KATEGORI"
+catHeader.Text = "CATEGORIES"
 catHeader.Parent = storeWindow
 
 local categoryButtons: { [string]: TextButton } = {}
@@ -259,7 +259,7 @@ itemsHeader.Font = Enum.Font.GothamBold
 itemsHeader.TextSize = 11
 itemsHeader.TextXAlignment = Enum.TextXAlignment.Left
 itemsHeader.TextColor3 = COLOR_GREY
-itemsHeader.Text = "ITEM"
+itemsHeader.Text = "ITEMS"
 itemsHeader.Parent = storeWindow
 
 local itemsScroll = Instance.new("ScrollingFrame")
@@ -279,7 +279,7 @@ itemsLayout.Padding = UDim.new(0, 5)
 itemsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 itemsLayout.Parent = itemsScroll
 
--- Status label (transient feedback, e.g. saldo tidak cukup)
+-- Status label (transient feedback, e.g. insufficient balance)
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Name = "StatusLabel"
 statusLabel.Size = UDim2.new(0, 380, 0, 16)
@@ -314,7 +314,7 @@ guideHeader.Font = Enum.Font.GothamBold
 guideHeader.TextSize = 11
 guideHeader.TextXAlignment = Enum.TextXAlignment.Left
 guideHeader.TextColor3 = COLOR_BLUE
-guideHeader.Text = "PANDUAN BUILD (PC)"
+guideHeader.Text = "BUILD GUIDE (PC)"
 guideHeader.Parent = storeWindow
 
 local guideBody = Instance.new("TextLabel")
@@ -329,7 +329,7 @@ guideBody.TextWrapped = true
 guideBody.TextXAlignment = Enum.TextXAlignment.Left
 guideBody.TextYAlignment = Enum.TextYAlignment.Top
 guideBody.TextColor3 = COLOR_TEXT
-guideBody.Text = "Urutan Rakit Workbench:\nChassis -> Mobo -> CPU -> RAM -> Storage -> PSU\n\nLangkah PC:\n- Klik saklar merah di bench\n- Dekati bench + tekan [E] (pegang laptop)\n- Terminal: install-os ubuntu-22.04\n- Terminal: stress-test\n- Terminal: ship (kirim ke dock)\n\nKontrol Placement:\n[Klik Kiri] Pasang\n[R] Putar 90 deg\n[Klik Kanan / Esc] Batal"
+guideBody.Text = "Workbench Assembly Order:\nChassis -> Mobo -> CPU -> RAM -> Storage -> PSU\n\nPC Steps:\n- Click red power switch on bench\n- Approach bench + press [E] (with laptop)\n- Terminal: install-os ubuntu-22.04\n- Terminal: stress-test\n- Terminal: ship (send crate to dock)\n\nPlacement Controls:\n[Left Click] Place\n[R] Rotate 90 deg\n[Right Click / Esc] Cancel"
 guideBody.Parent = storeWindow
 local guideCorner = Instance.new("UICorner")
 guideCorner.CornerRadius = UDim.new(0, 6)
@@ -352,7 +352,7 @@ ghostBanner.BackgroundTransparency = 0.12
 ghostBanner.Font = Enum.Font.GothamBold
 ghostBanner.TextSize = 13
 ghostBanner.TextColor3 = COLOR_YELLOW
-ghostBanner.Text = "[PLACEMENT PC]  Klik Kiri: Pasang  |  [R]: Putar 90 deg  |  Klik Kanan / [Esc]: Batal"
+ghostBanner.Text = "[PC PLACEMENT]  Left Click: Place  |  [R]: Rotate 90 deg  |  Right Click / [Esc]: Cancel"
 ghostBanner.Visible = false
 ghostBanner.Parent = storeGui
 local ghostBannerCorner = Instance.new("UICorner")
@@ -394,20 +394,24 @@ end
 
 onBuy = function(def: any)
 	if ghost ~= nil then
-		showStatus("Selesaikan / batalkan placement dulu (klik kanan = batal)")
+		showStatus("Finish or cancel active placement first (Right Click = cancel)")
 		return
 	end
 	if def.category == "Component" then
-		-- Components go straight to the workbench (server validates order + proximity)
+		-- Components go straight to the workbench (or spare inventory for replacement_hdd)
 		purchaseRemote:FireServer(def.id, "buy")
-		showStatus("Komponen dibeli: " .. tostring(def.name) .. " (pasang di bench)")
+		if def.id == "replacement_hdd" then
+			showStatus("Spare HDD purchased (+1) - run 'drive replace <bay>' on server console")
+		else
+			showStatus("Purchased component: " .. tostring(def.name) .. " (installed on bench)")
+		end
 	elseif def.category == "Cable" then
 		-- Fase 2: a spool fills the matching cable inventory server-side.
 		purchaseRemote:FireServer(def.id, "buy")
-		showStatus("Spool dibeli: " .. tostring(def.name) .. " (+" .. tostring(PlotConstants.CABLES.spoolYield) .. " kabel)")
+		showStatus("Purchased spool: " .. tostring(def.name) .. " (+" .. tostring(PlotConstants.CABLES.spoolYield) .. " cables)")
 	else
 		if lastBalance ~= nil and lastBalance < (def.price or 0) then
-			showStatus("Saldo tidak cukup untuk " .. tostring(def.name))
+			showStatus("Insufficient funds for " .. tostring(def.name))
 			return
 		end
 		purchaseRemote:FireServer(def.id, "prepare")
@@ -474,7 +478,7 @@ rebuildItems = function()
 		buyBtn.Font = Enum.Font.GothamBold
 		buyBtn.TextSize = 13
 		buyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-		buyBtn.Text = "BELI"
+		buyBtn.Text = "BUY"
 		buyBtn.AutoButtonColor = true
 		buyBtn.Parent = row
 		local buyCorner = Instance.new("UICorner")
@@ -493,7 +497,7 @@ rebuildItems = function()
 		empty.Font = Enum.Font.Gotham
 		empty.TextSize = 12
 		empty.TextColor3 = COLOR_GREY
-		empty.Text = "Tidak ada item di kategori ini"
+		empty.Text = "No items in this category"
 		empty.LayoutOrder = 9999
 		empty.Parent = itemsScroll
 	end

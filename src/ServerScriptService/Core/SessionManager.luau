@@ -118,6 +118,18 @@ function SessionManager.CreateSession(player: Player, plotIndex: number): any
 		carry = nil,
 		colocation = { crates = {}, byTicket = {} },
 		rackSlots = {},
+		-- Fase 3: shift clock, incident state, spare parts
+		shift = {
+			clockMinutes = Constants.SHIFT.startMinutes,
+			stats = { contractsCompleted = 0, incidentsResolved = 0, incidentsFailed = 0 },
+			lastSettlementText = nil,
+			lastSettlementAmount = nil,
+		},
+		incidentFaults = {},
+		incidentCooldownSec = 0,
+		incidentRotationIndex = 0,
+		spareParts = { hdd = 0 },
+		stormLit = false,
 	}
 	Sessions[player] = session
 	UsedPlots[plotIndex] = player

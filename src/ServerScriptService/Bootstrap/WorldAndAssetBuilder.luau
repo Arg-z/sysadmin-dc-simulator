@@ -360,7 +360,7 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 
 	-- Helper: builds a two-tone solid wall section (wainscot + silver dado + upper white).
 	local function addSolidWall(namePrefix: string, sizeX: number, sizeZ: number, cx: number, cz: number, yLow: number, yHigh: number)
-		local lowerTop = math.min(wainscotH, yHigh)
+		local lowerTop = math.clamp(wainscotH, yLow, yHigh)
 		if yLow < lowerTop then
 			local h = lowerTop - yLow
 			newPart({
@@ -728,6 +728,77 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 	acModel:PivotTo(plotCF(PlotConstants.AC_OFFSET.X, floorTopY + PlotConstants.AC_OFFSET.Y, PlotConstants.AC_OFFSET.Z))
 	acModel.Parent = facility
 	table.insert(activeFans, { part = acFan, baseCF = acFan.CFrame, angle = 0 })
+
+	-- ===== Interior Data-Center Decorations (perimeter, outside PLACEMENT_BOUNDS) =====
+	local upsModel = ModelFactory.BuildUPSBank()
+	upsModel:PivotTo(plotCF(16, floorTopY, -30.2))
+	upsModel.Parent = facility
+
+	local fireModel = ModelFactory.BuildFireSuppression()
+	fireModel:PivotTo(plotCF(-11, floorTopY, -30.8))
+	fireModel.Parent = facility
+
+	local storageModel = ModelFactory.BuildStorageRack()
+	storageModel:PivotTo(plotCF(29.8, floorTopY, 2) * CFrame.Angles(0, math.rad(-90), 0))
+	storageModel.Parent = facility
+
+	local patchModel = ModelFactory.BuildPatchPanelWall()
+	patchModel:PivotTo(plotCF(-30.8, floorTopY, -24) * CFrame.Angles(0, math.rad(90), 0))
+	patchModel.Parent = facility
+
+	local wallboardModel = ModelFactory.BuildWallboard()
+	wallboardModel:PivotTo(plotCF(0, floorTopY + 11.2, -31.4))
+	wallboardModel.Parent = facility
+
+	local breakModel = ModelFactory.BuildBreakCorner()
+	breakModel:PivotTo(plotCF(-24, floorTopY, 29.8) * CFrame.Angles(0, math.rad(180), 0))
+	breakModel.Parent = facility
+
+	for _, px in ipairs({ -9.5, 9.5 }) do
+		local planter = ModelFactory.BuildOfficePlanter()
+		planter:PivotTo(plotCF(px, floorTopY, 29.8))
+		planter.Parent = facility
+	end
+
+	-- Sub-floor glass fiber-optic trench window along the central walkway
+	newPart({
+		name = "SubFloorTrenchGlass",
+		size = Vector3.new(3.2, 0.035, 36),
+		cf = plotCF(0, floorTopY + 0.018, 6),
+		color = Color3.fromRGB(28, 42, 62),
+		canCollide = false,
+		canQuery = false,
+		castShadow = false,
+	}).Parent = facility
+	for i, col in ipairs({ colors.accentCyan, Color3.fromRGB(70, 130, 255), colors.accentAmber }) do
+		newPart({
+			name = "SubFloorFiber_" .. tostring(i),
+			size = Vector3.new(0.14, 0.04, 35.4),
+			cf = plotCF(-0.85 + (i - 1) * 0.85, floorTopY + 0.022, 6),
+			color = col,
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+	end
+
+	-- Biometric door access keypad beside the entrance portal
+	newPart({
+		name = "BiometricKeypad",
+		size = Vector3.new(0.55, 0.85, 0.16),
+		cf = plotCF(doorW / 2 + 1.2, floorTopY + 4.0, halfZ - 0.08),
+		color = colors.frame,
+		canCollide = false,
+	}).Parent = facility
+	newPart({
+		name = "KeypadLED",
+		size = Vector3.new(0.32, 0.12, 0.18),
+		cf = plotCF(doorW / 2 + 1.2, floorTopY + 4.25, halfZ - 0.09),
+		color = colors.ledGreen,
+		material = Enum.Material.Neon,
+		canCollide = false,
+	}).Parent = facility
 
 	-- ===== Lab sign billboard above the front door =====
 	local signAnchor = newPart({

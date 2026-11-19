@@ -11,6 +11,7 @@ export type DeviceType = "Router" | "Switch" | "BareMetal" | "ColocationServer"
 export type TicketCategory = "CloudVPS" | "Colocation" | "CustomBuild" | "Incident"
 export type TicketStatus = "Available" | "Active" | "Completed" | "Failed"
 export type TerminalMode = "Disconnected" | "LocalConsole" | "RemoteSSH"
+export type IncidentType = "CableFault" | "DDoSFlood" | "NoisyNeighbor" | "DriveFailure"
 
 export type PortData = {
 	portId: string,
@@ -33,6 +34,7 @@ export type VMData = {
 	cpuThrottlePercent: number,
 	currentLoadPercent: number,
 	status: VMStatus,
+	noisy: boolean?,
 }
 
 export type DeviceSpecs = {
@@ -104,6 +106,8 @@ export type ContractTicket = {
 	targetRackId: string?,
 	targetUSlot: number?,
 	status: TicketStatus,
+	incidentType: string?,
+	incidentData: { [string]: any }?,
 }
 
 export type TerminalSession = {
@@ -120,6 +124,7 @@ export type ActiveCable = {
 	bPortId: string,
 	color: CableColorType,
 	beam: Beam,
+	sheath: Beam?,
 }
 
 export type ConsoleLink = {
@@ -176,10 +181,14 @@ export type FacilitySnapshot = {
 	storm: boolean,
 	day: number,
 	clockText: string,
+	shiftPhase: string,
+	incidentCount: number,
+	lastSettlement: string?,
+	settlementAmount: number?,
 	devices: { DeviceSnapshot },
 	vms: { { name: string, hostId: string, cpu: number, ram: number, disk: number, ip: string?, status: VMStatus, loadPercent: number } },
 	objectives: { [string]: boolean },
-	tickets: { { id: string, category: string, title: string, description: string, rewardPayout: number, status: string, requirementsText: string, slaRemainingSec: number?, payoutIntervalSec: number?, validationText: string?, vlanId: number? } },
+	tickets: { { id: string, category: string, title: string, description: string, rewardPayout: number, status: string, requirementsText: string, slaRemainingSec: number?, payoutIntervalSec: number?, validationText: string?, vlanId: number?, incidentType: string? } },
 }
 
 export type Session = {
@@ -215,6 +224,17 @@ export type Session = {
 	carry: any?,
 	colocation: { [string]: any },
 	rackSlots: { [string]: any },
+	shift: {
+		clockMinutes: number,
+		stats: { contractsCompleted: number, incidentsResolved: number, incidentsFailed: number },
+		lastSettlementText: string?,
+		lastSettlementAmount: number?,
+	},
+	incidentFaults: { [string]: boolean },
+	incidentCooldownSec: number,
+	incidentRotationIndex: number,
+	spareParts: { [string]: number },
+	stormLit: boolean,
 }
 
 return nil

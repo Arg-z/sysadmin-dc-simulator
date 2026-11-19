@@ -234,9 +234,10 @@ function DataPersistenceManager.Save(session: SessionLike)
 	local tickets: { any } = {}
 	for _, t in ipairs(session.tickets or {}) do
 		-- Colocation contracts are short live sessions and reference a physical
-		-- crate; they are not persisted. The mounted server itself is saved as a
-		-- normal rack device above.
-		if t.status == "Active" and t.category ~= "Colocation" then
+		-- crate; they are not persisted. Fase 3 incidents reference live cable/
+		-- VM/device state, so they are not persisted either (their effects are
+		-- cleared on rejoin).
+		if t.status == "Active" and t.category ~= "Colocation" and t.category ~= "Incident" then
 			table.insert(tickets, {
 				id = t.id,
 				category = t.category,
@@ -254,6 +255,9 @@ function DataPersistenceManager.Save(session: SessionLike)
 	local payload: { [string]: any } = {
 		balance = session.balance,
 		reputation = session.reputation,
+		day = session.day,
+		shiftClockMinutes = if session.shift ~= nil then session.shift.clockMinutes else nil,
+		spareParts = session.spareParts,
 		devices = devices,
 		racks = racks,
 		cableSpools = session.cableSpools,
@@ -328,6 +332,19 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 	end
 	if tonumber(data.reputation) ~= nil then
 		session.reputation = tonumber(data.reputation) :: number
+	end
+	if tonumber(data.day) ~= nil then
+		session.day = math.max(1, math.floor(tonumber(data.day) :: number))
+	end
+	-- Fase 3: resume the shift clock when the saved time is inside 08:00-18:00.
+	if session.shift ~= nil and tonumber(data.shiftClockMinutes) ~= nil then
+		local clock = tonumber(data.shiftClockMinutes) :: number
+		if clock >= constants.SHIFT.startMinutes and clock < constants.SHIFT.endMinutes then
+			session.shift.clockMinutes = clock
+		end
+	end
+	if type(data.spareParts) == "table" then
+		session.spareParts.hdd = math.max(0, math.floor(tonumber(data.spareParts.hdd) or 0))
 	end
 
 	-- Fase 2 cable inventory.

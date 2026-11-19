@@ -24,7 +24,7 @@ local NetworkUtils = require(sharedFolder:WaitForChild("NetworkUtils"))
 
 local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", 180) :: any
 if remotesFolder == nil then
-	warn("[HudClient] ReplicatedStorage.Remotes tidak ditemukan (timeout 180s)")
+	warn("[HudClient] ReplicatedStorage.Remotes not found (timeout 180s)")
 	return
 end
 
@@ -96,7 +96,7 @@ local panel = Instance.new("Frame")
 panel.Name = "StatsPanel"
 panel.AnchorPoint = Vector2.new(1, 0)
 panel.Position = UDim2.new(1, -12, 0, 12)
-panel.Size = UDim2.new(0, 212, 0, 152)
+panel.Size = UDim2.new(0, 212, 0, 190)
 panel.BackgroundColor3 = COLOR_BG
 panel.BackgroundTransparency = 0.15
 panel.BorderSizePixel = 0
@@ -119,7 +119,7 @@ panelTitle.Font = Enum.Font.GothamBold
 panelTitle.TextSize = 11
 panelTitle.TextXAlignment = Enum.TextXAlignment.Left
 panelTitle.TextColor3 = COLOR_GREY
-panelTitle.Text = "STATUS LAB"
+panelTitle.Text = "LAB STATUS"
 panelTitle.Parent = panel
 
 local valueLabels: { [string]: TextLabel } = {}
@@ -140,7 +140,7 @@ do
 	label.TextSize = 12
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.TextColor3 = COLOR_GREY
-	label.Text = "SALDO"
+	label.Text = "BALANCE"
 	label.Parent = row
 
 	local value = Instance.new("TextLabel")
@@ -158,11 +158,13 @@ do
 end
 
 local HUD_ROWS: { { key: string, label: string } } = {
-	{ key = "reputation", label = "Reputasi" },
+	{ key = "reputation", label = "Reputation" },
 	{ key = "uptime", label = "Uptime" },
-	{ key = "power", label = "Daya" },
-	{ key = "temp", label = "Suhu" },
-	{ key = "clock", label = "Hari / Jam" },
+	{ key = "power", label = "Power" },
+	{ key = "temp", label = "Temp" },
+	{ key = "clock", label = "Day / Time" },
+	{ key = "phase", label = "Phase" },
+	{ key = "insiden", label = "Incidents" },
 }
 
 for i, rowDef in ipairs(HUD_ROWS) do
@@ -201,7 +203,7 @@ end
 local resetBtn = Instance.new("TextButton")
 resetBtn.Name = "ResetButton"
 resetBtn.AnchorPoint = Vector2.new(1, 0)
-resetBtn.Position = UDim2.new(1, -12, 0, 170)
+resetBtn.Position = UDim2.new(1, -12, 0, 208)
 resetBtn.Size = UDim2.new(0, 212, 0, 26)
 resetBtn.BackgroundColor3 = COLOR_RESET
 resetBtn.Font = Enum.Font.GothamBold
@@ -229,15 +231,91 @@ hintLabel.TextTruncate = Enum.TextTruncate.AtEnd
 hintLabel.Text = ""
 hintLabel.Parent = gui
 
+
+-- Left column: objectives checklist (moved here from the TicketMonitor)
+local OBJECTIVES: { { key: string, label: string } } = {
+	{ key = "cableWired", label = "Cable switch -> router & server" },
+	{ key = "ipSetStarter", label = "Configure starter server IP" },
+	{ key = "osInstalledStarter", label = "Install OS on starter server" },
+	{ key = "pingGateway", label = "Ping gateway router" },
+	{ key = "vmCreated", label = "Create first VM" },
+	{ key = "benchBuilt", label = "Assemble server on workbench" },
+	{ key = "benchOsInstalled", label = "Workbench: install OS" },
+	{ key = "stressPassed", label = "Pass stress test" },
+	{ key = "shipped", label = "Ship custom server crate" },
+}
+local objectiveDefs: { [string]: string } = {}
+for _, objDef in ipairs(OBJECTIVES) do
+	objectiveDefs[objDef.key] = objDef.label
+end
+
+local objPanel = Instance.new("Frame")
+objPanel.Name = "ObjectivesPanel"
+objPanel.Position = UDim2.new(0, 12, 0, 50)
+objPanel.Size = UDim2.new(0, 240, 0, 190)
+objPanel.BackgroundColor3 = COLOR_BG
+objPanel.BackgroundTransparency = 0.15
+objPanel.BorderSizePixel = 0
+objPanel.Parent = gui
+local objPanelCorner = Instance.new("UICorner")
+objPanelCorner.CornerRadius = UDim.new(0, 10)
+objPanelCorner.Parent = objPanel
+local objPanelStroke = Instance.new("UIStroke")
+objPanelStroke.Color = COLOR_BORDER
+objPanelStroke.Thickness = 1
+objPanelStroke.Parent = objPanel
+
+local objTitle = Instance.new("TextLabel")
+objTitle.Name = "ObjectivesTitle"
+objTitle.Size = UDim2.new(1, -12, 0, 14)
+objTitle.Position = UDim2.new(0, 8, 0, 4)
+objTitle.BackgroundTransparency = 1
+objTitle.Font = Enum.Font.GothamBold
+objTitle.TextSize = 11
+objTitle.TextXAlignment = Enum.TextXAlignment.Left
+objTitle.TextColor3 = COLOR_GREY
+objTitle.Text = "OBJECTIVES"
+objTitle.Parent = objPanel
+
+local objList = Instance.new("Frame")
+objList.Name = "ObjectivesList"
+objList.Position = UDim2.new(0, 8, 0, 20)
+objList.Size = UDim2.new(1, -16, 1, -26)
+objList.BackgroundTransparency = 1
+objList.Parent = objPanel
+local objListLayout = Instance.new("UIListLayout")
+objListLayout.FillDirection = Enum.FillDirection.Vertical
+objListLayout.Padding = UDim.new(0, 2)
+objListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+objListLayout.Parent = objList
+
+local objectiveRows: { [string]: TextLabel } = {}
+for _, objDef in ipairs(OBJECTIVES) do
+	local row = Instance.new("TextLabel")
+	row.Name = "Objective_" .. objDef.key
+	row.Size = UDim2.new(1, 0, 0, 16)
+	row.BackgroundTransparency = 1
+	row.Font = Enum.Font.Gotham
+	row.TextSize = 12
+	row.TextXAlignment = Enum.TextXAlignment.Left
+	row.TextColor3 = COLOR_GREY
+	row.Text = "o  " .. objDef.label
+	row.Parent = objList
+	objectiveRows[objDef.key] = row
+end
+
 -- ===== Hint system: rotating PC tips + priority server hints =====
 local TIPS = {
-	"Tekan [~] atau [F2] untuk buka / tutup Terminal (klik X [~] juga bisa)",
-	"Tekan [B] untuk buka / tutup Hardware Store",
-	"Pegang TechnicianLaptop (hotbar) lalu dekati device + tekan [E] = Kabel Console",
-	"Klik 2 port berbeda untuk kabel LAN | Klik port terhubung = cabut",
-	"Mode placement: [R] Putar 90 deg | Klik Kiri = Pasang | Klik Kanan/[Esc] = Batal",
-	"Kabel berwarna: port WAN otomatis pakai spool kuning, port data pakai biru/merah",
-	"Colocation: terima kontrak, angkat crate di dock, mount ke rack, atur VLAN + PDU",
+	"Press [~] or [F2] to open / close Terminal (or click X [~])",
+	"Press [B] to open / close the Hardware Store",
+	"Stand in front of the NOC Desk + press [E] for 3-Monitor Workstation View",
+	"Equip TechnicianLaptop [1] + press [E] near a device = Console Cable",
+	"Click two different ports to wire a LAN cable | Click a wired port to unplug",
+	"Placement mode: [R] Rotate 90 deg | Left Click = Place | Right Click / [Esc] = Cancel",
+	"Color-coded cables: WAN ports auto-use yellow spool, data ports use blue/red",
+	"Colocation: accept contract, pick up crate at dock, mount in rack, configure VLAN + PDU",
+	"Peak hours 11:00-17:00: incidents may trigger. Type 'incident' in terminal to resolve",
+	"Red alarm + klaxon = active outage. Check TicketMonitor or type 'incident'",
 }
 local tipIndex = 1
 local priorityActive = false
@@ -276,10 +354,10 @@ resetBtn.MouseButton1Click:Connect(function()
 		resetBtn.Text = "RESET DATA"
 		resetBtn.BackgroundColor3 = COLOR_RESET
 		resetDataRemote:FireServer()
-		showPriority("Data direset! Lab dibangun ulang oleh server...")
+		showPriority("Data reset! Rebuilding server lab...")
 	else
 		resetArmed = true
-		resetBtn.Text = "YAKIN? KLIK LAGI (4s)"
+		resetBtn.Text = "CONFIRM? CLICK AGAIN (4s)"
 		resetBtn.BackgroundColor3 = COLOR_RED
 		task.delay(4, function()
 			if resetArmed then
@@ -300,7 +378,7 @@ task.spawn(function()
 		end)
 	else
 		storeBtn.Visible = false
-		warn("[HudClient] BindableEvent NetSimToggleStore tidak ditemukan; tombol STORE disembunyikan")
+		warn("[HudClient] BindableEvent NetSimToggleStore not found; STORE button hidden")
 	end
 end)
 
@@ -347,5 +425,21 @@ stateSyncRemote.OnClientEvent:Connect(function(payload: any)
 	setValue("power", NetworkUtils.FormatWatts(payload.powerWatts or 0), COLOR_YELLOW)
 	local tempC = payload.avgTempC or 0
 	setValue("temp", string.format("%.1f °C", tempC), if tempC > 75 then COLOR_RED else COLOR_TEXT)
-	setValue("clock", string.format("Hari %d  -  %s", payload.day or 1, payload.clockText or "--:--"), COLOR_TEXT)
+	setValue("clock", string.format("Day %d  -  %s", payload.day or 1, payload.clockText or "--:--"), COLOR_TEXT)
+	local phase = tostring(payload.shiftPhase or "-")
+	setValue("phase", phase, if phase == "PEAK HOURS" or phase == "JAM SIBUK" then COLOR_YELLOW else COLOR_TEXT)
+	local incidentCount = tonumber(payload.incidentCount) or 0
+	setValue(
+		"insiden",
+		if incidentCount > 0 then string.format("%d ACTIVE", incidentCount) else "Clear",
+		if incidentCount > 0 then COLOR_RED else COLOR_GREEN
+	)
+	-- Objectives checklist
+	local objectives = payload.objectives or {}
+	for key, row in pairs(objectiveRows) do
+		local done = objectives[key] == true
+		row.Text = (done and "✓ " or "o ") .. objectiveDefs[key]
+		row.TextColor3 = if done then COLOR_GREEN else COLOR_GREY
+	end
+
 end)

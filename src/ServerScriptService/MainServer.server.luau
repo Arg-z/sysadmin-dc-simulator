@@ -116,18 +116,46 @@ starterLaptop.Parent = StarterPack
 local starterCutter = ModelFactory.BuildWireCutter()
 starterCutter.Parent = StarterPack
 
--- ===== Lifecycle pemain =====
+-- ===== Player lifecycle =====
+-- Roblox leaderboard (Fase 3 polish): Cash + Reputation, values mirrored by
+-- ShiftAndEconomyManager.ForceSync on every snapshot.
+local function ensureLeaderstats(player: Player, session: any)
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if leaderstats == nil then
+		leaderstats = Instance.new("Folder")
+		leaderstats.Name = "leaderstats"
+		leaderstats.Parent = player
+	end
+	local cash = leaderstats:FindFirstChild("Cash")
+	if cash == nil then
+		cash = Instance.new("IntValue")
+		cash.Name = "Cash"
+		cash.Parent = leaderstats
+	end
+	local reputation = leaderstats:FindFirstChild("Reputation")
+	if reputation == nil then
+		reputation = Instance.new("IntValue")
+		reputation.Name = "Reputation"
+		reputation.Parent = leaderstats
+	end
+	local cashValue = cash :: IntValue
+	local reputationValue = reputation :: IntValue
+	cashValue.Value = math.floor(session.balance)
+	reputationValue.Value = math.floor(session.reputation)
+end
+
 local function buildSession(player: Player)
 	local session = SessionManager.GetSession(player)
 	if session ~= nil then
-		return -- sudah punya lab
+		return -- already owns a lab
 	end
 	local plotIndex = SessionManager.ClaimNextPlot()
 	if plotIndex == nil then
-		player:Kick("Semua lab penuh (4 pemain). Coba lagi nanti.")
+		player:Kick("All server labs are full (4 players). Please try again later.")
 		return
 	end
 	session = SessionManager.CreateSession(player, plotIndex)
+	ensureLeaderstats(player, session)
 	WorldAndAssetBuilder.BuildFacility(session)
 
 	-- hook interaksi starter devices + facility

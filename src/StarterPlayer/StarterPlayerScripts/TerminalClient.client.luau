@@ -32,7 +32,7 @@ local NetworkUtils = require(sharedFolder:WaitForChild("NetworkUtils"))
 
 local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", 180) :: any
 if remotesFolder == nil then
-	warn("[TerminalClient] ReplicatedStorage.Remotes tidak ditemukan (timeout 180s)")
+	warn("[TerminalClient] ReplicatedStorage.Remotes not found (timeout 180s)")
 	return
 end
 
@@ -116,7 +116,7 @@ hotkeyHint.Font = Enum.Font.Gotham
 hotkeyHint.TextSize = 11
 hotkeyHint.TextXAlignment = Enum.TextXAlignment.Right
 hotkeyHint.TextColor3 = COLOR_GREY
-hotkeyHint.Text = "drag bar | [~]/[F2] tutup"
+hotkeyHint.Text = "drag bar | [~]/[F2] close"
 hotkeyHint.Parent = topBar
 
 -- Hint overlay shown inside the bar area for 3 seconds
@@ -198,7 +198,7 @@ inputBox.BackgroundColor3 = COLOR_BAR
 inputBox.Font = Enum.Font.RobotoMono
 inputBox.TextSize = 14
 inputBox.TextColor3 = COLOR_BLUE
-inputBox.PlaceholderText = "ketik help | Enter=kirim | Tab=lengkapi | Up/Down=riwayat | [~]/[F2]=tutup"
+inputBox.PlaceholderText = "type help | Enter=send | Tab=complete | Up/Down=history | [~]/[F2]=close"
 inputBox.PlaceholderColor3 = COLOR_GREY
 inputBox.ClearTextOnFocus = false
 inputBox.Text = ""
@@ -230,6 +230,7 @@ local COMMANDS = {
 	"top", "vm create", "vm list", "vm throttle", "vm delete", "install-os", "stress-test", "ship",
 	"vlan list", "vlan set", "switch port", "switch list",
 	"cable", "cable use", "cable buy", "cable cut", "mount list", "mount",
+	"incident", "ddos block", "drive status", "drive replace", "shift",
 }
 
 local function scrollToEnd()
@@ -483,7 +484,7 @@ inputBox.FocusLost:Connect(function(enterPressed: boolean)
 		return (executeRemote :: any):InvokeServer(raw)
 	end)
 	if not ok then
-		appendLines({ '<font color="#FF5555">[terminal] gagal mengirim perintah ke server</font>' })
+		appendLines({ '<font color="#FF5555">[terminal] failed to send command to server</font>' })
 	else
 		local lines = (result :: any).lines
 		if type(lines) == "table" then
@@ -606,8 +607,8 @@ if player.Character ~= nil then
 	bindCharacter(player.Character :: Model)
 end
 
--- ===== Welcome banner (Indonesian, PC controls) =====
+-- ===== Welcome banner (English, PC controls) =====
 appendLines({
-	'<font color="#00FF66">[NetSim Terminal] Selamat datang, teknisi.</font>',
-	'<font color="#8B949E">Ketik <b>help</b> untuk daftar perintah. [~] / [F2] / klik X = tutup | Tab = autocomplete | Up/Down = riwayat | Ctrl+L = clear.</font>',
+	'<font color="#00FF66">[NetSim Terminal] Welcome, SysAdmin.</font>',
+	'<font color="#8B949E">Type <b>help</b> for available commands. [~] / [F2] / click X = close | Tab = autocomplete | Up/Down = history | Ctrl+L = clear.</font>',
 })

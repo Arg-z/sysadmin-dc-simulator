@@ -137,7 +137,7 @@ local function resolveSource(session: any): (string, string?)
 		return "", "Not connected"
 	end
 	if session.devices[targetId] == nil then
-		return "", "Not connected: device tidak ditemukan"
+		return "", "Not connected: device not found"
 	end
 	return targetId, nil
 end
@@ -146,7 +146,7 @@ end
 -- Returns (node, errorLine?).
 local function requireDevice(session: any, commandName: string): (any, string?)
 	if session.terminal.mode == "Disconnected" then
-		return nil, commandName .. ": belum terhubung ke device (attach console / ssh <ip> dulu)"
+		return nil, commandName .. ": not connected to a device (attach console cable or 'ssh <ip>' first)"
 	end
 	local targetId = session.terminal.targetDeviceId
 	local node = if targetId ~= nil then session.devices[targetId] else nil
@@ -186,41 +186,47 @@ end
 
 local function cmdHelp(): { string }
 	local lines: { string } = {}
-	table.insert(lines, b("=== NETSIM SHELL - DAFTAR PERINTAH ==="))
-	table.insert(lines, b("-- Jaringan --"))
-	table.insert(lines, "  " .. g("ping <ip>") .. gr("                  uji koneksi (4 packet ICMP)"))
-	table.insert(lines, "  " .. g("traceroute <ip>") .. gr("              telusuri rute hop-per-hop"))
-	table.insert(lines, "  " .. g("vlan list") .. gr("                    VLAN tiap port switch/router aktif"))
-	table.insert(lines, "  " .. g("vlan set <port> <id>") .. gr("        set VLAN port (contoh: vlan set eth2 20)"))
-	table.insert(lines, "  " .. g("switch port <port> vlan <id>") .. gr("  alias VLAN untuk port switch"))
-	table.insert(lines, "  " .. g("switch port <port> trunk on") .. gr("    trunk 802.1Q (semua VLAN lewat)"))
-	table.insert(lines, b("-- Kabel (Fase 2) --"))
-	table.insert(lines, "  " .. g("cable") .. gr("                        stok spool + warna aktif"))
-	table.insert(lines, "  " .. g("cable use <warna>") .. gr("            LAN_Blue | WAN_Yellow | Mgmt_Red"))
-	table.insert(lines, "  " .. g("cable buy <warna>") .. gr("            beli 1 spool (5 kabel)"))
-	table.insert(lines, "  " .. g("cable cut <port>") .. gr("             potong kabel di port device aktif"))
-	table.insert(lines, b("-- Colocation (Fase 2) --"))
-	table.insert(lines, "  " .. g("mount list") .. gr("                   rack + sisa slot U"))
-	table.insert(lines, "  " .. g("mount [rackId]") .. gr("               pasang crate yang sedang dibawa"))
+	table.insert(lines, b("=== NETSIM SHELL - COMMAND REFERENCE ==="))
+	table.insert(lines, b("-- Networking --"))
+	table.insert(lines, "  " .. g("ping <ip>") .. gr("                  test reachability (4 ICMP packets)"))
+	table.insert(lines, "  " .. g("traceroute <ip>") .. gr("              trace hop-by-hop network route"))
+	table.insert(lines, "  " .. g("vlan list") .. gr("                    list port VLANs on active switch/router"))
+	table.insert(lines, "  " .. g("vlan set <port> <id>") .. gr("        set port VLAN (e.g., vlan set eth2 20)"))
+	table.insert(lines, "  " .. g("switch port <port> vlan <id>") .. gr("  switch port VLAN alias"))
+	table.insert(lines, "  " .. g("switch port <port> trunk on") .. gr("    802.1Q trunk (carry all VLANs)"))
+	table.insert(lines, b("-- Cabling --"))
+	table.insert(lines, "  " .. g("cable") .. gr("                        show spool stock & active color"))
+	table.insert(lines, "  " .. g("cable use <color>") .. gr("            LAN_Blue | WAN_Yellow | Mgmt_Red"))
+	table.insert(lines, "  " .. g("cable buy <color>") .. gr("            buy 1 spool (5 cables)"))
+	table.insert(lines, "  " .. g("cable cut <port>") .. gr("             cut cable on active device port"))
+	table.insert(lines, b("-- Colocation --"))
+	table.insert(lines, "  " .. g("mount list") .. gr("                   list racks & available U slots"))
+	table.insert(lines, "  " .. g("mount [rackId]") .. gr("               mount carried colocation crate"))
+	table.insert(lines, b("-- Incidents & Shift --"))
+	table.insert(lines, "  " .. g("incident") .. gr("                      list active outages & resolution steps"))
+	table.insert(lines, "  " .. g("ddos block <ip>") .. gr("             mitigate DDoS from router console"))
+	table.insert(lines, "  " .. g("drive status") .. gr("                 check drive health on active host"))
+	table.insert(lines, "  " .. g("drive replace [bay]") .. gr("         replace failed drive (needs replacement_hdd)"))
+	table.insert(lines, "  " .. g("shift") .. gr("                         shift clock, stats & last settlement"))
 	table.insert(lines, b("-- Interface --"))
-	table.insert(lines, "  " .. g("ip a | ip addr") .. gr("                info hostname, IP, mask, gateway, port"))
-	table.insert(lines, "  " .. g("ip set <ip> <gw> [mask]") .. gr("      set IP statis device aktif"))
+	table.insert(lines, "  " .. g("ip a | ip addr") .. gr("                show hostname, IP, mask, gateway & ports"))
+	table.insert(lines, "  " .. g("ip set <ip> <gw> [mask]") .. gr("      configure static IP on active device"))
 	table.insert(lines, b("-- Remote --"))
-	table.insert(lines, "  " .. g("ssh <ip>") .. gr("                      SSH ke device via management bridge / LAN"))
-	table.insert(lines, "  " .. g("exit") .. gr("                         keluar dari ssh / lepas console"))
-	table.insert(lines, b("-- Sistem --"))
-	table.insert(lines, "  " .. g("top") .. gr("                          monitor CPU/RAM/temp host aktif"))
+	table.insert(lines, "  " .. g("ssh <ip>") .. gr("                      SSH into device via mgmt bridge / LAN"))
+	table.insert(lines, "  " .. g("exit") .. gr("                         exit SSH session / detach console cable"))
+	table.insert(lines, b("-- System --"))
+	table.insert(lines, "  " .. g("top") .. gr("                          monitor CPU/RAM/temp on active host"))
 	table.insert(lines, "  " .. g("install-os <os>") .. gr("              ubuntu-22.04 | debian-12 | rocky-9"))
-	table.insert(lines, "  " .. g("stress-test") .. gr("                   burn-in 5 detik (validasi thermal)"))
-	table.insert(lines, "  " .. g("ship") .. gr("                          kirim custom server workbench ke dock"))
-	table.insert(lines, b("-- VM --"))
+	table.insert(lines, "  " .. g("stress-test") .. gr("                   5-second thermal burn-in validation"))
+	table.insert(lines, "  " .. g("ship") .. gr("                          ship custom workbench server to dock"))
+	table.insert(lines, b("-- Virtual Machines --"))
 	table.insert(lines, "  " .. g("vm create --name <n> --cpu <n> --ram <n> --disk <n>"))
-	table.insert(lines, "  " .. g("vm list") .. gr("                       daftar VM di host aktif"))
-	table.insert(lines, "  " .. g("vm throttle <name> --limit <pct>") .. gr("   batasi CPU VM (5-100)"))
-	table.insert(lines, "  " .. g("vm delete <name>") .. gr("              hapus VM, resource kembali ke host"))
+	table.insert(lines, "  " .. g("vm list") .. gr("                       list VMs on active host"))
+	table.insert(lines, "  " .. g("vm throttle <name> --limit <pct>") .. gr("   cap VM CPU usage (5-100)"))
+	table.insert(lines, "  " .. g("vm delete <name>") .. gr("              delete VM and reclaim host resources"))
 	table.insert(lines, b("-- Terminal --"))
-	table.insert(lines, "  " .. g("clear") .. gr("                        bersihkan layar"))
-	table.insert(lines, "  " .. g("help") .. gr("                         daftar ini"))
+	table.insert(lines, "  " .. g("clear") .. gr("                        clear terminal screen"))
+	table.insert(lines, "  " .. g("help") .. gr("                         show this command list"))
 	return lines
 end
 
@@ -255,7 +261,7 @@ local function cmdPing(session: any, tokens: { string }): { string }
 		gr(string.format("--- %s ping statistics --- 4 packets transmitted, 4 received, 0%% packet loss", targetIP))
 	)
 	if session.broadcastStorm then
-		table.insert(lines, r("PERINGATAN: broadcast storm terdeteksi (ada loop di topology)"))
+		table.insert(lines, r("WARNING: broadcast storm detected (topology loop exists)"))
 	end
 	return lines
 end
@@ -291,7 +297,7 @@ local function cmdTraceroute(session: any, tokens: { string }): { string }
 	end
 
 	local lines: { string } = {}
-	table.insert(lines, gr("traceroute ke " .. targetIP .. ", " .. num(#path - 1) .. " hop:"))
+	table.insert(lines, gr("traceroute to " .. targetIP .. ", " .. num(#path - 1) .. " hops:"))
 	local cumulative = 0
 	for i = 2, #path do
 		local nodeId = path[i]
@@ -318,11 +324,11 @@ local function cmdIpAddr(session: any): { string }
 		-- laptop itself: only the management bridge
 		local lines: { string } = {}
 		table.insert(lines, b("hostname:  ") .. g("technician-laptop"))
-		table.insert(lines, b("inet:      ") .. g(Constants.LAPTOP_BRIDGE_IP .. "/24") .. gr("  (management bridge Wi-Fi)"))
+		table.insert(lines, b("inet:      ") .. g(Constants.LAPTOP_BRIDGE_IP .. "/24") .. gr("  (Wi-Fi management bridge)"))
 		table.insert(lines, b("gateway:   ") .. gr("--"))
 		table.insert(lines, gr("--- ports ---"))
 		table.insert(lines, "  " .. g("wifi0") .. "  " .. g("UP") .. "    " .. gr("vlan 1  peer --"))
-		table.insert(lines, gr("hint: klik port console device ('Connect Console Cable') untuk akses console"))
+		table.insert(lines, gr("hint: equip laptop + press [E] on a device console port to connect"))
 		return lines
 	end
 	local node, err = requireDevice(session, "ip a")
@@ -340,7 +346,7 @@ local function cmdIpAddr(session: any): { string }
 		)
 		table.insert(lines, b("gateway:   ") .. g(node.gateway or "--"))
 	else
-		table.insert(lines, b("inet:      ") .. r("-- belum di-set") .. gr("  (ip set <ip> <gw>)"))
+		table.insert(lines, b("inet:      ") .. r("-- not set") .. gr("  (ip set <ip> <gw>)"))
 		table.insert(lines, b("gateway:   ") .. gr("--"))
 	end
 	table.insert(lines, b("vlan:      ") .. g(num(node.defaultVlan)))
@@ -392,12 +398,12 @@ local function cmdIpSet(session: any, tokens: { string }): { string }
 		return { r("Gateway not in subnet") }
 	end
 	if ip == Constants.LAPTOP_BRIDGE_IP then
-		return { r("IP conflict: " .. ip .. " dipakai bridge laptop") }
+		return { r("IP conflict: " .. ip .. " is reserved for laptop bridge") }
 	end
 	if Graph.IsIPUsedByOther(session, ip, node.id) then
 		local holder = Graph.FindDeviceByIP(session, ip)
 		local holderName = if holder ~= nil then holder.name else "?"
-		return { r("IP conflict: " .. ip .. " sudah dipakai " .. holderName) }
+		return { r("IP conflict: " .. ip .. " is already used by " .. holderName) }
 	end
 	node.ip = ip
 	node.gateway = gateway
@@ -433,7 +439,10 @@ local function cmdSsh(session: any, tokens: { string }): { string }
 			return { r("ssh: connect to host " .. targetIP .. " port 22: No route to host") }
 		end
 		if not targetNode.isPowered then
-			return { r("ssh: connect to host " .. targetIP .. " port 22: Connection refused (device mati)") }
+			return { r("ssh: connect to host " .. targetIP .. " port 22: Connection refused (device powered off)") }
+		end
+		if targetNode.isUnderDDoS == true then
+			return { r("ssh: connect to host " .. targetIP .. " port 22: Operation timed out (target under DDoS flood)") }
 		end
 	else
 		local sourceId, err = resolveSource(session)
@@ -445,7 +454,7 @@ local function cmdSsh(session: any, tokens: { string }): { string }
 			return { r("ssh: connect to host " .. targetIP .. " port 22: No route to host") }
 		end
 		if targetNode.id == sourceId then
-			return { r("ssh: sudah berada di device ini") }
+			return { r("ssh: already connected to this device") }
 		end
 		local reachable, _, reachErr = Graph.CanReachIP(session, sourceId, targetIP)
 		if not reachable then
@@ -464,14 +473,14 @@ local function cmdSsh(session: any, tokens: { string }): { string }
 
 	local lines: { string } = {}
 	table.insert(lines, b("SSH session established -> ") .. g(targetNode.name) .. gr(" (" .. (targetNode.ip or "?") .. ")"))
-	table.insert(lines, gr("ketik 'exit' untuk kembali"))
+	table.insert(lines, gr("type 'exit' to return"))
 	return lines
 end
 
 local function cmdExit(session: any): { string }
 	local term = session.terminal
 	if term.mode == "Disconnected" then
-		return { gr("Sudah di local shell (laptop).") }
+		return { gr("Already in local shell (laptop).") }
 	end
 	if term.mode == "LocalConsole" then
 		-- detach the physical console cable (RackAndCablingSystem notifies client)
@@ -490,19 +499,19 @@ local function cmdExit(session: any): { string }
 		term.mode = "LocalConsole"
 		term.targetDeviceId = consoleNode.id
 		notifyMode(session, "LocalConsole", consoleNode)
-		return { gr("Kembali ke console ") .. g(consoleNode.name) }
+		return { gr("Returned to console ") .. g(consoleNode.name) }
 	elseif top ~= nil and session.devices[top] ~= nil then
 		term.mode = "RemoteSSH"
 		term.targetDeviceId = top
 		local node = session.devices[top]
 		notifyMode(session, "RemoteSSH", node)
-		return { gr("Kembali ke ") .. g(node.name) .. gr(" (" .. (node.ip or "?") .. ")") }
+		return { gr("Returned to ") .. g(node.name) .. gr(" (" .. (node.ip or "?") .. ")") }
 	else
 		term.mode = "Disconnected"
 		term.targetDeviceId = nil
 		term.sshStack = {}
 		notifyMode(session, "Disconnected", nil)
-		return { gr("Kembali ke local shell (laptop).") }
+		return { gr("Returned to local shell (laptop).") }
 	end
 end
 
@@ -540,7 +549,7 @@ local function cmdTop(session: any): { string }
 		table.insert(lines, r("[DDoS] UNDER ATTACK from " .. (node.ddosAttackerIp or "unknown")))
 	end
 	if next(node.vms) == nil then
-		table.insert(lines, gr("  (belum ada VM - coba: vm create --name web-1 --cpu 2 --ram 4 --disk 50)"))
+		table.insert(lines, gr("  (no VMs yet - try: vm create --name web-1 --cpu 2 --ram 4 --disk 50)"))
 		return lines
 	end
 	table.insert(
@@ -585,7 +594,7 @@ local function requireBareMetal(session: any, commandName: string): (any, string
 		return nil, err
 	end
 	if node.deviceType ~= "BareMetal" then
-		return nil, commandName .. ": device bukan BareMetal (" .. node.deviceType .. ")"
+		return nil, commandName .. ": device is not BareMetal (" .. node.deviceType .. ")"
 	end
 	return node, nil
 end
@@ -600,10 +609,10 @@ local function cmdVmCreate(session: any, tokens: { string }): { string }
 		return { r(err) }
 	end
 	if node.osInstalled == nil then
-		return { r("vm create: OS belum terinstall (install-os dulu)") }
+		return { r("vm create: OS is not installed yet (run 'install-os' first)") }
 	end
 	if not node.isPowered then
-		return { r("vm create: device mati (nyalakan dulu)") }
+		return { r("vm create: device is powered off (turn it on first)") }
 	end
 	local name = parseFlag(tokens, "--name")
 	local cpu = tonumber(parseFlag(tokens, "--cpu") or "")
@@ -613,14 +622,14 @@ local function cmdVmCreate(session: any, tokens: { string }): { string }
 		return { r("vm create: usage: vm create --name <n> --cpu <n> --ram <n> --disk <n>") }
 	end
 	if cpu <= 0 or ram <= 0 or disk <= 0 then
-		return { r("vm create: --cpu / --ram / --disk harus > 0") }
+		return { r("vm create: --cpu / --ram / --disk must be > 0") }
 	end
 	-- sanitize VM name: 1-16 chars of [A-Za-z0-9_-]
 	if #name > 16 or string.match(name, "^[%w%-_]+$") == nil then
-		return { r("vm create: nama VM invalid (1-16 huruf/angka/-/_): '" .. name .. "'") }
+		return { r("vm create: invalid VM name (1-16 letters/digits/-/_): '" .. name .. "'") }
 	end
 	if node.vms[name] ~= nil then
-		return { r("vm create: nama VM '" .. name .. "' sudah dipakai di host ini") }
+		return { r("vm create: VM name '" .. name .. "' already exists on this host") }
 	end
 	-- capacity check against the host specs
 	local usedCpu, usedRam, usedDisk = 0, 0, 0
@@ -631,13 +640,13 @@ local function cmdVmCreate(session: any, tokens: { string }): { string }
 	end
 	local specs = node.specs
 	if usedCpu + cpu > specs.cpu then
-		return { r(string.format("vm create: CPU penuh (%s/%s terpakai, diminta %s)", num(usedCpu), num(specs.cpu), num(cpu))) }
+		return { r(string.format("vm create: insufficient CPU (%s/%s used, requested %s)", num(usedCpu), num(specs.cpu), num(cpu))) }
 	end
 	if usedRam + ram > specs.ram then
-		return { r(string.format("vm create: RAM penuh (%s/%s GB terpakai, diminta %s GB)", num(usedRam), num(specs.ram), num(ram))) }
+		return { r(string.format("vm create: insufficient RAM (%s/%s GB used, requested %s GB)", num(usedRam), num(specs.ram), num(ram))) }
 	end
 	if usedDisk + disk > specs.disk then
-		return { r(string.format("vm create: disk penuh (%s/%s GB terpakai, diminta %s GB)", num(usedDisk), num(specs.disk), num(disk))) }
+		return { r(string.format("vm create: insufficient disk (%s/%s GB used, requested %s GB)", num(usedDisk), num(specs.disk), num(disk))) }
 	end
 	-- assign an internal IP from the per-host counter (10.0.0.x)
 	local nextIndex = (session.vmIpCounter[node.id] or 1) + 1
@@ -671,7 +680,7 @@ local function cmdVmList(session: any): { string }
 		return { r(err) }
 	end
 	if next(node.vms) == nil then
-		return { gr("(kosong) Belum ada VM di " .. node.name) }
+		return { gr("(empty) No VMs running on " .. node.name) }
 	end
 	local lines: { string } = {}
 	table.insert(lines, vmHeader(node))
@@ -719,12 +728,12 @@ local function cmdVmThrottle(session: any, tokens: { string }): { string }
 	end
 	local limit = tonumber(limitRaw)
 	if limit == nil then
-		return { r("vm throttle: limit harus angka (5-100)") }
+		return { r("vm throttle: limit must be a number (5-100)") }
 	end
 	limit = math.clamp(math.floor(limit + 0.5), 5, 100)
 	local vm = node.vms[name]
 	if vm == nil then
-		return { r("vm throttle: VM '" .. name .. "' tidak ditemukan") }
+		return { r("vm throttle: VM '" .. name .. "' not found") }
 	end
 	vm.cpuThrottlePercent = limit
 	vm.status = if limit < 100 then "throttled" else "running"
@@ -741,10 +750,10 @@ local function cmdVmDelete(session: any, tokens: { string }): { string }
 		return { r("vm delete: usage: vm delete <name>") }
 	end
 	if node.vms[name] == nil then
-		return { r("vm delete: VM '" .. name .. "' tidak ditemukan") }
+		return { r("vm delete: VM '" .. name .. "' not found") }
 	end
 	node.vms[name] = nil
-	return { g("VM '" .. name .. "' deleted, resource dikembalikan ke host") }
+	return { g("VM '" .. name .. "' deleted, resources returned to host") }
 end
 
 local function cmdVm(session: any, tokens: { string }): { string }
@@ -792,12 +801,12 @@ local function cmdInstallOs(player: Player, session: any, tokens: { string }): {
 	end
 	local osName = string.lower(tokens[2] or "")
 	if not VALID_OS[osName] then
-		return { r("install-os: pilih salah satu: install-os ubuntu-22.04 | debian-12 | rocky-9") }
+		return { r("install-os: choose one: install-os ubuntu-22.04 | debian-12 | rocky-9") }
 	end
 	local deviceId = node.id
 	local guardKey = "installing_" .. deviceId
 	if session.flags[guardKey] then
-		return { r("install-os: instalasi sudah berjalan di " .. node.name) }
+		return { r("install-os: installation already running on " .. node.name) }
 	end
 	session.flags[guardKey] = true
 
@@ -820,8 +829,8 @@ local function cmdInstallOs(player: Player, session: any, tokens: { string }): {
 		liveSession.flags["installing_" .. deviceId] = nil
 		liveNode.osInstalled = osName
 		pushLines(player, {
-			g("[ ok ] OS terinstall: " .. osName .. " on " .. liveNode.name),
-			gr("Lanjut: vm create --name <n> --cpu <n> --ram <n> --disk <n>"),
+			g("[ ok ] OS installed: " .. osName .. " on " .. liveNode.name),
+			gr("Next: vm create --name <n> --cpu <n> --ram <n> --disk <n>"),
 		})
 		playSfx(player, "cash")
 	end)
@@ -834,19 +843,19 @@ local function cmdStressTest(player: Player, session: any, _tokens: { string }):
 		return { r(err) }
 	end
 	if node.osInstalled == nil then
-		return { r("stress-test: OS belum terinstall (install-os dulu)") }
+		return { r("stress-test: OS not installed yet (run 'install-os' first)") }
 	end
 	local deviceId = node.id
 	local guardKey = "stress_" .. deviceId
 	if session.flags[guardKey] then
-		return { r("stress-test: sudah berjalan di " .. node.name) }
+		return { r("stress-test: already running on " .. node.name) }
 	end
 	session.flags[guardKey] = true
 
 	local lines: { string } = {}
 	table.insert(lines, gr("stress-test: running burn-in on ") .. g(node.name) .. gr(" ..."))
-	table.insert(lines, gr("  cpu: 100% semua core | ram sweep | nvme seq+rand"))
-	table.insert(lines, gr("  hasil akan muncul dalam ±5 detik ..."))
+	table.insert(lines, gr("  cpu: 100% all cores | ram sweep | nvme seq+rand"))
+	table.insert(lines, gr("  results will appear in ~5 seconds ..."))
 
 	task.delay(5, function()
 		local liveSession = if Sessions ~= nil then Sessions.GetSession(player) else nil
@@ -863,15 +872,15 @@ local function cmdStressTest(player: Player, session: any, _tokens: { string }):
 		liveNode.temperatureC = peakTemp
 		local resultLines: { string } = {}
 		if peakTemp < 80 then
-			table.insert(resultLines, g(string.format("[PASS] stress-test 5s: temp peak %.1fC (limit 80C)", peakTemp)))
-			table.insert(resultLines, gr("CPU / RAM / storage: semua OK - server tervalidasi"))
+			table.insert(resultLines, g(string.format("[PASS] stress-test 5s: peak temp %.1fC (limit 80C)", peakTemp)))
+			table.insert(resultLines, gr("CPU / RAM / storage: all OK - server validated"))
 			if deviceId == "bench_1" and liveSession.workbench ~= nil then
 				liveSession.workbench.tested = true
-				table.insert(resultLines, g("Custom build validated - ketik 'ship' untuk kirim crate ke dock"))
+				table.insert(resultLines, g("Custom build validated - type 'ship' to send crate to dock"))
 			end
 			playSfx(player, "cash")
 		else
-			table.insert(resultLines, r(string.format("[FAIL] stress-test: temp peak %.1fC (>= 80C)", peakTemp)))
+			table.insert(resultLines, r(string.format("[FAIL] stress-test: peak temp %.1fC (>= 80C)", peakTemp)))
 		end
 		pushLines(player, resultLines)
 	end)
@@ -880,15 +889,15 @@ end
 
 local function cmdShip(session: any): { string }
 	if Workbench == nil or type(Workbench.Ship) ~= "function" then
-		return { r("ship: sistem workbench tidak tersedia") }
+		return { r("ship: workbench system is not available") }
 	end
 	local ok, errMsg = Workbench.Ship(session)
 	if not ok then
 		return { r("ship: " .. tostring(errMsg)) }
 	end
 	return {
-		g("[ ok ] Custom server dikirim ke Loading Dock!"),
-		gr("Payout sudah ditambahkan ke saldo lab."),
+		g("[ ok ] Custom server shipped to Loading Dock!"),
+		gr("Contract payout added to your lab balance."),
 	}
 end
 
@@ -934,15 +943,15 @@ end
 local function cableStockLines(session: any): { string }
 	local selected = session.selectedCableColor or "LAN_Blue"
 	local lines: { string } = {
-		b("=== SPOOL KABEL ==="),
-		string.format("  Warna aktif : %s", selected),
+		b("=== CABLE SPOOLS ==="),
+		string.format("  Active color : %s", selected),
 	}
 	for _, color in ipairs(Constants.CABLES.colors) do
 		local label = Constants.CABLES.labels[color] or color
 		local count = tonumber(session.cableSpools[color]) or 0
-		table.insert(lines, string.format("  %-10s : %d kabel  (%s)", color, count, label))
+		table.insert(lines, string.format("  %-10s : %d cables (%s)", color, count, label))
 	end
-	table.insert(lines, gr("cable use <warna> | cable buy <warna> | cable cut <port>"))
+	table.insert(lines, gr("cable use <color> | cable buy <color> | cable cut <port>"))
 	return lines
 end
 
@@ -955,24 +964,24 @@ local function cmdCable(player: Player, session: any, tokens: { string }): { str
 	if sub == "use" then
 		local color = normalizeCableColor(tokens[3])
 		if color == nil then
-			return { r("cable use: pilih LAN_Blue | WAN_Yellow | Mgmt_Red") }
+			return { r("cable use: choose LAN_Blue | WAN_Yellow | Mgmt_Red") }
 		end
 		session.selectedCableColor = color
 		playSfx(player, "key")
-		return { g("Warna kabel aktif: " .. color .. " (" .. (Constants.CABLES.labels[color] or color) .. ")") }
+		return { g("Active cable color: " .. color .. " (" .. (Constants.CABLES.labels[color] or color) .. ")") }
 	end
 
 	if sub == "buy" then
 		local color = normalizeCableColor(tokens[3]) or session.selectedCableColor or "LAN_Blue"
 		local itemId = Constants.CABLES.itemByColor[color]
 		if itemId == nil then
-			return { r("cable buy: warna tidak dikenal") }
+			return { r("cable buy: unknown cable color") }
 		end
 		if Placement == nil then
-			return { r("cable buy: sistem store tidak tersedia") }
+			return { r("cable buy: store system not available") }
 		end
 		Placement.OnPurchase(player, itemId, "buy", nil, nil)
-		return { gr("Pembelian spool " .. color .. " diproses.") }
+		return { gr("Spool purchase for " .. color .. " processed.") }
 	end
 
 	if sub == "cut" then
@@ -987,21 +996,21 @@ local function cmdCable(player: Player, session: any, tokens: { string }): { str
 		end
 		local node = session.devices[deviceId]
 		if node == nil then
-			return { r("cable cut: device tidak ditemukan") }
+			return { r("cable cut: device not found") }
 		end
 		local port = node.ports[portId]
 		if port == nil then
-			return { r("cable cut: port tidak ditemukan") }
+			return { r("cable cut: port not found") }
 		end
 		if port.connectedToDeviceId == nil then
-			return { r(string.format("%s:%s tidak tersambung", node.name, portId)) }
+			return { r(string.format("%s:%s is not connected", node.name, portId)) }
 		end
 		Graph.DisconnectPort(session, deviceId, portId)
 		playSfx(player, "plug")
-		return { g(string.format("Kabel di %s:%s dipotong.", node.name, portId)) }
+		return { g(string.format("Cable on %s:%s disconnected.", node.name, portId)) }
 	end
 
-	return { r("cable: usage: cable | cable use <warna> | cable buy <warna> | cable cut <port>") }
+	return { r("cable: usage: cable | cable use <color> | cable buy <color> | cable cut <port>") }
 end
 
 local function vlanUsage(): { string }
@@ -1014,13 +1023,13 @@ local function cmdVlan(session: any, tokens: { string }): { string }
 		local deviceId = vlanDeviceId(session)
 		local node = session.devices[deviceId]
 		if node == nil then
-			return { r("vlan: device aktif tidak ditemukan") }
+			return { r("vlan: active device not found") }
 		end
 		local lines: { string } = { b(string.format("=== VLAN %s (%s) ===", node.name, deviceId)) }
 		for _, line in ipairs(Graph.ListPortVlans(session, deviceId)) do
 			table.insert(lines, "  " .. line)
 		end
-		table.insert(lines, gr("Set: vlan set <port> <id>   contoh: vlan set eth2 20"))
+		table.insert(lines, gr("Set: vlan set <port> <id>   e.g.: vlan set eth2 20"))
 		return lines
 	end
 
@@ -1062,14 +1071,14 @@ local function cmdVlan(session: any, tokens: { string }): { string }
 	end
 	local node = session.devices[deviceId]
 	if node == nil then
-		return { r("vlan: device tidak ditemukan") }
+		return { r("vlan: device not found") }
 	end
 	if node.deviceType ~= "Switch" and node.deviceType ~= "Router" then
-		return { r("vlan: hanya port switch/router yang punya VLAN") }
+		return { r("vlan: only switch/router ports support VLANs") }
 	end
 	local vlan = tonumber(vlanRaw)
 	if vlan == nil then
-		return { r("vlan: id harus angka 1..4094") }
+		return { r("vlan: id must be a number 1..4094") }
 	end
 	local ok, err = Graph.SetPortVlan(session, deviceId, portId, vlan)
 	if not ok then
@@ -1088,15 +1097,15 @@ local function cmdSwitch(session: any, tokens: { string }): { string }
 	end
 	local node = session.devices[deviceId]
 	if node == nil then
-		return { r("switch: device tidak ditemukan") }
+		return { r("switch: device not found") }
 	end
 	if node.deviceType ~= "Switch" and node.deviceType ~= "Router" then
-		return { r("switch: perintah ini hanya untuk switch/router") }
+		return { r("switch: command is only for switches/routers") }
 	end
 
 	local action = tokens[index]
 	if action == nil or action == "list" then
-		local lines: { string } = { b(string.format("=== PORT %s (%s) ===", node.name, deviceId)) }
+		local lines: { string } = { b(string.format("=== PORTS %s (%s) ===", node.name, deviceId)) }
 		for _, line in ipairs(Graph.ListPortVlans(session, deviceId)) do
 			table.insert(lines, "  " .. line)
 		end
@@ -1125,7 +1134,7 @@ local function cmdSwitch(session: any, tokens: { string }): { string }
 	end
 	local vlan = tonumber(value)
 	if vlan == nil then
-		return { r("switch: id VLAN harus angka 1..4094") }
+		return { r("switch: VLAN id must be a number 1..4094") }
 	end
 	local ok, err = Graph.SetPortVlan(session, deviceId, portId, vlan)
 	if not ok then
@@ -1142,7 +1151,7 @@ local function cmdMount(session: any, tokens: { string }): { string }
 			table.insert(rackIds, rackId)
 		end
 		table.sort(rackIds)
-		local lines: { string } = { b("=== RACK & SLOT ===") }
+		local lines: { string } = { b("=== RACKS & SLOTS ===") }
 		for _, rackId in ipairs(rackIds) do
 			local rack = session.racks[rackId]
 			local used = 0
@@ -1157,24 +1166,185 @@ local function cmdMount(session: any, tokens: { string }): { string }
 				used,
 				rack.maxU,
 				if rack.pduPowered then "ON" else "OFF",
-				if free ~= nil then string.format("muat %dU di U%d", Constants.COLOCATION.uSize, free) else "penuh"
+				if free ~= nil then string.format("fits %dU at U%d", Constants.COLOCATION.uSize, free) else "full"
 			))
 		end
-		table.insert(lines, gr("Angkat crate colocation, lalu: mount <rackId>"))
+		table.insert(lines, gr("Pick up colocation crate, then run: mount <rackId>"))
 		return lines
 	end
 
 	if Carry == nil then
-		return { r("mount: sistem carry tidak tersedia") }
+		return { r("mount: carry system not available") }
 	end
 	local rackId = sub
 	if session.racks[rackId] == nil then
-		return { r("mount: rack tidak ditemukan (" .. tostring(rackId) .. ")") }
+		return { r("mount: rack not found (" .. tostring(rackId) .. ")") }
 	end
 	if Carry.MountCarried(session, rackId) then
-		return { g("Crate dipasang di " .. rackId) }
+		return { g("Crate mounted into " .. rackId) }
 	end
 	return {}
+end
+
+---------------------------------------------------------------------
+-- Fase 3: incidents, DDoS mitigation, drive replacement, shift info
+---------------------------------------------------------------------
+
+local function cmdIncident(session: any): { string }
+	local lines: { string } = { b("=== ACTIVE / RECENT INCIDENTS ===") }
+	local shown = 0
+	for _, t in ipairs(session.tickets or {}) do
+		if t.category == "Incident" and (t.status == "Active" or t.status == "Completed" or t.status == "Failed") then
+			shown += 1
+			local headerColor = if t.status == "Active" then r(t.title) elseif t.status == "Completed" then g(t.title) else gr(t.title)
+			local sla = if t.status == "Active" then string.format("  SLA %ds", t.slaRemainingSec or 0) else "  [" .. tostring(t.status) .. "]"
+			table.insert(lines, headerColor .. gr(sla))
+			if t.validationText ~= nil and t.validationText ~= "" then
+				table.insert(lines, gr("  Status : ") .. t.validationText)
+			end
+			if t.requirementsText ~= nil and t.requirementsText ~= "" then
+				table.insert(lines, gr("  Resolve: ") .. t.requirementsText)
+			end
+		end
+	end
+	if shown == 0 then
+		table.insert(lines, gr("No active incidents. Outages may trigger during peak hours (11:00-17:00)."))
+	end
+	return lines
+end
+
+local function cmdDDoS(player: Player, session: any, tokens: { string }): { string }
+	local sub = if tokens[2] ~= nil then string.lower(tokens[2]) else "list"
+	if sub ~= "block" then
+		local lines: { string } = { b("=== DDoS STATUS ===") }
+		local found = 0
+		for _, node in pairs(session.devices) do
+			if node.isUnderDDoS == true then
+				found += 1
+				table.insert(lines, r(string.format("%s (%s) under attack from %s", node.name, node.ip or "?", node.ddosAttackerIp or "?")))
+			end
+		end
+		if found == 0 then
+			table.insert(lines, gr("No active DDoS attacks."))
+		end
+		table.insert(lines, gr("Mitigate: run 'ddos block <attackerIp>' on router console."))
+		return lines
+	end
+
+	local ip = tokens[3]
+	if ip == nil then
+		return { r("ddos block: usage: ddos block <ip>") }
+	end
+	if Utils == nil or not Utils.IsValidIPv4(ip) then
+		return { r("ddos block: invalid IPv4 address") }
+	end
+	local node, err = requireDevice(session, "ddos block")
+	if err ~= nil then
+		return { r(err) }
+	end
+	if node.deviceType ~= "Router" then
+		return { r("ddos block: run on router console (not " .. node.name .. ")") }
+	end
+	node.blockedIps[ip] = true
+	local cleared = 0
+	for _, victim in pairs(session.devices) do
+		if victim.isUnderDDoS == true and victim.ddosAttackerIp == ip then
+			victim.isUnderDDoS = false
+			victim.ddosAttackerIp = nil
+			cleared += 1
+			if Graph ~= nil then
+				Graph.UpdateDeviceLED(session, victim.id)
+			end
+		end
+	end
+	playSfx(player, if cleared > 0 then "plug" else "error")
+	local lines: { string } = {
+		g(string.format("Firewall %s: blocked %s.", node.name, ip)),
+	}
+	if cleared > 0 then
+		table.insert(lines, g(string.format("%d device(s) recovered from DDoS flood.", cleared)))
+	else
+		table.insert(lines, gr("No active target matched that IP (rule saved)."))
+	end
+	return lines
+end
+
+local function cmdDrive(player: Player, session: any, tokens: { string }): { string }
+	local node, err = requireDevice(session, "drive")
+	if err ~= nil then
+		return { r(err) }
+	end
+	if session.spareParts == nil then
+		session.spareParts = { hdd = 0 }
+	end
+	local sub = if tokens[2] ~= nil then string.lower(tokens[2]) else "status"
+	local spares = tonumber(session.spareParts.hdd) or 0
+
+	if sub == "status" then
+		local lines: { string } = { b("=== DRIVE " .. node.name .. " ===") }
+		if node.hasDegradedDrive == true then
+			table.insert(lines, r(string.format("Bay %d: FAILED - performance degraded, host payout paused", node.degradedBayIndex or 0)))
+		else
+			table.insert(lines, g("All drives healthy."))
+		end
+		table.insert(lines, gr("Spare replacement_hdd: " .. tostring(spares)))
+		table.insert(lines, gr("Replace: drive replace <bay> (buy replacement_hdd in Store > Component)"))
+		return lines
+	end
+
+	if sub ~= "replace" then
+		return { r("drive: usage: drive status | drive replace [bay]") }
+	end
+	if node.hasDegradedDrive ~= true then
+		return { r("drive replace: no failed drive on " .. node.name) }
+	end
+	local bay = tonumber(tokens[3]) or node.degradedBayIndex
+	if bay == nil then
+		return { r("drive replace: unknown bay") }
+	end
+	if node.degradedBayIndex ~= nil and bay ~= node.degradedBayIndex then
+		return { r(string.format("drive replace: bay %d is healthy - failed bay is %d", bay, node.degradedBayIndex)) }
+	end
+	if spares <= 0 then
+		return { r("drive replace: no replacement_hdd in stock. Buy one in Store > Component ($90).") }
+	end
+	session.spareParts.hdd = spares - 1
+	node.hasDegradedDrive = false
+	node.degradedBayIndex = nil
+	if Graph ~= nil then
+		Graph.UpdateDeviceLED(session, node.id)
+	end
+	playSfx(player, "plug")
+	return {
+		g(string.format("Drive bay %d replaced on %s. Storage array healthy.", bay, node.name)),
+		gr("Remaining spare replacement_hdd: " .. tostring(session.spareParts.hdd)),
+	}
+end
+
+local function cmdShift(session: any): { string }
+	local shift = session.shift
+	if shift == nil then
+		return { r("shift: shift state unavailable") }
+	end
+	local total = math.floor(shift.clockMinutes) % (24 * 60)
+	local phase = "SHIFT"
+	if shift.clockMinutes >= Constants.SHIFT.peakStartMinutes and shift.clockMinutes < Constants.SHIFT.peakEndMinutes then
+		phase = "PEAK HOURS (11:00-17:00)"
+	elseif shift.clockMinutes >= Constants.SHIFT.peakEndMinutes then
+		phase = "CLOSING"
+	end
+	local lines: { string } = {
+		b("=== SHIFT STATUS ==="),
+		string.format("  Day         : %d", session.day),
+		string.format("  Time        : %02d:%02d  (%s)", math.floor(total / 60), total % 60, phase),
+		string.format("  Contracts   : %d completed", shift.stats.contractsCompleted),
+		string.format("  Incidents   : %d resolved, %d failed", shift.stats.incidentsResolved, shift.stats.incidentsFailed),
+	}
+	if shift.lastSettlementText ~= nil then
+		table.insert(lines, gr("  Last Settle : " .. shift.lastSettlementText))
+	end
+	table.insert(lines, gr("Shift runs 08:00-18:00; daily settlement runs at 18:00."))
+	return lines
 end
 
 ---------------------------------------------------------------------
@@ -1215,21 +1385,29 @@ local function dispatch(player: Player, session: any, tokens: { string }): { str
 		return cmdSwitch(session, tokens)
 	elseif cmd == "mount" then
 		return cmdMount(session, tokens)
+	elseif cmd == "incident" or cmd == "insiden" then
+		return cmdIncident(session)
+	elseif cmd == "ddos" then
+		return cmdDDoS(player, session, tokens)
+	elseif cmd == "drive" then
+		return cmdDrive(player, session, tokens)
+	elseif cmd == "shift" then
+		return cmdShift(session)
 	end
-	return { r("command not found: " .. cmd) .. gr("  (ketik 'help')") }
+	return { r("command not found: " .. cmd) .. gr("  (type 'help')") }
 end
 
 -- ExecuteCommand.OnServerInvoke(player, rawText) -> {lines = {string}}
 local function onInvoke(player: Player, rawText: any): { lines: { string } }
 	local session = if Sessions ~= nil then Sessions.GetSession(player) else nil
 	if session == nil then
-		return { lines = { r("Session belum siap. Tunggu sebentar ...") } }
+		return { lines = { r("Session not ready yet. Please wait a moment ...") } }
 	end
 	if type(rawText) ~= "string" or #rawText == 0 then
 		return { lines = {} }
 	end
 	if #rawText > 240 then
-		return { lines = { r("command terlalu panjang (max 240 karakter)") } }
+		return { lines = { r("command too long (max 240 characters)") } }
 	end
 	local tokens: { string } = {}
 	for token in string.gmatch(rawText, "%S+") do

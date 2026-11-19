@@ -32,6 +32,14 @@ local BEAM_COLORS: { [string]: ColorSequence } = {
 	Mgmt_Red = ColorSequence.new(Color3.fromRGB(230, 80, 80)),
 }
 
+-- Dark braided-jacket shade drawn under the coloured core beam so cables
+-- read as round two-tone leads instead of flat single ribbons.
+local BEAM_SHEATH_COLORS: { [string]: Color3 } = {
+	LAN_Blue = Color3.fromRGB(28, 52, 105),
+	WAN_Yellow = Color3.fromRGB(122, 102, 32),
+	Mgmt_Red = Color3.fromRGB(108, 36, 36),
+}
+
 local LED_GREEN = Color3.fromRGB(85, 255, 120)
 local LED_RED = Color3.fromRGB(255, 80, 80)
 local LED_OFF = Color3.fromRGB(70, 70, 70)
@@ -43,6 +51,15 @@ local AUTO_CABLE_RANGE = 60 -- studs
 -- Init(deps): shared modules are required directly at the top, so deps are
 -- reserved for future use (CONTRACT allows ignoring them).
 function NetworkGraph.Init(_deps: { [string]: any }) end
+
+--[[ Stable key for one physical link, independent of endpoint order.
+	 Used by the Fase 3 incident engine (Cable Fault marks a link as bad and
+	 clears the mark once the player re-cables the same pair). ]]
+function NetworkGraph.LinkKey(devA: string, portA: string, devB: string, portB: string): string
+	local left = devA .. "|" .. portA
+	local right = devB .. "|" .. portB
+	return if left <= right then left .. ">" .. right else right .. ">" .. left
+end
 
 ---------------------------------------------------------------------
 -- Port / node factories
@@ -189,6 +206,7 @@ function NetworkGraph.RemoveDevice(session: any, deviceId: string)
 end
 
 -- StatusLED green/red by power state; port LEDs green when linkUp else off.
+-- A DDoSed device reports red even while powered.
 function NetworkGraph.UpdateDeviceLED(session: any, deviceId: string)
 	local node = session.devices[deviceId]
 	local model = session.deviceModels[deviceId]
@@ -197,7 +215,11 @@ function NetworkGraph.UpdateDeviceLED(session: any, deviceId: string)
 	end
 	local led = model:FindFirstChild("StatusLED", true)
 	if led ~= nil and led:IsA("BasePart") then
-		led.Color = if node.isPowered then LED_GREEN else LED_RED
+		if node.isUnderDDoS then
+			led.Color = LED_RED
+		else
+			led.Color = if node.isPowered then LED_GREEN else LED_RED
+		end
 	end
 	for _, port in pairs(node.ports) do
 		local ledPart = model:FindFirstChild("PortLED_" .. port.portId, true)
@@ -217,6 +239,14 @@ local function findPortPart(session: any, deviceId: string, portId: string): Bas
 	if model == nil then
 		return nil
 	end
+	-- Ports are now multi-part assemblies (jack + bezel + mouth details all
+	-- carry PortId); the beam anchor lives on the part owning PortAttach.
+	for _, desc in ipairs(model:GetDescendants()) do
+		if desc:IsA("BasePart") and desc:GetAttribute("PortId") == portId
+			and desc:FindFirstChild("PortAttach") ~= nil then
+			return desc
+		end
+	end
 	for _, desc in ipairs(model:GetDescendants()) do
 		if desc:IsA("BasePart") and desc:GetAttribute("PortId") == portId then
 			return desc
@@ -234,28 +264,28 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 	local a = session.devices[devAId]
 	local b = session.devices[devBId]
 	if a == nil or b == nil then
-		return false, "Device tidak ditemukan"
+		return false, "Device not found"
 	end
 	if devAId == devBId then
-		return false, "Tidak bisa menghubungkan device ke dirinya sendiri"
+		return false, "Cannot connect a device to itself"
 	end
 	local pa = a.ports[portAId]
 	local pb = b.ports[portBId]
 	if pa == nil or pb == nil then
-		return false, "Port tidak ditemukan"
+		return false, "Port not found"
 	end
 	if pa.portType == "Console" or pb.portType == "Console" then
-		return false, "Port console hanya untuk kabel console laptop"
+		return false, "Console port is only for laptop console cable"
 	end
 	if pa.connectedToDeviceId ~= nil or pb.connectedToDeviceId ~= nil then
-		return false, "Port sudah terpakai"
+		return false, "Port is already in use"
 	end
 	-- type compatibility: WAN-WAN, RJ45-RJ45, SFP-SFP, RJ45 <-> SFP
 	local compatible = pa.portType == pb.portType
 		or (pa.portType == "RJ45" and pb.portType == "SFP")
 		or (pa.portType == "SFP" and pb.portType == "RJ45")
 	if not compatible then
-		return false, "Tipe port tidak kompatibel (" .. pa.portType .. " vs " .. pb.portType .. ")"
+		return false, "Incompatible port types (" .. pa.portType .. " vs " .. pb.portType .. ")"
 	end
 
 	-- Fase 2 cable colours: yellow is reserved for WAN uplinks, LAN/Mgmt for
@@ -263,10 +293,10 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 	local bothWan = pa.portType == "WAN" and pb.portType == "WAN"
 	local cableColor: string = if BEAM_COLORS[color] ~= nil then color else "LAN_Blue"
 	if bothWan and cableColor ~= "WAN_Yellow" then
-		return false, "Port WAN membutuhkan kabel kuning (WAN_Yellow)"
+		return false, "WAN port requires a yellow cable (WAN_Yellow)"
 	end
 	if not bothWan and cableColor == "WAN_Yellow" then
-		return false, "Kabel WAN kuning hanya untuk port WAN"
+		return false, "Yellow WAN cable is only for WAN ports"
 	end
 
 	local cableId = SessionManager.NextCableId(session)
@@ -286,30 +316,49 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 	local attachA = if partA ~= nil then partA:FindFirstChild("PortAttach") else nil
 	local attachB = if partB ~= nil then partB:FindFirstChild("PortAttach") else nil
 	local beam: Beam? = nil
+	local sheath: Beam? = nil
 	if attachA ~= nil and attachB ~= nil and attachA:IsA("Attachment") and attachB:IsA("Attachment") then
-		beam = Instance.new("Beam")
-		beam.Name = "Cable_" .. cableId
-		beam.Attachment0 = attachA
-		beam.Attachment1 = attachB
-		beam.Color = BEAM_COLORS[cableColor] :: ColorSequence
-		beam.Transparency = NumberSequence.new(0.1)
-		beam.Width0 = 0.12
-		beam.Width1 = 0.12
-		beam.CurveSize0 = -0.6
-		beam.CurveSize1 = -0.6
-		beam.Segments = 12
-		beam.FaceCamera = true
+		-- Sag scales with run length so long runs droop naturally.
+		local dist = (attachA.WorldPosition - attachB.WorldPosition).Magnitude
+		local droop = -math.clamp(dist * 0.06, 0.4, 1.4)
 		local facility = session.facility
 		local cablesFolder = if facility ~= nil then facility.cables else nil
-		if cablesFolder ~= nil then
-			beam.Parent = cablesFolder
-		else
+		local cableParent = cablesFolder
+		if cableParent == nil then
 			-- fallback during facility build (cables folder not assigned yet):
-			-- keep the beam under the device model so it still renders in-world
-			local modelA = session.deviceModels[devAId]
-			if modelA ~= nil then
-				beam.Parent = modelA
-			end
+			-- keep the beams under the device model so they still render in-world
+			cableParent = session.deviceModels[devAId]
+		end
+		if cableParent ~= nil then
+			-- Outer braided jacket (wider, darker, more transparent)
+			sheath = Instance.new("Beam")
+			sheath.Name = "CableSheath_" .. cableId
+			sheath.Attachment0 = attachA
+			sheath.Attachment1 = attachB
+			sheath.Color = ColorSequence.new(BEAM_SHEATH_COLORS[cableColor])
+			sheath.Transparency = NumberSequence.new(0.3)
+			sheath.Width0 = 0.26
+			sheath.Width1 = 0.26
+			sheath.CurveSize0 = droop
+			sheath.CurveSize1 = droop
+			sheath.Segments = 16
+			sheath.FaceCamera = true
+			sheath.Parent = cableParent
+
+			-- Inner coloured core on top
+			beam = Instance.new("Beam")
+			beam.Name = "Cable_" .. cableId
+			beam.Attachment0 = attachA
+			beam.Attachment1 = attachB
+			beam.Color = BEAM_COLORS[cableColor] :: ColorSequence
+			beam.Transparency = NumberSequence.new(0.05)
+			beam.Width0 = 0.14
+			beam.Width1 = 0.14
+			beam.CurveSize0 = droop
+			beam.CurveSize1 = droop
+			beam.Segments = 16
+			beam.FaceCamera = true
+			beam.Parent = cableParent
 		end
 	end
 
@@ -321,7 +370,13 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 		bPortId = portBId,
 		color = cableColor,
 		beam = beam,
+		sheath = sheath,
 	}
+
+	-- A fresh cable on this exact pair repairs an active Cable Fault incident.
+	if session.incidentFaults ~= nil then
+		session.incidentFaults[NetworkGraph.LinkKey(devAId, portAId, devBId, portBId)] = nil
+	end
 
 	NetworkGraph.UpdateDeviceLED(session, devAId)
 	NetworkGraph.UpdateDeviceLED(session, devBId)
@@ -349,6 +404,9 @@ function NetworkGraph.DisconnectPort(session: any, deviceId: string, portId: str
 		if match then
 			if cable.beam ~= nil then
 				cable.beam:Destroy()
+			end
+			if cable.sheath ~= nil then
+				cable.sheath:Destroy()
 			end
 			session.cables[cableId] = nil
 			break
@@ -384,21 +442,21 @@ end
 function NetworkGraph.SetPortVlan(session: any, deviceId: string, portId: string, vlanId: number): (boolean, string)
 	local node = session.devices[deviceId]
 	if node == nil then
-		return false, "Device tidak ditemukan"
+		return false, "Device not found"
 	end
 	local port = node.ports[portId]
 	if port == nil then
-		return false, "Port tidak ditemukan"
+		return false, "Port not found"
 	end
 	if port.portType == "Console" then
-		return false, "Port console tidak punya VLAN"
+		return false, "Console port does not support VLANs"
 	end
 	if type(vlanId) ~= "number" or vlanId ~= vlanId then
-		return false, "VLAN harus angka"
+		return false, "VLAN must be a number"
 	end
 	local vlan = math.floor(vlanId)
 	if vlan < 1 or vlan > 4094 then
-		return false, "VLAN harus 1..4094"
+		return false, "VLAN must be in range 1..4094"
 	end
 	port.vlanId = vlan
 	return true, ""
@@ -409,14 +467,14 @@ end
 function NetworkGraph.SetPortTrunk(session: any, deviceId: string, portId: string, enabled: boolean): (boolean, string)
 	local node = session.devices[deviceId]
 	if node == nil then
-		return false, "Device tidak ditemukan"
+		return false, "Device not found"
 	end
 	local port = node.ports[portId]
 	if port == nil then
-		return false, "Port tidak ditemukan"
+		return false, "Port not found"
 	end
 	if port.portType == "Console" then
-		return false, "Port console tidak bisa dijadikan trunk"
+		return false, "Console port cannot be configured as a trunk"
 	end
 	port.isTrunk = enabled == true
 	return true, ""
@@ -446,7 +504,7 @@ end
 function NetworkGraph.ListPortVlans(session: any, deviceId: string): { string }
 	local node = session.devices[deviceId]
 	if node == nil then
-		return { "Device tidak ditemukan" }
+		return { "Device not found" }
 	end
 	local ids: { string } = {}
 	for portId in pairs(node.ports) do
@@ -461,7 +519,7 @@ function NetworkGraph.ListPortVlans(session: any, deviceId: string): { string }
 		table.insert(lines, string.format("%s  %s  %s", portId, mode, state))
 	end
 	if #lines == 0 then
-		return { "Tidak ada port" }
+		return { "No ports" }
 	end
 	return lines
 end
@@ -599,6 +657,15 @@ local function bfsPath(session: any, sourceDeviceId: string, targetId: string): 
 			if not port.linkUp or port.connectedToDeviceId == nil then
 				continue
 			end
+			local nextId = port.connectedToDeviceId :: string
+			-- Fase 3 Cable Fault: the physical cable is still plugged in, but
+			-- the link is electrically bad until the pair is re-cabled.
+			if session.incidentFaults ~= nil then
+				local peerPortId = port.connectedToPortId or ""
+				if session.incidentFaults[NetworkGraph.LinkKey(current.id, portId, nextId, peerPortId)] == true then
+					continue
+				end
+			end
 			-- VLAN isolation while forwarding through a switch (and through a
 			-- router whose inter-VLAN routing is disabled). Routers route
 			-- between VLANs at L3, so they bridge VLANs by design.
@@ -611,9 +678,12 @@ local function bfsPath(session: any, sourceDeviceId: string, targetId: string): 
 					continue
 				end
 			end
-			local nextId = port.connectedToDeviceId :: string
 			local nextNode = session.devices[nextId]
 			if nextNode == nil then
+				continue
+			end
+			-- A DDoSed device drops/does not forward traffic while mitigated.
+			if nextNode.isUnderDDoS == true then
 				continue
 			end
 			if visited[nextId] then
@@ -656,14 +726,17 @@ function NetworkGraph.CanReachIP(session: any, sourceDeviceId: string, targetIP:
 	-- Laptop management bridge (Disconnected terminal mode)
 	if sourceDeviceId == "__laptop__" then
 		if targetIP == PlotConstants.LAPTOP_BRIDGE_IP then
-			return false, 0, "Destination Host Unreachable (bridge laptop sendiri)"
+			return false, 0, "Destination Host Unreachable (own laptop bridge)"
 		end
 		local target = NetworkGraph.FindDeviceByIP(session, targetIP)
 		if target ~= nil then
-			if target.isPowered then
-				return true, math.random(2, 6) + math.random(), ""
+			if not target.isPowered then
+				return false, 0, "Destination Host Unreachable (device powered off)"
 			end
-			return false, 0, "Destination Host Unreachable (device mati)"
+			if target.isUnderDDoS == true then
+				return false, 0, "Request timed out (target under DDoS flood)"
+			end
+			return true, math.random(2, 6) + math.random(), ""
 		end
 		if not NetworkUtils.IsPrivateIP(targetIP) then
 			return true, math.random(12, 25) + math.random(), ""
@@ -673,10 +746,13 @@ function NetworkGraph.CanReachIP(session: any, sourceDeviceId: string, targetIP:
 
 	local src = session.devices[sourceDeviceId]
 	if src == nil then
-		return false, 0, "Device sumber tidak ditemukan"
+		return false, 0, "Source device not found"
 	end
 	if not src.isPowered then
-		return false, 0, "Destination Host Unreachable (device mati)"
+		return false, 0, "Destination Host Unreachable (device powered off)"
+	end
+	if src.isUnderDDoS == true then
+		return false, 0, "Request timed out (source device under DDoS)"
 	end
 	if src.ip == targetIP then
 		return true, 0.1, "" -- ping to self
@@ -685,7 +761,10 @@ function NetworkGraph.CanReachIP(session: any, sourceDeviceId: string, targetIP:
 	local targetNode = NetworkGraph.FindDeviceByIP(session, targetIP)
 	local isPublic = not NetworkUtils.IsPrivateIP(targetIP)
 	if targetNode ~= nil and not targetNode.isPowered then
-		return false, 0, "Destination Host Unreachable (device mati)"
+		return false, 0, "Destination Host Unreachable (device powered off)"
+	end
+	if targetNode ~= nil and targetNode.isUnderDDoS == true then
+		return false, 0, "Request timed out (target under DDoS flood)"
 	end
 	if targetNode == nil and not isPublic then
 		return false, 0, "Destination Host Unreachable"
@@ -734,7 +813,7 @@ function NetworkGraph.GetRoutePath(session: any, sourceDeviceId: string, targetI
 		return nil
 	end
 	local src = session.devices[sourceDeviceId]
-	if src == nil or not src.isPowered then
+	if src == nil or not src.isPowered or src.isUnderDDoS == true then
 		return nil
 	end
 	if src.ip == targetIP then

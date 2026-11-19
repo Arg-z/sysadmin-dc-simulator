@@ -322,7 +322,11 @@ def audit_facility():
 
 def audit_cli():
     text = read("ServerScriptService/Core/CommandExecutor.luau")
-    for c in ["help", "clear", "ping", "traceroute", "ip", "ssh", "exit", "top", "vm", "install-os", "stress-test", "cable", "vlan", "switch", "mount"]:
+    for c in [
+        "help", "clear", "ping", "traceroute", "ip", "ssh", "exit", "top", "vm",
+        "install-os", "stress-test", "ship", "cable", "vlan", "switch", "mount",
+        "incident", "ddos", "drive", "shift",
+    ]:
         check(f"G: command '{c}' dispatched", re.search(r'cmd == "' + re.escape(c) + r'"', text) is not None)
     for sub in ['"a"', '"addr"', '"set"']:
         check(f"G: ip subcommand {sub}", re.search(r"sub == " + sub, text) is not None)
@@ -383,6 +387,45 @@ def audit_fase2():
     check("F2: persistence saves port VLANs", "trunk = port.isTrunk" in persistence)
 
 
+def audit_fase3():
+    """Fase 3 surface: shift clock & daily settlement, 4 incidents, alarm beacon, audio/pose, leaderstats."""
+    constants = read("ReplicatedStorage/Shared/PlotConstants.luau")
+    check("F3: PlotConstants.SHIFT defined", "PlotConstants.SHIFT" in constants)
+    check("F3: PlotConstants.INCIDENTS defined", "PlotConstants.INCIDENTS" in constants)
+    for itype in ["CableFault", "DDoSFlood", "NoisyNeighbor", "DriveFailure"]:
+        check(f"F3: incident type '{itype}' in PlotConstants", f'"{itype}"' in constants)
+
+    graph = read("ServerScriptService/Core/NetworkGraph.luau")
+    check("F3: NetworkGraph.LinkKey exists", "function NetworkGraph.LinkKey" in graph)
+    check("F3: NetworkGraph checks incidentFaults & isUnderDDoS",
+          "incidentFaults" in graph and "isUnderDDoS" in graph)
+
+    contract = read("ServerScriptService/Gameplay/ContractAndIncidentManager.luau")
+    for fn in ["spawnIncident", "checkIncidentResolved", "resolveIncident", "failIncident", "tickIncidents", "updateAlarmVisuals"]:
+        check(f"F3: ContractAndIncidentManager.{fn} present", f"local function {fn}" in contract)
+
+    economy = read("ServerScriptService/Gameplay/ShiftAndEconomyManager.luau")
+    for fn in ["advanceShift", "settleDay", "updateLeaderstats"]:
+        check(f"F3: ShiftAndEconomyManager.{fn} present", f"local function {fn}" in economy)
+    for field in ["shiftPhase", "incidentCount", "lastSettlement", "settlementAmount"]:
+        check(f"F3: snapshot includes '{field}'", f"{field} =" in economy)
+
+    session = read("ServerScriptService/Core/SessionManager.luau")
+    for field in ["shift", "incidentFaults", "spareParts"]:
+        check(f"F3: session.{field} initialized", f"{field} =" in session)
+
+    persistence = read("ServerScriptService/Gameplay/DataPersistenceManager.luau")
+    check("F3: persistence saves shiftClockMinutes & spareParts",
+          "shiftClockMinutes" in persistence and "spareParts" in persistence)
+
+    audio = read("StarterPlayer/StarterPlayerScripts/AudioAndEffectsClient.client.luau")
+    check("F3: AudioAndEffectsClient klaxon + fan hum + typing pose",
+          "klaxon" in audio and "attachFanHum" in audio and "bindTypingPose" in audio)
+
+    main_srv = read("ServerScriptService/MainServer.server.luau")
+    check("F3: MainServer initializes Roblox leaderstats", "ensureLeaderstats" in main_srv)
+
+
 def main():
     print("=== Cross-file consistency audit (static) ===")
     audit_requires()
@@ -394,6 +437,7 @@ def main():
     audit_cli()
     audit_client_refs()
     audit_fase2()
+    audit_fase3()
     print()
     print(f"SUMMARY: {passed} passed, {failed} failed, {passed + failed} total")
     if failed > 0:

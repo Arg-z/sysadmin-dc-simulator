@@ -4,7 +4,8 @@
 	Mengisi 3 monitor SurfaceGui di NOC Desk milik plot pemain:
 	- TopologyMonitor : kartu node device + garis edge (midpoint + atan2 rotation),
 	  klik node -> popup info + tombol "Putus semua kabel" (CableActionRemote).
-	- TicketMonitor   : daftar kontrak (Accept -> ContractActionRemote) + checklist objectives.
+	- TicketMonitor   : daftar kontrak (Accept -> ContractActionRemote).
+	  (Checklist objectives tampil di panel HUD kiri, bukan di monitor.)
 	- TelemetryMonitor: Saldo, Reputasi, Uptime, Daya, Suhu rata-rata, Hari/Jam + banner storm.
 
 	Catatan tipe: mirror manual dari ReplicatedStorage/Shared/NetworkTypes (module type-only
@@ -16,6 +17,8 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
@@ -25,7 +28,7 @@ local NetworkUtils = require(sharedFolder:WaitForChild("NetworkUtils"))
 
 local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", 180) :: any
 if remotesFolder == nil then
-	warn("[NOCMonitorClient] ReplicatedStorage.Remotes tidak ditemukan (timeout 180s)")
+	warn("[NOCMonitorClient] ReplicatedStorage.Remotes not found (timeout 180s)")
 	return
 end
 
@@ -70,6 +73,7 @@ type SnapTicket = {
 	payoutIntervalSec: number?,
 	validationText: string?,
 	vlanId: number?,
+	incidentType: string?,
 }
 
 type FacilitySnapshot = {
@@ -82,6 +86,10 @@ type FacilitySnapshot = {
 	storm: boolean,
 	day: number,
 	clockText: string,
+	shiftPhase: string,
+	incidentCount: number,
+	lastSettlement: string?,
+	settlementAmount: number?,
 	devices: { SnapDevice },
 	vms: { any },
 	objectives: { [string]: boolean },
@@ -103,23 +111,213 @@ local topoPopup: Frame? = nil
 local topoCanvasW = 264 -- px, recomputed at build time from part size x PixelsPerStud
 local topoCanvasH = 164
 local ticketsScroll: ScrollingFrame? = nil
-local objectiveChecks: { [string]: TextLabel } = {}
 local teleValues: { [string]: TextLabel } = {}
 local stormBanner: Frame? = nil
+local stormLabel: TextLabel? = nil
+local teleGaugeFill: Frame? = nil
 
 local MONITOR_NAMES = { "TopologyMonitor", "TicketMonitor", "TelemetryMonitor" }
 
-local OBJECTIVES: { { key: string, label: string } } = {
-	{ key = "cableWired", label = "Kabel switch -> router & server" },
-	{ key = "ipSetStarter", label = "Set IP server starter" },
-	{ key = "osInstalledStarter", label = "Install OS server starter" },
-	{ key = "pingGateway", label = "Ping gateway" },
-	{ key = "vmCreated", label = "Buat VM pertama" },
-	{ key = "benchBuilt", label = "Rakit server di bench" },
-	{ key = "benchOsInstalled", label = "Bench: install OS" },
-	{ key = "stressPassed", label = "Stress test" },
-	{ key = "shipped", label = "Kirim crate" },
-}
+-- ===== NOC Workstation [E] Camera View =====
+local inStationView = false
+local stationEnterTime = 0
+local activeStationPrompt: ProximityPrompt? = nil
+local savedWalkSpeed = 16
+local savedJumpPower = 50
+local savedFOV = 70
+
+local stationGui = Instance.new("ScreenGui")
+stationGui.Name = "NetSimNOCStationGui"
+stationGui.ResetOnSpawn = false
+stationGui.IgnoreGuiInset = false
+stationGui.DisplayOrder = 85
+stationGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+stationGui.Parent = playerGui
+
+local stationBanner = Instance.new("Frame")
+stationBanner.Name = "WorkstationBanner"
+stationBanner.AnchorPoint = Vector2.new(0.5, 1)
+stationBanner.Position = UDim2.new(0.5, 0, 1, -18)
+stationBanner.Size = UDim2.new(0, 620, 0, 42)
+stationBanner.BackgroundColor3 = COLOR_BG
+stationBanner.BackgroundTransparency = 0.08
+stationBanner.BorderSizePixel = 0
+stationBanner.Active = true
+stationBanner.Visible = false
+stationBanner.Parent = stationGui
+
+local bannerCorner = Instance.new("UICorner")
+bannerCorner.CornerRadius = UDim.new(0, 8)
+bannerCorner.Parent = stationBanner
+
+local bannerStroke = Instance.new("UIStroke")
+bannerStroke.Color = COLOR_BLUE
+bannerStroke.Thickness = 1.5
+bannerStroke.Parent = stationBanner
+
+local bannerTitle = Instance.new("TextLabel")
+bannerTitle.Name = "BannerInfo"
+bannerTitle.Size = UDim2.new(1, -210, 1, 0)
+bannerTitle.Position = UDim2.new(0, 14, 0, 0)
+bannerTitle.BackgroundTransparency = 1
+bannerTitle.Font = Enum.Font.GothamBold
+bannerTitle.TextSize = 13
+bannerTitle.TextColor3 = COLOR_TEXT
+bannerTitle.TextXAlignment = Enum.TextXAlignment.Left
+bannerTitle.Text = "NOC 3-MONITOR WORKSTATION  |  Click monitors to interact  |  [~] Terminal"
+bannerTitle.Parent = stationBanner
+
+local exitStationBtn = Instance.new("TextButton")
+exitStationBtn.Name = "ExitStationButton"
+exitStationBtn.AnchorPoint = Vector2.new(1, 0.5)
+exitStationBtn.Position = UDim2.new(1, -10, 0.5, 0)
+exitStationBtn.Size = UDim2.new(0, 184, 0, 28)
+exitStationBtn.BackgroundColor3 = Color3.fromRGB(165, 45, 50)
+exitStationBtn.Font = Enum.Font.GothamBold
+exitStationBtn.TextSize = 12
+exitStationBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+exitStationBtn.Text = "EXIT WORKSTATION [E]"
+exitStationBtn.AutoButtonColor = true
+exitStationBtn.Active = true
+exitStationBtn.Modal = true
+exitStationBtn.Parent = stationBanner
+
+local exitBtnCorner = Instance.new("UICorner")
+exitBtnCorner.CornerRadius = UDim.new(0, 6)
+exitBtnCorner.Parent = exitStationBtn
+
+local function setCharacterHidden(hidden: boolean)
+	local char = player.Character
+	if char == nil then
+		return
+	end
+	local mod = if hidden then 1 else 0
+	for _, desc in ipairs(char:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			desc.LocalTransparencyModifier = mod
+		end
+	end
+end
+
+local function exitStationView()
+	if not inStationView then
+		return
+	end
+	inStationView = false
+	stationBanner.Visible = false
+
+	local cam = Workspace.CurrentCamera
+	if cam ~= nil then
+		cam.CameraType = Enum.CameraType.Custom
+		cam.FieldOfView = savedFOV
+	end
+
+	setCharacterHidden(false)
+	local char = player.Character
+	if char ~= nil then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum ~= nil then
+			hum.WalkSpeed = if savedWalkSpeed > 0 then savedWalkSpeed else 16
+			hum.JumpPower = if savedJumpPower > 0 then savedJumpPower else 50
+		end
+	end
+
+	if activeStationPrompt ~= nil and activeStationPrompt.Parent ~= nil then
+		activeStationPrompt.Enabled = true
+	end
+end
+
+local function enterStationView(deskTopPart: BasePart, prompt: ProximityPrompt)
+	if inStationView then
+		exitStationView()
+		return
+	end
+	local cam = Workspace.CurrentCamera
+	if cam == nil then
+		return
+	end
+
+	inStationView = true
+	stationEnterTime = os.clock()
+	activeStationPrompt = prompt
+	prompt.Enabled = false
+	stationBanner.Visible = true
+
+	savedFOV = cam.FieldOfView
+	local char = player.Character
+	if char ~= nil then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum ~= nil then
+			if hum.WalkSpeed > 0 then
+				savedWalkSpeed = hum.WalkSpeed
+			end
+			if hum.JumpPower > 0 then
+				savedJumpPower = hum.JumpPower
+			end
+			hum.WalkSpeed = 0
+			hum.JumpPower = 0
+		end
+	end
+	setCharacterHidden(true)
+
+	-- Position camera directly facing the 3 NOC monitors (Topology, Ticket, Telemetry)
+	local camPos = deskTopPart.CFrame:PointToWorldSpace(Vector3.new(0, 1.66, 3.55))
+	local lookPos = deskTopPart.CFrame:PointToWorldSpace(Vector3.new(0, 1.60, -1.10))
+	local targetCF = CFrame.lookAt(camPos, lookPos)
+
+	cam.CameraType = Enum.CameraType.Scriptable
+	TweenService:Create(
+		cam,
+		TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ CFrame = targetCF, FieldOfView = 70 }
+	):Play()
+end
+
+exitStationBtn.MouseButton1Down:Connect(function()
+	exitStationView()
+end)
+
+UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
+	if not inStationView then
+		return
+	end
+	if os.clock() - stationEnterTime < 0.25 then
+		return
+	end
+	if UserInputService:GetFocusedTextBox() ~= nil then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Space then
+		exitStationView()
+	elseif not gameProcessed and (input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D) then
+		exitStationView()
+	end
+end)
+
+player.CharacterAdded:Connect(function()
+	if inStationView then
+		exitStationView()
+	end
+end)
+
+local function bindStationPrompt(plot: Instance)
+	local promptInst = plot:FindFirstChild("NOCStationPrompt", true)
+	if promptInst ~= nil and promptInst:IsA("ProximityPrompt") then
+		local prompt = promptInst :: ProximityPrompt
+		if prompt:GetAttribute("NetSimNOCHooked") ~= true then
+			prompt:SetAttribute("NetSimNOCHooked", true)
+			prompt.Triggered:Connect(function(triggerPlayer: Player)
+				if triggerPlayer ~= player then
+					return
+				end
+				local parentPart = prompt.Parent
+				if parentPart ~= nil and parentPart:IsA("BasePart") then
+					enterStationView(parentPart :: BasePart, prompt)
+				end
+			end)
+		end
+	end
+end
 
 -- Row assignment per device type (top / middle / bottom), Y positions in canvas scale
 local ROW_Y = { 0.12, 0.45, 0.78 }
@@ -207,7 +405,6 @@ local function resetContentCaches()
 	topoCanvas = nil
 	topoPopup = nil
 	ticketsScroll = nil
-	objectiveChecks = {}
 	teleValues = {}
 	stormBanner = nil
 end
@@ -219,14 +416,16 @@ local function resetCachesFor(name: string)
 		topoPopup = nil
 	elseif name == "TicketMonitor" then
 		ticketsScroll = nil
-		objectiveChecks = {}
 	elseif name == "TelemetryMonitor" then
 		teleValues = {}
 		stormBanner = nil
+		stormLabel = nil
+		teleGaugeFill = nil
 	end
 end
 
 local function refreshMonitorRefs(plot: Instance)
+	bindStationPrompt(plot)
 	-- Drop refs whose plot was destroyed (facility rebuild / reset data)
 	for name, ref in pairs(monitorRefs) do
 		if ref.part.Parent == nil or ref.root.Parent == nil then
@@ -249,7 +448,7 @@ end
 -- ===== TopologyMonitor =====
 local function buildTopology(ref: MonitorRef)
 	local root = ref.root
-	makeTitle(root, "TOPOLOGI JARINGAN")
+	makeTitle(root, "NETWORK TOPOLOGY")
 
 	local canvas = Instance.new("Frame")
 	canvas.Name = "TopoCanvas"
@@ -315,14 +514,14 @@ local function openNodePopup(dev: SnapDevice)
 	title.Parent = popup
 
 	local infoLines = string.format(
-		"Tipe: %s\nIP: %s\nDaya: %s\nSuhu: %.1f C  |  Beban: %.0f%%  |  VM: %d\nPeer: %s",
+		"Type: %s\nIP: %s\nPower: %s\nTemp: %.1f C  |  Load: %.0f%%  |  VMs: %d\nPeers: %s",
 		dev.deviceType,
 		dev.ip or "-",
 		if dev.isPowered then "ON" else "OFF",
 		dev.temperatureC or 0,
 		dev.loadPercent or 0,
 		dev.vmCount or 0,
-		if #dev.peers > 0 then table.concat(dev.peers, ", ") else "tidak ada"
+		if #dev.peers > 0 then table.concat(dev.peers, ", ") else "none"
 	)
 	local info = Instance.new("TextLabel")
 	info.Name = "PopupInfo"
@@ -347,7 +546,7 @@ local function openNodePopup(dev: SnapDevice)
 	discBtn.Font = Enum.Font.GothamBold
 	discBtn.TextSize = 11
 	discBtn.TextColor3 = COLOR_TEXT
-	discBtn.Text = "PUTUS SEMUA KABEL"
+	discBtn.Text = "DISCONNECT ALL CABLES"
 	discBtn.AutoButtonColor = true
 	discBtn.ZIndex = 31
 	discBtn.Parent = popup
@@ -368,7 +567,7 @@ local function openNodePopup(dev: SnapDevice)
 	closeBtn.Font = Enum.Font.GothamBold
 	closeBtn.TextSize = 11
 	closeBtn.TextColor3 = COLOR_TEXT
-	closeBtn.Text = "TUTUP"
+	closeBtn.Text = "CLOSE"
 	closeBtn.AutoButtonColor = true
 	closeBtn.ZIndex = 31
 	closeBtn.Parent = popup
@@ -502,12 +701,12 @@ end
 -- ===== TicketMonitor =====
 local function buildTickets(ref: MonitorRef)
 	local root = ref.root
-	makeTitle(root, "KONTRAK & OBJECTIVES")
+	makeTitle(root, "CONTRACTS")
 
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "TicketsList"
 	scroll.Position = UDim2.new(0, 4, 0, 16)
-	scroll.Size = UDim2.new(1, -8, 0, 62)
+	scroll.Size = UDim2.new(1, -8, 1, -20)
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
 	scroll.ScrollBarThickness = 3
@@ -520,52 +719,6 @@ local function buildTickets(ref: MonitorRef)
 	listLayout.Padding = UDim.new(0, 3)
 	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	listLayout.Parent = scroll
-
-	local objHeader = Instance.new("TextLabel")
-	objHeader.Name = "ObjectivesHeader"
-	objHeader.Size = UDim2.new(1, -8, 0, 10)
-	objHeader.Position = UDim2.new(0, 4, 0, 80)
-	objHeader.BackgroundTransparency = 1
-	objHeader.Font = Enum.Font.GothamBold
-	objHeader.TextScaled = true
-	objHeader.TextColor3 = COLOR_GREY
-	objHeader.TextXAlignment = Enum.TextXAlignment.Left
-	objHeader.Text = "OBJECTIVES:"
-	objHeader.Parent = root
-
-	for i, objDef in ipairs(OBJECTIVES) do
-		local row = Instance.new("Frame")
-		row.Name = "Objective_" .. objDef.key
-		row.Size = UDim2.new(1, -8, 0, 8.6)
-		row.Position = UDim2.new(0, 4, 0, 92 + (i - 1) * 9.2)
-		row.BackgroundTransparency = 1
-		row.Parent = root
-
-		local check = Instance.new("TextLabel")
-		check.Name = "Check"
-		check.Size = UDim2.new(0, 10, 1, 0)
-		check.Position = UDim2.new(0, 2, 0, 0)
-		check.BackgroundTransparency = 1
-		check.Font = Enum.Font.GothamBold
-		check.TextScaled = true
-		check.TextColor3 = COLOR_GREY
-		check.Text = "o"
-		check.Parent = row
-
-		local label = Instance.new("TextLabel")
-		label.Name = "Label"
-		label.Size = UDim2.new(1, -18, 1, 0)
-		label.Position = UDim2.new(0, 14, 0, 0)
-		label.BackgroundTransparency = 1
-		label.Font = Enum.Font.Gotham
-		label.TextScaled = true
-		label.TextColor3 = COLOR_TEXT
-		label.TextXAlignment = Enum.TextXAlignment.Left
-		label.Text = objDef.label
-		label.Parent = row
-
-		objectiveChecks[objDef.key] = check
-	end
 
 	ticketsScroll = scroll
 end
@@ -583,10 +736,11 @@ local function updateTickets(snap: FacilitySnapshot)
 		if ticket.status == "Available" or ticket.status == "Active" then
 			order += 1
 			local isActive = ticket.status == "Active"
+			local isIncident = ticket.category == "Incident"
 			local row = Instance.new("Frame")
 			row.Name = "Ticket_" .. tostring(ticket.id)
 			row.Size = UDim2.new(1, -6, 0, 40)
-			row.BackgroundColor3 = COLOR_ROW
+			row.BackgroundColor3 = if isIncident then Color3.fromRGB(52, 24, 28) else COLOR_ROW
 			row.BorderSizePixel = 0
 			row.LayoutOrder = order
 			row.Parent = scroll
@@ -601,7 +755,7 @@ local function updateTickets(snap: FacilitySnapshot)
 			titleLabel.BackgroundTransparency = 1
 			titleLabel.Font = Enum.Font.GothamBold
 			titleLabel.TextScaled = true
-			titleLabel.TextColor3 = if isActive then COLOR_GREEN else COLOR_TEXT
+			titleLabel.TextColor3 = if isIncident then COLOR_RED elseif isActive then COLOR_GREEN else COLOR_TEXT
 			titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 			titleLabel.Text = ticket.title
 			titleLabel.Parent = row
@@ -615,7 +769,8 @@ local function updateTickets(snap: FacilitySnapshot)
 			subLabel.TextScaled = true
 			subLabel.TextColor3 = COLOR_YELLOW
 			subLabel.TextXAlignment = Enum.TextXAlignment.Left
-			subLabel.Text = NetworkUtils.FormatCurrency(ticket.rewardPayout or 0) .. "  -  " .. tostring(ticket.category)
+			local categoryLabel = if isIncident then "INCIDENT" else tostring(ticket.category)
+			subLabel.Text = NetworkUtils.FormatCurrency(ticket.rewardPayout or 0) .. "  -  " .. categoryLabel
 			subLabel.Parent = row
 
 			local statusBits: { string } = {}
@@ -625,7 +780,7 @@ local function updateTickets(snap: FacilitySnapshot)
 					table.insert(statusBits, "VLAN " .. tostring(ticket.vlanId))
 				end
 				local note = ticket.validationText or ""
-				running = string.find(note, "Layanan jalan") ~= nil
+				running = string.find(note, "Service running") ~= nil or string.find(note, "Layanan jalan") ~= nil
 				if ticket.slaRemainingSec ~= nil and ticket.slaRemainingSec > 0 and not running then
 					table.insert(statusBits, string.format("SLA %ds", ticket.slaRemainingSec))
 				end
@@ -643,7 +798,7 @@ local function updateTickets(snap: FacilitySnapshot)
 				statusLabel.BackgroundTransparency = 1
 				statusLabel.Font = Enum.Font.Gotham
 				statusLabel.TextSize = 10
-				statusLabel.TextColor3 = if running then COLOR_GREEN else COLOR_GREY
+				statusLabel.TextColor3 = if running then COLOR_GREEN elseif isIncident then COLOR_RED else COLOR_GREY
 				statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 				statusLabel.TextTruncate = Enum.TextTruncate.AtEnd
 				statusLabel.Text = table.concat(statusBits, "  |  ")
@@ -658,8 +813,8 @@ local function updateTickets(snap: FacilitySnapshot)
 				activeLabel.BackgroundTransparency = 1
 				activeLabel.Font = Enum.Font.GothamBold
 				activeLabel.TextScaled = true
-				activeLabel.TextColor3 = COLOR_GREEN
-				activeLabel.Text = "AKTIF"
+				activeLabel.TextColor3 = if isIncident then COLOR_RED else COLOR_GREEN
+				activeLabel.Text = if isIncident then "INCIDENT" else "ACTIVE"
 				activeLabel.Parent = row
 			else
 				local acceptBtn = Instance.new("TextButton")
@@ -670,7 +825,7 @@ local function updateTickets(snap: FacilitySnapshot)
 				acceptBtn.Font = Enum.Font.GothamBold
 				acceptBtn.TextSize = 12
 				acceptBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-				acceptBtn.Text = "TERIMA"
+				acceptBtn.Text = "ACCEPT"
 				acceptBtn.AutoButtonColor = true
 				acceptBtn.Parent = row
 				local btnCorner = Instance.new("UICorner")
@@ -690,35 +845,25 @@ local function updateTickets(snap: FacilitySnapshot)
 		empty.Font = Enum.Font.Gotham
 		empty.TextSize = 11
 		empty.TextColor3 = COLOR_GREY
-		empty.Text = "Belum ada kontrak tersedia..."
+		empty.Text = "No contracts available..."
 		empty.LayoutOrder = 999
 		empty.Parent = scroll
 	end
 
-	-- Objectives checklist
-	local objectives = snap.objectives or {}
-	for _, objDef in ipairs(OBJECTIVES) do
-		local check = objectiveChecks[objDef.key]
-		if check ~= nil then
-			local done = objectives[objDef.key] == true
-			check.Text = if done then "✓" else "o"
-			check.TextColor3 = if done then COLOR_GREEN else COLOR_GREY
-		end
-	end
 end
 
 -- ===== TelemetryMonitor =====
 local function buildTelemetry(ref: MonitorRef)
 	local root = ref.root
-	makeTitle(root, "TELEMETRI")
+	makeTitle(root, "TELEMETRY & SLA")
 
 	local rows: { { key: string, label: string } } = {
-		{ key = "balance", label = "Saldo" },
-		{ key = "reputation", label = "Reputasi" },
+		{ key = "balance", label = "Balance" },
+		{ key = "reputation", label = "Reputation" },
 		{ key = "uptime", label = "Uptime" },
-		{ key = "power", label = "Daya" },
-		{ key = "temp", label = "Suhu Rata2" },
-		{ key = "clock", label = "Hari / Jam" },
+		{ key = "power", label = "Power" },
+		{ key = "temp", label = "Avg Temp" },
+		{ key = "clock", label = "Day / Time" },
 	}
 	for i, rowDef in ipairs(rows) do
 		local row = Instance.new("Frame")
@@ -754,10 +899,33 @@ local function buildTelemetry(ref: MonitorRef)
 		teleValues[rowDef.key] = value
 	end
 
+	-- Fase 3 SLA gauge: uptime bar (green / yellow / red).
+	local gaugeBg = Instance.new("Frame")
+	gaugeBg.Name = "UptimeGauge"
+	gaugeBg.Size = UDim2.new(1, -8, 0, 10)
+	gaugeBg.Position = UDim2.new(0, 4, 0, 128)
+	gaugeBg.BackgroundColor3 = COLOR_ROW
+	gaugeBg.BorderSizePixel = 0
+	gaugeBg.Parent = root
+	local gaugeCorner = Instance.new("UICorner")
+	gaugeCorner.CornerRadius = UDim.new(0, 3)
+	gaugeCorner.Parent = gaugeBg
+
+	local gaugeFill = Instance.new("Frame")
+	gaugeFill.Name = "UptimeFill"
+	gaugeFill.Size = UDim2.fromScale(1, 1)
+	gaugeFill.BackgroundColor3 = COLOR_GREEN
+	gaugeFill.BorderSizePixel = 0
+	gaugeFill.Parent = gaugeBg
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0, 3)
+	fillCorner.Parent = gaugeFill
+	teleGaugeFill = gaugeFill
+
 	local banner = Instance.new("Frame")
 	banner.Name = "StormBanner"
-	banner.Size = UDim2.new(1, -8, 0, 24)
-	banner.Position = UDim2.new(0, 4, 0, 132)
+	banner.Size = UDim2.new(1, -8, 0, 28)
+	banner.Position = UDim2.new(0, 4, 0, 144)
 	banner.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
 	banner.BorderSizePixel = 0
 	banner.Visible = false
@@ -777,6 +945,7 @@ local function buildTelemetry(ref: MonitorRef)
 	bannerLabel.Parent = banner
 
 	stormBanner = banner
+	stormLabel = bannerLabel
 end
 
 local function updateTelemetry(snap: FacilitySnapshot)
@@ -796,10 +965,31 @@ local function updateTelemetry(snap: FacilitySnapshot)
 	setValue("power", NetworkUtils.FormatWatts(snap.powerWatts or 0), COLOR_YELLOW)
 	local tempC = snap.avgTempC or 0
 	setValue("temp", string.format("%.1f °C", tempC), if tempC > 75 then COLOR_RED else COLOR_TEXT)
-	setValue("clock", string.format("Hari %d  -  %s", snap.day or 1, snap.clockText or "--:--"), COLOR_TEXT)
+	setValue("clock", string.format("Day %d - %s (%s)", snap.day or 1, snap.clockText or "--:--", snap.shiftPhase or "-"), COLOR_TEXT)
+
+	if teleGaugeFill ~= nil then
+		local uptime = math.clamp(snap.uptimePercent or 0, 0, 100)
+		teleGaugeFill.Size = UDim2.fromScale(uptime / 100, 1)
+		teleGaugeFill.BackgroundColor3 = if uptime >= 90 then COLOR_GREEN elseif uptime >= 70 then COLOR_YELLOW else COLOR_RED
+	end
 
 	if stormBanner ~= nil then
-		stormBanner.Visible = snap.storm == true
+		local incidentCount = tonumber(snap.incidentCount) or 0
+		if snap.storm == true then
+			stormBanner.Visible = true
+			stormBanner.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+			if stormLabel ~= nil then
+				stormLabel.Text = "BROADCAST STORM!"
+			end
+		elseif incidentCount > 0 then
+			stormBanner.Visible = true
+			stormBanner.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+			if stormLabel ~= nil then
+				stormLabel.Text = string.format("ACTIVE INCIDENTS: %d - check TicketMonitor", incidentCount)
+			end
+		else
+			stormBanner.Visible = false
+		end
 	end
 end
 

@@ -103,7 +103,7 @@ local function addMountPrompts(session: any)
 			local rack = session.racks[rackId]
 			local prompt = Instance.new("ProximityPrompt")
 			prompt.Name = "MountPrompt"
-			prompt.ActionText = "Pasang Server"
+			prompt.ActionText = "Mount Server"
 			prompt.ObjectText = if rack ~= nil then rack.name else rackId
 			prompt.HoldDuration = 0.35
 			prompt.MaxActivationDistance = 18
@@ -188,7 +188,7 @@ function CarryAndMountSystem.SpawnCrate(session: any, ticket: any): boolean
 	if box ~= nil then
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = "CarryPrompt"
-		prompt.ActionText = "Angkat Crate"
+		prompt.ActionText = "Pick Up Crate"
 		prompt.ObjectText = tostring(ticket.clientName) .. " Colo Server"
 		prompt.HoldDuration = 0.2
 		prompt.MaxActivationDistance = 14
@@ -210,20 +210,20 @@ function CarryAndMountSystem.SpawnCrate(session: any, ticket: any): boolean
 	crate.Parent = if cratesFolder ~= nil then cratesFolder else facility.root
 	session.colocation.crates[ticket.id] = crate
 	session.colocation.byTicket[ticket.id] = crate
-	hint(session.player, "Crate colocation tiba di Loading Dock. Angkat lalu pasang di rack.")
+	hint(session.player, "Colocation crate arrived at the Loading Dock. Pick it up and mount it in a rack.")
 	playSFX(session.player, "key")
 	return true
 end
 
 function CarryAndMountSystem.BeginCarry(session: any, crate: Model, ticketId: string)
 	if session.carry ~= nil then
-		hint(session.player, "Kamu sudah membawa crate. Pasang dulu di rack.")
+		hint(session.player, "You are already carrying a crate. Mount it in a rack first.")
 		return
 	end
 	local char = session.player.Character
 	local hrp = if char ~= nil then char:FindFirstChild("HumanoidRootPart") else nil
 	if hrp == nil then
-		hint(session.player, "Karakter belum siap.")
+		hint(session.player, "Character is not ready.")
 		return
 	end
 
@@ -234,11 +234,11 @@ function CarryAndMountSystem.BeginCarry(session: any, crate: Model, ticketId: st
 			updateCarry(session)
 		end),
 	}
-	setCratePromptText(crate, "Turunkan Crate")
+	setCratePromptText(crate, "Drop Crate")
 	addMountPrompts(session)
 	updateCarry(session)
 	playSFX(session.player, "key")
-	hint(session.player, "Crate diangkat. Dekati rack dan tekan 'Pasang Server'.")
+	hint(session.player, "Crate picked up. Approach a rack and press 'Mount Server'.")
 end
 
 function CarryAndMountSystem.EndCarry(session: any)
@@ -250,7 +250,7 @@ function CarryAndMountSystem.EndCarry(session: any)
 		carry.conn:Disconnect()
 	end
 	if carry.crate ~= nil and carry.crate.Parent ~= nil then
-		setCratePromptText(carry.crate, "Angkat Crate")
+		setCratePromptText(carry.crate, "Pick Up Crate")
 	end
 	session.carry = nil
 	removeMountPrompts(session)
@@ -268,7 +268,7 @@ function CarryAndMountSystem.DropCarried(session: any)
 		crate:PivotTo(dockCF :: CFrame)
 	end
 	CarryAndMountSystem.EndCarry(session)
-	hint(session.player, "Crate diturunkan di Loading Dock.")
+	hint(session.player, "Crate dropped at the Loading Dock.")
 	playSFX(session.player, "plug")
 end
 
@@ -276,17 +276,17 @@ end
 function CarryAndMountSystem.MountCarried(session: any, rackId: string): boolean
 	local carry = session.carry
 	if carry == nil then
-		hint(session.player, "Tidak ada crate yang dibawa.")
+		hint(session.player, "You are not carrying a crate.")
 		return false
 	end
 	local ticket = findTicket(session, carry.ticketId)
 	if ticket == nil or ticket.status ~= "Active" then
-		hint(session.player, "Kontrak colocation tidak aktif.")
+		hint(session.player, "Colocation contract is not active.")
 		return false
 	end
 	local rack = session.racks[rackId]
 	if rack == nil then
-		hint(session.player, "Rack tidak ditemukan.")
+		hint(session.player, "Rack not found.")
 		return false
 	end
 
@@ -294,7 +294,7 @@ function CarryAndMountSystem.MountCarried(session: any, rackId: string): boolean
 	local uSize = colo.uSize
 	local uSlot = Placement.FindFreeUSlot(session, rackId, uSize)
 	if uSlot == nil then
-		hint(session.player, string.format("Rack %s tidak punya ruang %dU kosong.", rack.name, uSize))
+		hint(session.player, string.format("Rack %s does not have %dU of free space.", rack.name, uSize))
 		playSFX(session.player, "error")
 		return false
 	end
@@ -315,7 +315,7 @@ function CarryAndMountSystem.MountCarried(session: any, rackId: string): boolean
 		idPrefix = "colo",
 	})
 	if not ok then
-		hint(session.player, "Gagal mount: " .. tostring(result))
+		hint(session.player, "Mount failed: " .. tostring(result))
 		playSFX(session.player, "error")
 		return false
 	end
@@ -324,7 +324,7 @@ function CarryAndMountSystem.MountCarried(session: any, rackId: string): boolean
 	ticket.targetRackId = rackId
 	ticket.targetUSlot = uSlot
 	ticket.phase = "mounted"
-	ticket.validationText = "Terpasang - kabel ke switch, atur VLAN, PDU ON"
+	ticket.validationText = "Mounted - cable to switch, configure VLAN, turn PDU ON"
 
 	local crate = carry.crate
 	if crate ~= nil then
@@ -337,7 +337,7 @@ function CarryAndMountSystem.MountCarried(session: any, rackId: string): boolean
 	playSFX(session.player, "plug")
 	local ourU = uSlot - (def ~= nil and def.uSize or uSize) + 1
 	hint(session.player, string.format(
-		"Server klien terpasang di %s U%d-%d. Kabel ke switch, set VLAN %d, nyalakan PDU.",
+		"Client server mounted in %s U%d-%d. Cable to switch, set VLAN %d, power on PDU.",
 		rack.name,
 		math.max(1, ourU),
 		uSlot,
@@ -354,38 +354,38 @@ end
 function CarryAndMountSystem.EvaluateColo(session: any, ticket: any): (boolean, string)
 	local deviceId = ticket.targetDeviceId
 	if deviceId == nil then
-		return false, "Crate belum dipasang di rack"
+		return false, "Crate not mounted in rack yet"
 	end
 	local node = session.devices[deviceId]
 	if node == nil then
-		return false, "Server klien tidak ditemukan"
+		return false, "Client server not found"
 	end
 	if not node.isPowered then
-		return false, "PDU rack OFF - nyalakan PDU"
+		return false, "Rack PDU is OFF - power on PDU"
 	end
 	local accessSwitch, accessPortId = Graph.GetAccessSwitchPort(session, deviceId)
 	if accessSwitch == nil or accessPortId == nil then
-		return false, "Belum ada kabel ke switch"
+		return false, "No cable connected to switch yet"
 	end
 	local port = accessSwitch.ports[accessPortId]
 	if port == nil then
-		return false, "Port switch tidak ditemukan"
+		return false, "Switch port not found"
 	end
 	local wanted = ticket.vlanId or 1
 	if port.isTrunk == true then
-		return false, "Port access masih trunk - set mode access + VLAN " .. tostring(wanted)
+		return false, "Access port is in trunk mode - set access mode + VLAN " .. tostring(wanted)
 	end
 	if port.vlanId ~= wanted then
-		return false, string.format("VLAN switch %d != %d", port.vlanId, wanted)
+		return false, string.format("Switch VLAN %d != %d", port.vlanId, wanted)
 	end
 	if node.ip == nil then
-		return false, "Server klien belum punya IP"
+		return false, "Client server has no IP"
 	end
 	local reachable = Graph.CanReachIP(session, GATEWAY_DEVICE_ID, node.ip)
 	if not reachable then
-		return false, "Tidak reachable dari gateway - cek kabel uplink/VLAN"
+		return false, "Unreachable from gateway - check uplink cable/VLAN"
 	end
-	return true, string.format("Reachable dari gateway di VLAN %d", port.vlanId)
+	return true, string.format("Reachable from gateway on VLAN %d", port.vlanId)
 end
 
 --[[ Removes every physical trace of a ticket: crate and mounted server. ]]

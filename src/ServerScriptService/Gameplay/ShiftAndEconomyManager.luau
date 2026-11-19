@@ -1,24 +1,28 @@
 --!strict
 --[[
 	ShiftAndEconomyManager (ModuleScript, ServerScriptService/Gameplay)
-	AGENT C - Fase 1.
+	AGENT C - Fase 1 + Fase 3 shift economy.
 
 	Economy tick (every ECONOMY.tickSeconds = 5s) per session:
+	  - Shift clock: 08:00 -> 18:00 at SHIFT.secondsPerGameHour (30 real
+	    seconds per in-game hour). At 18:00 the day settles: base bonus +
+	    uptime bonus + perfect-shift bonus - incident failure penalties;
+	    then day += 1 and the clock resets to 08:00.
 	  - VM load jitter: running VMs get a smoothed currentLoadPercent toward a
 	    random 35..95 target, capped by cpuThrottlePercent (status "throttled"
-	    while a throttle limit > 0 is set); stopped VMs sit at 0.
+	    while a throttle limit > 0 is set); stopped VMs sit at 0. A Fase 3
+	    "noisy neighbor" VM ignores its limit and pins load at 100 until the
+	    incident is resolved. DDoSed hosts report 100% load.
 	  - Device loadPercent = sum(vm.cpu * vmLoad / 100) / specs.cpu * 100.
 	  - Thermal sim: temperatureC = 30 + loadPercent * 0.45; at >= 80 C the
 	    model's "OverheatSmoke" ParticleEmitter is enabled, otherwise disabled.
 	  - Power cost per tick: sum of powered device powerWatts + 40 W per rack
 	    with pduPowered; balance -= watts * electricityPerWattPerTick (clamp >= 0).
 	  - Payout every ECONOMY.payoutInterval (15s = 3 ticks): per VM hosted on a
-	    powered device that has an IP: cpu*vpsCpuRate + ram*vpsRamRate + disk*vpsDiskRate.
+	    powered device that has an IP, is not DDoSed and has no failed drive:
+	    cpu*vpsCpuRate + ram*vpsRamRate + disk*vpsDiskRate. Noisy VMs earn 0.
 	  - cabling.Update(session): console cable distance check.
 	  - BuildSnapshot -> StateSyncRemote:FireClient.
-
-	Fase 1 runs 24/7 (no shift clock / daily settlement - that is Fase 3 scope,
-	see CONTRACT.md Section 9). clockText in the snapshot reflects that.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,6 +56,7 @@ type VMLike = {
 	cpuThrottlePercent: number,
 	currentLoadPercent: number,
 	status: VMStatus,
+	noisy: boolean?,
 }
 
 -- Session tables are constructed by SessionManager (Agent A) and cross-module
@@ -91,16 +96,16 @@ local function getRemote(): any
 	return stateSyncRemote
 end
 
---[[ Total uptime percent: producing VMs / total VMs (100 when no VM exists).
-	 A VM counts as producing when its host is powered, has an IP, and the VM
-	 is not stopped. ]]
+--[[ Total uptime percent: healthy producing VMs / total VMs (100 when no VM
+	 exists). DDoSed hosts and noisy VMs do not count as producing. ]]
 local function computeUptimePercent(session: SessionLike): number
 	local total = 0
 	local producing = 0
 	for _, node in pairs(session.devices) do
 		for _, vm: VMLike in pairs(node.vms) do
 			total += 1
-			if node.isPowered and node.ip ~= nil and vm.status ~= "stopped" then
+			if node.isPowered and node.ip ~= nil and vm.status ~= "stopped"
+				and node.isUnderDDoS ~= true and vm.noisy ~= true then
 				producing += 1
 			end
 		end
@@ -139,6 +144,12 @@ local function applyLoadAndThermal(session: SessionLike)
 		for _, vm: VMLike in pairs(node.vms) do
 			if vm.status == "stopped" then
 				vm.currentLoadPercent = 0
+			elseif vm.noisy == true then
+				-- Fase 3 Noisy Neighbor: the VM ignores its throttle until the
+				-- incident is resolved by throttling/deleting it.
+				vm.currentLoadPercent = 100
+				vm.status = "running"
+				totalLoad += vm.cpu
 			else
 				local throttle = vm.cpuThrottlePercent or 0
 				local target = rng:NextInteger(35, 95)
@@ -157,6 +168,9 @@ local function applyLoadAndThermal(session: SessionLike)
 		local loadPercent = 0
 		if hostCpu > 0 then
 			loadPercent = math.clamp(totalLoad / hostCpu * 100, 0, 100)
+		end
+		if node.isUnderDDoS == true then
+			loadPercent = 100 -- flood traffic saturates the host
 		end
 		-- loadPercent lives as a dynamic node field (DeviceSnapshot needs it).
 		node.loadPercent = loadPercent
@@ -180,16 +194,20 @@ local function chargeElectricity(session: SessionLike)
 	session.balance = math.max(0, session.balance - cost)
 end
 
---[[ VPS income every payoutInterval: per VM on a powered host with an IP set. ]]
+--[[ VPS income every payoutInterval: per VM on a powered host with an IP set.
+	 Fase 3: DDoSed hosts and hosts with a failed drive earn nothing, and a
+	 noisy-neighbor VM earns nothing until the incident is resolved. ]]
 local function payVpsIncome(session: SessionLike)
 	local economy = constants.ECONOMY
 	local income = 0
 	for _, node in pairs(session.devices) do
-		if node.isPowered and node.ip ~= nil then
+		if node.isPowered and node.ip ~= nil and node.isUnderDDoS ~= true and node.hasDegradedDrive ~= true then
 			for _, vm: VMLike in pairs(node.vms) do
-				income += vm.cpu * economy.vpsCpuRatePerPayout
-				income += vm.ram * economy.vpsRamRatePerPayout
-				income += vm.disk * economy.vpsDiskRatePerPayout
+				if vm.noisy ~= true and vm.status ~= "stopped" then
+					income += vm.cpu * economy.vpsCpuRatePerPayout
+					income += vm.ram * economy.vpsRamRatePerPayout
+					income += vm.disk * economy.vpsDiskRatePerPayout
+				end
 			end
 		end
 	end
@@ -235,6 +253,127 @@ function ShiftAndEconomyManager.sessionHasAnyVM(session: SessionLike): boolean
 		end
 	end
 	return false
+end
+
+---------------------------------------------------------------------
+-- Fase 3: shift clock + daily settlement
+---------------------------------------------------------------------
+
+-- "HH:MM" for the current in-game time.
+local function formatClock(clockMinutes: number): string
+	local total = math.floor(clockMinutes) % (24 * 60)
+	return string.format("%02d:%02d", math.floor(total / 60), total % 60)
+end
+
+-- Shift phase label for HUD / NOC (English).
+local function getShiftPhase(session: SessionLike): string
+	local shiftCfg = constants.SHIFT
+	local minutes = session.shift.clockMinutes
+	if minutes >= shiftCfg.peakStartMinutes and minutes < shiftCfg.peakEndMinutes then
+		return "PEAK HOURS"
+	elseif minutes >= shiftCfg.peakEndMinutes then
+		return "CLOSING"
+	end
+	return "SHIFT"
+end
+
+-- Number of Active incident tickets (alarm + telemetry use this).
+local function countActiveIncidents(session: SessionLike): number
+	local count = 0
+	for _, t in ipairs(session.tickets or {}) do
+		if t.status == "Active" and t.category == "Incident" then
+			count += 1
+		end
+	end
+	return count
+end
+
+local function sendShiftHint(session: SessionLike, message: string)
+	if remotesFolder == nil then
+		return
+	end
+	local opener = remotesFolder:FindFirstChild("OpenTerminalEvent")
+	if opener ~= nil then
+		opener:FireClient(session.player, { action = "hint", message = message })
+	end
+end
+
+local function playShiftSFX(session: SessionLike, name: string)
+	if remotesFolder == nil then
+		return
+	end
+	local sfx = remotesFolder:FindFirstChild("PlaySFXRemote")
+	if sfx ~= nil then
+		sfx:FireClient(session.player, name)
+	end
+end
+
+--[[ End-of-day settlement: base + uptime + perfect shift - incident penalties.
+	 Resets the stats, advances the day and drops the clock back to 08:00. ]]
+local function settleDay(session: SessionLike)
+	local shiftCfg = constants.SHIFT
+	local shift = session.shift
+	local stats = shift.stats
+	local uptime = computeUptimePercent(session)
+	local uptimeBonus = math.floor(uptime * shiftCfg.settlementUptimeBonusPerPercent)
+	local perfectBonus = if stats.incidentsFailed == 0 then shiftCfg.settlementPerfectBonus else 0
+	local penalty = stats.incidentsFailed * shiftCfg.incidentFailurePenalty
+	local amount = shiftCfg.settlementBaseBonus + uptimeBonus + perfectBonus - penalty
+	session.balance = math.max(0, session.balance + amount)
+	if stats.incidentsFailed == 0 then
+		session.reputation += 2
+	end
+
+	local text = string.format(
+		"Day %d Settlement: uptime %.1f%% | contracts %d | incidents %d resolved, %d failed | bonus $%d, penalty $%d, net %s$%d",
+		session.day,
+		uptime,
+		stats.contractsCompleted,
+		stats.incidentsResolved,
+		stats.incidentsFailed,
+		shiftCfg.settlementBaseBonus + uptimeBonus + perfectBonus,
+		penalty,
+		if amount >= 0 then "+" else "-",
+		math.abs(amount)
+	)
+	shift.lastSettlementText = text
+	shift.lastSettlementAmount = amount
+	shift.stats = { contractsCompleted = 0, incidentsResolved = 0, incidentsFailed = 0 }
+	session.day += 1
+	shift.clockMinutes = shiftCfg.startMinutes
+
+	playShiftSFX(session, if amount >= 0 then "cash" else "error")
+	sendShiftHint(session, text .. " - Day " .. tostring(session.day) .. " started.")
+end
+
+-- Advance the clock by one economy tick; settles the day at 18:00.
+local function advanceShift(session: SessionLike)
+	local shiftCfg = constants.SHIFT
+	local stepMinutes = constants.ECONOMY.tickSeconds / shiftCfg.secondsPerGameHour * 60
+	session.shift.clockMinutes += stepMinutes
+	if session.shift.clockMinutes >= shiftCfg.endMinutes then
+		settleDay(session)
+	end
+end
+
+-- Mirror balance/reputation into the Roblox leaderboard (created in MainServer).
+local function updateLeaderstats(session: SessionLike)
+	local player = session.player
+	if player == nil then
+		return
+	end
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if leaderstats == nil then
+		return
+	end
+	local balanceValue = leaderstats:FindFirstChild("Cash")
+	if balanceValue ~= nil and balanceValue:IsA("IntValue") then
+		balanceValue.Value = math.floor(session.balance)
+	end
+	local reputationValue = leaderstats:FindFirstChild("Reputation")
+	if reputationValue ~= nil and reputationValue:IsA("IntValue") then
+		reputationValue.Value = math.floor(session.reputation)
+	end
 end
 
 --[[ Build the full FacilitySnapshot for a session (shape = NetworkTypes.FacilitySnapshot). ]]
@@ -310,6 +449,7 @@ function ShiftAndEconomyManager.BuildSnapshot(session: SessionLike): FacilitySna
 			payoutIntervalSec = t.payoutIntervalSec,
 			validationText = t.validationText or "",
 			vlanId = t.vlanId,
+			incidentType = t.incidentType,
 		})
 	end
 
@@ -322,8 +462,11 @@ function ShiftAndEconomyManager.BuildSnapshot(session: SessionLike): FacilitySna
 		avgTempC = avgTempC,
 		storm = session.broadcastStorm == true,
 		day = session.day,
-		-- Fase 1 has no shift clock yet (Fase 3 scope); the lab runs 24/7.
-		clockText = "24/7",
+		clockText = formatClock(session.shift.clockMinutes),
+		shiftPhase = getShiftPhase(session),
+		incidentCount = countActiveIncidents(session),
+		lastSettlement = session.shift.lastSettlementText,
+		settlementAmount = session.shift.lastSettlementAmount,
 		devices = deviceSnapshots,
 		vms = vmRows,
 		objectives = computeObjectives(session),
@@ -334,6 +477,7 @@ end
 
 --[[ Immediately build and push a snapshot to this session's player. ]]
 function ShiftAndEconomyManager.ForceSync(session: SessionLike)
+	updateLeaderstats(session)
 	local remote = getRemote()
 	if remote == nil then
 		return
@@ -343,6 +487,7 @@ end
 
 --[[ One economy tick for one session. ]]
 local function tickSession(session: SessionLike, isPayoutTick: boolean)
+	advanceShift(session)
 	applyLoadAndThermal(session)
 	chargeElectricity(session)
 	if isPayoutTick then

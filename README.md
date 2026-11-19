@@ -1,64 +1,52 @@
-# SysAdmin & Cloud Data Center Simulator (Roblox) — Fase 1 + 2
+# SysAdmin & Cloud Data Center Simulator (Roblox) — Fase 1 + 2 + 3 (Full Production)
 
-Game Roblox: jadi teknisi/sysadmin yang punya lab server sendiri — rakit PC server,
-hosting VPS via terminal CLI, kabel jaringan, income & kontrak. Dibangun dari spec
-`docs/roblox_sysadmin_full_production_spec.md` + keputusan desain di `docs/SPEC_GABUNGAN.md`.
+Game Roblox PC: jadi teknisi/sysadmin yang mengelola lab server & cloud data center sendiri —
+rakit PC server di workbench, hosting VPS & Colocation via terminal CLI, manajemen VLAN/trunk &
+kabel berwarna, serta mitigasi insiden live selama jam shift.
 
-## Cara main (dev)
+## Cara main (Roblox Studio - PC)
 
-1. Buka **`build/NetworkSimulator.rbxlx`** di Roblox Studio (File > Open from File).
-2. **Play (F5)**. Lu langsung dapat: lab pribadi + laptop (hotbar) + starter kit di rack.
-3. Loop dasar:
-   - Dua-klik port = kabel LAN (switch -> router, server -> switch).
-   - Dekati device + `ProximityPrompt` = kabel console laptop (atau klik laptop = SSH).
-   - Terminal: `help`, `ip set <ip> <gw>`, `install-os ubuntu-22.04`, `ping 8.8.8.8`,
-     `vm create --name web1 --cpu 4 --ram 8 --disk 200`, `stress-test`, dst.
-   - `[B]` = Hardware Store (beli + ghost placement freeform; kategori Cable = spool 5 kabel).
-   - Kabel berwarna: port WAN otomatis pakai spool kuning, port data pakai biru/merah.
-     `cable`, `cable use <warna>`, `cable buy <warna>`, `cable cut <port>`.
-   - VLAN: `vlan list`, `vlan set <port> <id>`, `switch port <port> trunk on`
-     (trunk 802.1Q ke router, access VLAN untuk server colocation).
-   - Rakit server di Workbench (Chassis -> Mobo -> CPU -> RAM -> Storage -> PSU),
-     nyalakan bench, install OS + stress test, ship crate.
-   - Income VPS jalan per 15 detik; kontrak CloudVPS / Colocation / CustomBuild
-     punya SLA dan bisa di-accept di NOC desk. Colocation: angkat crate di dock,
-     mount ke rack, kabel ke switch, set VLAN, nyalakan PDU, lalu payout jalan.
-   - Save otomatis (DataStore; butuh publish + Studio API access).
+1. Buka **`build/NetworkSimulator.rbxlx`** di Roblox Studio (**File > Open from File**).
+2. Tekan **Play (F5)**. Kamu langsung mendapat lab pribadi, `TechnicianLaptop` + `WireCutter` di hotbar, dan starter kit di rack.
+3. **Kontrol PC & Loop Utama:**
+   - **Terminal (`[~]` / `[F2]` / klik Laptop / tombol `TERMINAL [~]`):**
+     - Tutup kapan saja dengan **`[~]`**, **`[F2]`**, **`Ctrl+W`**, klik **`X [~]`**, atau ketik **`close`**.
+     - Jaringan & Sistem: `help`, `clear` (`Ctrl+L`), `ip a`, `ip set <ip> <gw> [mask]`, `ping <ip>`, `traceroute <ip>`, `ssh <ip>`, `exit`, `top`, `install-os <ubuntu-22.04|debian-12|rocky-9>`, `stress-test`, `ship`.
+     - VM Hosting: `vm create --name <n> --cpu <n> --ram <n> --disk <n>`, `vm list`, `vm throttle <name> --limit <pct>`, `vm delete <name>`.
+     - Kabel & VLAN (Fase 2): `cable`, `cable use <blue|yellow|red>`, `cable buy <warna>`, `cable cut <port>`, `vlan list`, `vlan set <port> <id>`, `switch port <port> trunk <on|off>`, `switch list`, `mount list`, `mount [rackId]`.
+     - Insiden & Shift (Fase 3): `incident`, `ddos block <ip>`, `drive status`, `drive replace [bay]`, `shift`.
+   - **Hardware Store (`[B]` / tombol `STORE [B]`):**
+     - Beli Rack, Switch/Router, Bare-Metal Server (mode ghost placement: **`[R]`** putar 90°, **Klik Kiri** pasang, **Klik Kanan / `[Esc]`** batal).
+     - Beli komponen custom build (urutan di Workbench: `Chassis -> Mobo -> CPU -> RAM -> Storage -> PSU`) atau `Replacement HDD` untuk cadangan Remote Hands.
+     - Beli Cable Spools (`LAN Blue`, `WAN Yellow`, `Mgmt Red`).
+   - **Kontrak & Insiden (NOC Desk 3 Monitor):**
+     - **CloudVPS**, **CustomBuild**, dan **Colocation** (angkat crate di Loading Dock -> mount ke Rack -> pasang kabel VLAN -> nyalakan PDU).
+     - **Shift Clock (08:00–18:00)** dengan **Jam Sibuk (11:00–17:00)** tempat 4 tipe insiden bisa muncul (*Kabel Putus*, *DDoS Flood*, *Noisy Neighbor*, *Drive Failure*) lengkap dengan alarm beacon merah, klaxon, kedip LED, dan **Daily Settlement** otomatis tiap pukul 18:00.
+   - **Save Otomatis (DataStore)** + **Roblox Leaderboard (`Saldo` & `Reputasi`)** + tombol **RESET DATA**.
 
 ## Struktur
 
 ```
 src/
-├── ReplicatedStorage/Shared/     # kontrak shared: types, utils, katalog, konstanta, model factory
+├── ReplicatedStorage/Shared/     # kontrak shared: types, utils, katalog, konstanta, model factory 3D
 ├── ServerScriptService/
-│   ├── MainServer.server.luau    # orkestrasi + lifecycle + wiring remote
-│   ├── Bootstrap/                # WorldAndAssetBuilder (procedural world, zero-setup)
-│   ├── Core/                     # SessionManager, NetworkGraph (BFS/VLAN/storm), CommandExecutor (CLI)
+│   ├── MainServer.server.luau    # orkestrasi + lifecycle + leaderstats + wiring remote
+│   ├── Bootstrap/                # WorldAndAssetBuilder (procedural Tier-4 data center lab)
+│   ├── Core/                     # SessionManager, NetworkGraph (BFS/VLAN/trunk/storm/faults), CommandExecutor (CLI)
 │   ├── Physical/                 # cabling, carry & mount, placement ghost, workbench rakit server
-│   └── Gameplay/                 # economy, kontrak, DataStore persistence
-├── StarterPlayer/StarterPlayerScripts/  # Terminal, NOC monitors, Store, HUD, SFX (client)
+│   └── Gameplay/                 # shift & economy, kontrak & incident engine, DataStore persistence
+├── StarterPlayer/StarterPlayerScripts/  # Terminal PC, NOC monitors, Store, HUD, SFX & typing pose (client)
 build/
-├── NetworkSimulator.rbxlx        # place siap buka di Studio
-├── build_place.py                # generator rbxlx dari src/
+├── NetworkSimulator.rbxlx        # place siap buka & dimainkan di Roblox Studio
+├── build_place.py                # generator & validator rbxlx dari src/
 ├── QA_REPORT.md / BUGS.md / BUILD_REPORT.md / DECISIONS.md
-tests/                            # unit test NetworkUtils (luau CLI) + audit konsistensi
-docs/                             # spec lengkap (EN) + spec gabungan (ID)
-CONTRACT.md                       # API binding antar modul (arsitektur)
+tests/                            # unit test NetworkUtils + static catalog check + audit konsistensi (Fase 1-3)
+CONTRACT.md                       # spesifikasi arsitektur & kontrak antar modul
 ```
 
-## Status Fase 1 + 2
+## Status Fase 1 + 2 + 3
 
-- 22 file / ~10.000 baris Luau strict, server-authoritative.
-- Fase 2 selesai: spool kabel berwarna + wire cutter, VLAN/trunk + inter-VLAN
-  routing di router, carry & mount crate ke U-slot (PDU), kontrak Colocation
-  dengan SLA + payout interval, dan save/restore rack + device rack-mounted.
-- Terverifikasi: sintaks 22/22 (luau-compile), audit konsistensi + katalog lulus,
-  XML roundtrip build.
-- Belum: playtest live di Studio (laporin bug kalau ketemu).
-- Fase 3 (dijadwalkan): incident engine (DDoS, cable fault, noisy neighbor,
-  drive failure), shift clock + settlement harian, alarm beacon aktif, audio penuh.
-
-## Tooling (opsional, tidak disertakan di repo)
-
-Validator di VM: StyLua + luau CLI (`tools/`, di-.gitignore). Regenerasi place:
-`python3 build/build_place.py` (butuh folder `src/`).
+- **Fase 1 (Selesai):** Core lab prosedural, cabling 2-klik & console laptop, CLI dasar, VM hosting, custom build workbench, store placement, ekonomi & persistence.
+- **Fase 2 (Selesai):** VLAN & 802.1Q trunking + router inter-VLAN routing, cable spools berwarna + WireCutter, carry & rack-mount crate, kontrak Colocation ber-SLA.
+- **Fase 3 (Selesai):** Incident Engine (Cable Fault, DDoS Flood, Noisy Neighbor, Drive Failure), Shift Clock (08:00–18:00) + Daily Settlement, Alarm Beacon + Klaxon + LED flashing, spatial AC hum + animasi mengetik, dan Roblox Leaderboard.
+- **Build & Audit:** `python build/build_place.py`, `python tests/audit_consistency.py`, `python tests/check_catalog_static.py`.
