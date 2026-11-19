@@ -43,10 +43,11 @@ local REMOTE_DEFS = {
 	{ name = "StateSyncRemote", class = "RemoteEvent" },
 	{ name = "PlaySFXRemote", class = "RemoteEvent" },
 	{ name = "ResetDataRemote", class = "RemoteEvent" },
+	{ name = "SaveGameRemote", class = "RemoteFunction" },
 }
 
 --[[
-	Creates ReplicatedStorage.Remotes with exactly the 10 contract remotes.
+	Creates ReplicatedStorage.Remotes with the contract remotes.
 	Idempotent: an existing folder is reused and any missing remote is added,
 	so calling it twice never duplicates entries.
 ]]

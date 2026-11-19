@@ -146,13 +146,13 @@ local function serializeRequirements(req: any): { [string]: number }?
 end
 
 --[[ Save one session (balance, reputation, devices, workbench, active tickets). ]]
-function DataPersistenceManager.Save(session: SessionLike)
+function DataPersistenceManager.Save(session: SessionLike): boolean
 	if not storeOk then
 		warnStoreUnavailableOnce()
-		return
+		return false
 	end
 	if type(session) ~= "table" or session.player == nil then
-		return
+		return false
 	end
 
 	local devices: { any } = {}
@@ -276,7 +276,9 @@ function DataPersistenceManager.Save(session: SessionLike)
 			session.noSaveWarned = true
 			warn("[DataPersistenceManager] Save failed for userId " .. tostring(session.player.UserId) .. ": " .. tostring(err))
 		end
+		return false
 	end
+	return true
 end
 
 --[[ Rebuild VM tables onto a node; returns the highest used 10.0.0.x octet

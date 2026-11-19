@@ -239,3 +239,16 @@ if resetRemote then
 		rebuildSession(player)
 	end)
 end
+
+-- ===== SaveGameRemote: manual save dari Tab menu, balikin status ke client =====
+local saveGameRemote = remotes:FindFirstChild("SaveGameRemote")
+if saveGameRemote then
+	(saveGameRemote :: any).OnServerInvoke = function(player: Player): (boolean, string)
+		local session = SessionManager.GetSession(player)
+		if session == nil then
+			return false, "Session not ready yet"
+		end
+		local ok = DataPersistenceManager.Save(session)
+		return ok, if ok then "Game saved" else "Saving unavailable (DataStore off)"
+	end
+end
