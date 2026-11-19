@@ -10,7 +10,7 @@
 	    then day += 1 and the clock resets to 08:00.
 	  - VM load jitter: running VMs get a smoothed currentLoadPercent toward a
 	    random 35..95 target, capped by cpuThrottlePercent (status "throttled"
-	    while a throttle limit > 0 is set); stopped VMs sit at 0. A Fase 3
+	    while a real cap 1..99 is set; 100 = no limit); stopped VMs sit at 0. A Fase 3
 	    "noisy neighbor" VM ignores its limit and pins load at 100 until the
 	    incident is resolved. DDoSed hosts report 100% load.
 	  - Device loadPercent = sum(vm.cpu * vmLoad / 100) / specs.cpu * 100.
@@ -153,10 +153,15 @@ local function applyLoadAndThermal(session: SessionLike)
 			else
 				local throttle = vm.cpuThrottlePercent or 0
 				local target = rng:NextInteger(35, 95)
-				if throttle > 0 then
-					-- Throttle limit caps the load; status stays throttled while set.
+				-- cpuThrottlePercent 100 means "no limit": fresh VMs start at 100
+				-- and 'vm throttle --limit 100' restores "running". Only a real
+				-- cap (1..99) marks the VM throttled; anything else heals back to
+				-- running so saves written by the old >0 check recover on tick.
+				if throttle > 0 and throttle < 100 then
 					target = math.min(target, throttle)
 					vm.status = "throttled"
+				else
+					vm.status = "running"
 				end
 				local current = vm.currentLoadPercent or 0
 				current += (target - current) * LOAD_SMOOTHING
@@ -384,18 +389,15 @@ function ShiftAndEconomyManager.BuildSnapshot(session: SessionLike): FacilitySna
 	local poweredCount = 0
 
 	for id, node in pairs(session.devices) do
-		-- peers = names of devices connected on any port (deduped)
+		-- peers = device ids of devices connected on any port (deduped).
+		-- IDs, not names: purchased hardware can share a display name.
 		local peers: { string } = {}
 		local seen: { [string]: boolean } = {}
 		for _, port in pairs(node.ports) do
 			local peerId = port.connectedToDeviceId
-			if peerId ~= nil then
-				local peer = session.devices[peerId]
-				local peerName = if peer ~= nil then peer.name else peerId
-				if not seen[peerName] then
-					seen[peerName] = true
-					table.insert(peers, peerName)
-				end
+			if peerId ~= nil and not seen[peerId] then
+				seen[peerId] = true
+				table.insert(peers, peerId)
 			end
 		end
 

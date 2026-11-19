@@ -471,7 +471,26 @@ local function spawnIncident(session: SessionLike, incidentType: string): boolea
 		if node == nil then
 			return false
 		end
-		local attackerIp = string.format("203.0.113.%d", rng:NextInteger(2, 254))
+		-- Pick an attacker IP that no router has already blocked, so a prior
+		-- 'ddos block <ip>' actually keeps that source from attacking again.
+		local attackerIp: string? = nil
+		for _ = 1, 24 do
+			local candidate = string.format("203.0.113.%d", rng:NextInteger(2, 254))
+			local blocked = false
+			for _, other in pairs(session.devices) do
+				if other.blockedIps ~= nil and other.blockedIps[candidate] == true then
+					blocked = true
+					break
+				end
+			end
+			if not blocked then
+				attackerIp = candidate
+				break
+			end
+		end
+		if attackerIp == nil then
+			return false -- every public source IP is already blocked
+		end
 		node.isUnderDDoS = true
 		node.ddosAttackerIp = attackerIp
 		data = {

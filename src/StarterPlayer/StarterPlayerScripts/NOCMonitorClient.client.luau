@@ -108,6 +108,8 @@ local lastPlotIndex: number? = nil
 
 local topoCanvas: Frame? = nil
 local topoPopup: Frame? = nil
+-- Latest snapshot devices keyed by id (snapshot peers are device ids).
+local lastDevicesById: { [string]: SnapDevice } = {}
 local topoCanvasW = 264 -- px, recomputed at build time from part size x PixelsPerStud
 local topoCanvasH = 164
 local ticketsScroll: ScrollingFrame? = nil
@@ -513,6 +515,11 @@ local function openNodePopup(dev: SnapDevice)
 	title.ZIndex = 31
 	title.Parent = popup
 
+	local peerNames: { string } = {}
+	for _, peerId in ipairs(dev.peers) do
+		local peer = lastDevicesById[peerId]
+		table.insert(peerNames, if peer ~= nil then peer.name else peerId)
+	end
 	local infoLines = string.format(
 		"Type: %s\nIP: %s\nPower: %s\nTemp: %.1f C  |  Load: %.0f%%  |  VMs: %d\nPeers: %s",
 		dev.deviceType,
@@ -521,7 +528,7 @@ local function openNodePopup(dev: SnapDevice)
 		dev.temperatureC or 0,
 		dev.loadPercent or 0,
 		dev.vmCount or 0,
-		if #dev.peers > 0 then table.concat(dev.peers, ", ") else "none"
+		if #peerNames > 0 then table.concat(peerNames, ", ") else "none"
 	)
 	local info = Instance.new("TextLabel")
 	info.Name = "PopupInfo"
@@ -639,11 +646,9 @@ local function updateTopology(snap: FacilitySnapshot)
 	clearChildren(canvas, { topoPopup })
 
 	local devices = snap.devices or {}
-	local byName: { [string]: SnapDevice } = {}
+	lastDevicesById = {}
 	for _, dev in ipairs(devices) do
-		if byName[dev.name] == nil then
-			byName[dev.name] = dev
-		end
+		lastDevicesById[dev.id] = dev
 	end
 
 	-- Group devices per row, spread horizontally
@@ -652,25 +657,25 @@ local function updateTopology(snap: FacilitySnapshot)
 		table.insert(rowDevices[rowIndexOf(dev.deviceType)], dev)
 	end
 
-	local nodeByName: { [string]: { cx: number, cy: number, powered: boolean, id: string, name: string } } = {}
+	local nodeById: { [string]: { cx: number, cy: number, powered: boolean, id: string, name: string } } = {}
 	for rowIdx = 1, 3 do
 		local list = rowDevices[rowIdx]
 		local n = #list
 		for i, dev in ipairs(list) do
 			local cx = (i - 0.5) / n
 			local cy = ROW_Y[rowIdx] + 0.06 -- node center (node height = 0.12 scale)
-			nodeByName[dev.name] = createNodeButton(canvas, dev, cx, cy)
+			nodeById[dev.id] = createNodeButton(canvas, dev, cx, cy)
 		end
 	end
 
-	-- Edge lines derived from peers (matched by device name), one per unordered pair
+	-- Edge lines derived from peers (matched by device id), one per unordered pair
 	local seenEdges: { [string]: boolean } = {}
 	for _, dev in ipairs(devices) do
-		local a = nodeByName[dev.name]
+		local a = nodeById[dev.id]
 		if a ~= nil then
-			for _, peerName in ipairs(dev.peers) do
-				local b = nodeByName[peerName]
-				if b ~= nil and b.name ~= a.name then
+			for _, peerId in ipairs(dev.peers) do
+				local b = nodeById[peerId]
+				if b ~= nil and b.id ~= a.id then
 					local pairKey = if a.id < b.id then a.id .. "|" .. b.id else b.id .. "|" .. a.id
 					if not seenEdges[pairKey] then
 						seenEdges[pairKey] = true
