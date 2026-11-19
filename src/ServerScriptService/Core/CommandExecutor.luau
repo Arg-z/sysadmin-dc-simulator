@@ -75,6 +75,16 @@ local function gr(text: string): string -- grey
 	return rich(HEX_GREY, text)
 end
 
+-- Escape dynamic text for RichText without applying a color. Unescaped
+-- sequences like "<->" (cable pair) invalidate the whole RichText string and
+-- make the terminal fall back to showing raw markup.
+local function esc(text: string): string
+	if Utils == nil then
+		return text
+	end
+	return Utils.EscapeRich(text)
+end
+
 -- Left-pad text to a fixed width (terminal font is monospace).
 local function pad(text: string, width: number): string
 	if #text >= width then
@@ -408,6 +418,21 @@ local function cmdIpSet(session: any, tokens: { string }): { string }
 	end
 	if not Utils.IsValidIPv4(mask) then
 		return { r("ip set: invalid subnet mask: " .. mask) }
+	end
+	-- BUG-003: reject discontiguous masks (e.g. 255.255.2.0). MaskToPrefix
+	-- stops at the first zero bit, so re-expanding the prefix must round-trip
+	-- to the original mask; otherwise the bitwise semantics would silently
+	-- accept a mask no real OS would take.
+	local maskPrefix = Utils.MaskToPrefix(mask)
+	local canonicalOctets: { string } = {}
+	local bitsLeft = maskPrefix
+	for i = 1, 4 do
+		local octetBits = math.clamp(bitsLeft, 0, 8)
+		canonicalOctets[i] = string.format("%d", 256 - 2 ^ (8 - octetBits))
+		bitsLeft -= octetBits
+	end
+	if table.concat(canonicalOctets, ".") ~= mask then
+		return { r("ip set: invalid subnet mask (not contiguous): " .. mask) }
 	end
 	if not Utils.IsSameSubnet(ip, gateway, mask) then
 		return { r("Gateway not in subnet") }
@@ -1216,10 +1241,10 @@ local function cmdIncident(session: any): { string }
 			local sla = if t.status == "Active" then string.format("  SLA %ds", t.slaRemainingSec or 0) else "  [" .. tostring(t.status) .. "]"
 			table.insert(lines, headerColor .. gr(sla))
 			if t.validationText ~= nil and t.validationText ~= "" then
-				table.insert(lines, gr("  Status : ") .. t.validationText)
+				table.insert(lines, gr("  Status : ") .. esc(t.validationText))
 			end
 			if t.requirementsText ~= nil and t.requirementsText ~= "" then
-				table.insert(lines, gr("  Resolve: ") .. t.requirementsText)
+				table.insert(lines, gr("  Resolve: ") .. esc(t.requirementsText))
 			end
 		end
 	end
