@@ -347,15 +347,25 @@ resetBtn.MouseButton1Click:Connect(function()
 	setMenuOpen(false)
 end)
 
-UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-	if input.KeyCode ~= Enum.KeyCode.Tab or gameProcessed then
-		return
+-- Tab default-nya milik leaderboard core Roblox (bind-nya dilahap duluan
+-- sebelum action game), jadi PlayerList dimatikan - lab ini single-player -
+-- supaya Tab bebas buat menu.
+local StarterGui = game:GetService("StarterGui")
+pcall(function()
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+end)
+
+local ContextActionService = game:GetService("ContextActionService")
+ContextActionService:BindAction("NetSimTabMenu", function(_action, state)
+	if state ~= Enum.UserInputState.Begin then
+		return Enum.ContextActionResult.Pass
 	end
 	-- Terminal memegang Tab saat window-nya visible (autocomplete).
 	local term = playerGui:FindFirstChild("NetSimTerminal")
 	local termWin = if term ~= nil then term:FindFirstChild("Window") else nil
 	if termWin ~= nil and termWin.Visible then
-		return
+		return Enum.ContextActionResult.Pass
 	end
 	setMenuOpen(not menuOpen)
-end)
+	return Enum.ContextActionResult.Sink
+end, false, Enum.KeyCode.Tab)
