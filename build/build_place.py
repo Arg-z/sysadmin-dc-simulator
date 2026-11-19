@@ -82,6 +82,7 @@ CLIENT_SCRIPTS = [
     ("LocalScript", "CatalogAndBuilderClient", "StarterPlayer/StarterPlayerScripts/CatalogAndBuilderClient.client.luau"),
     ("LocalScript", "HudClient", "StarterPlayer/StarterPlayerScripts/HudClient.client.luau"),
     ("LocalScript", "AudioAndEffectsClient", "StarterPlayer/StarterPlayerScripts/AudioAndEffectsClient.client.luau"),
+    ("LocalScript", "TabMenuClient", "StarterPlayer/StarterPlayerScripts/TabMenuClient.client.luau"),
 ]
 
 FORBIDDEN = re.compile(r"TODO|FIXME|STUB|XXX|HACK", re.I)
@@ -371,7 +372,7 @@ def validate(xml_text, sources):
 
 def main():
     all_srcs = all_source_files()
-    assert len(all_srcs) == 22, f"expected 22 sources, got {len(all_srcs)}"
+    assert len(all_srcs) == 23, f"expected 23 sources, got {len(all_srcs)}"
 
     sources = {}
     print("=== Loading & guarding sources ===")

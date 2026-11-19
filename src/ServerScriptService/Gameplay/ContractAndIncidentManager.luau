@@ -1164,7 +1164,7 @@ local function updateAlarmVisuals(session: SessionLike)
 	for _, cable in pairs(session.cables) do
 		local key = linkKey(cable.aDeviceId, cable.aPortId, cable.bDeviceId, cable.bPortId)
 		local isFaulted = faultedKeys[key] == true
-		for _, beam in ipairs({ cable.beam, cable.sheath, cable.beam2, cable.sheath2 }) do
+		for _, beam in ipairs({ cable.beam, cable.sheath, cable.beam2, cable.sheath2, cable.beam3, cable.sheath3 }) do
 			if beam ~= nil and beam.Parent ~= nil then
 				local base = if beam.Name:find("Sheath") ~= nil then 0.25 else 0.02
 				if isFaulted then

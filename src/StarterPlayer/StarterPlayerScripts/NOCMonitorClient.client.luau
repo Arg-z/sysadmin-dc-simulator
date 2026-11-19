@@ -19,6 +19,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
@@ -128,6 +130,13 @@ local savedWalkSpeed = 16
 local savedJumpPower = 50
 local savedFOV = 70
 
+-- Mouse-position soft look (cursor stays free for SurfaceGui clicks)
+local mouseLookConn: RBXScriptConnection? = nil
+local baseCamPos = Vector3.zero
+local baseLookPos = Vector3.zero
+local lookYaw = 0
+local lookPitch = 0
+
 local stationGui = Instance.new("ScreenGui")
 stationGui.Name = "NetSimNOCStationGui"
 stationGui.ResetOnSpawn = false
@@ -166,7 +175,7 @@ bannerTitle.Font = Enum.Font.GothamBold
 bannerTitle.TextSize = 13
 bannerTitle.TextColor3 = COLOR_TEXT
 bannerTitle.TextXAlignment = Enum.TextXAlignment.Left
-bannerTitle.Text = "NOC 3-MONITOR WORKSTATION  |  Click monitors to interact  |  [~] Terminal"
+bannerTitle.Text = "NOC 3-MONITOR WORKSTATION  |  Move mouse to look around  |  Click monitors to interact  |  [~] Terminal"
 bannerTitle.Parent = stationBanner
 
 local exitStationBtn = Instance.new("TextButton")
@@ -207,6 +216,11 @@ local function exitStationView()
 	end
 	inStationView = false
 	stationBanner.Visible = false
+
+	if mouseLookConn ~= nil then
+		mouseLookConn:Disconnect()
+		mouseLookConn = nil
+	end
 
 	local cam = Workspace.CurrentCamera
 	if cam ~= nil then
@@ -267,12 +281,70 @@ local function enterStationView(deskTopPart: BasePart, prompt: ProximityPrompt)
 	local lookPos = deskTopPart.CFrame:PointToWorldSpace(Vector3.new(0, 1.60, -1.10))
 	local targetCF = CFrame.lookAt(camPos, lookPos)
 
+	-- Mouse-look base pose: eye stays fixed, gaze rotates around this anchor
+	baseCamPos = camPos
+	baseLookPos = lookPos
+	lookYaw = 0
+	lookPitch = 0
+
 	cam.CameraType = Enum.CameraType.Scriptable
 	TweenService:Create(
 		cam,
 		TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{ CFrame = targetCF, FieldOfView = 70 }
 	):Play()
+
+	if mouseLookConn ~= nil then
+		mouseLookConn:Disconnect()
+		mouseLookConn = nil
+	end
+	-- Soft look: yaw/pitch follow the mouse position on screen (cursor stays free).
+	-- Applies only after the entry tween (0.3s guard) so it never fights the tween.
+	mouseLookConn = RunService.RenderStepped:Connect(function(dt: number)
+		if not inStationView then
+			return
+		end
+		if os.clock() - stationEnterTime <= 0.3 then
+			return
+		end
+		local lookCam = Workspace.CurrentCamera
+		if lookCam == nil then
+			return
+		end
+
+		-- Normalize mouse to 0..1 (GetMouseLocation includes the GUI inset, ViewportSize does not)
+		local mousePos = UserInputService:GetMouseLocation()
+		local inset = GuiService:GetGuiInset()
+		local vp = lookCam.ViewportSize
+		local nx = math.clamp((mousePos.X - inset.X) / math.max(vp.X, 1), 0, 1)
+		local ny = math.clamp((mousePos.Y - inset.Y) / math.max(vp.Y, 1), 0, 1)
+		local targetYaw = -((nx - 0.5) * 2) * 50 -- -1 left .. +1 right -> gaze left/right
+		local targetPitch = math.clamp((ny - 0.5) * 2, -1, 1) * -8 -- mouse up -> look slightly up
+
+		local alpha = 1 - math.exp(-dt * 6)
+		lookYaw += (targetYaw - lookYaw) * alpha
+		lookPitch += (targetPitch - lookPitch) * alpha
+
+		-- Rotate the base forward: yaw around world Y, then small pitch around the local right axis
+		local baseForward = baseLookPos - baseCamPos
+		local flatForward = Vector3.new(baseForward.X, 0, baseForward.Z)
+		if flatForward.Magnitude < 1e-3 then
+			flatForward = Vector3.new(0, 0, -1)
+		end
+		local yawRot = CFrame.fromAxisAngle(Vector3.yAxis, math.rad(lookYaw))
+		local yawedForward = yawRot:Vector3ToWorldSpace(baseForward)
+		local yawedFlat = yawRot:Vector3ToWorldSpace(flatForward)
+		local rightAxis = Vector3.new(yawedFlat.X, 0, yawedFlat.Z)
+		if rightAxis.Magnitude < 1e-3 then
+			rightAxis = Vector3.new(1, 0, 0)
+		else
+			rightAxis = rightAxis.Unit
+		end
+		rightAxis = rightAxis:Cross(Vector3.yAxis)
+		local pitchRot = CFrame.fromAxisAngle(rightAxis, math.rad(lookPitch))
+		local newForward = pitchRot:Vector3ToWorldSpace(yawedForward)
+		lookCam.CFrame = CFrame.lookAt(baseCamPos, baseCamPos + newForward)
+	end)
 end
 
 exitStationBtn.MouseButton1Down:Connect(function()

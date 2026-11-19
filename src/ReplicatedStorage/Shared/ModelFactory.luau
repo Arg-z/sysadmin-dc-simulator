@@ -53,6 +53,30 @@ local function applyFaceTexture(part: BasePart, asset: string)
 	tex.Parent = part
 end
 
+-- Label nama perangkat di atas faceplate (SurfaceGui, selalu menghadap +Z).
+local function applyNameLabel(part: BasePart, text: string)
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "NameLabel"
+	gui.Face = Enum.NormalId.Back
+	gui.CanvasSize = Vector2.new(512, 72)
+	gui.MaxDistance = 45
+	gui.LightInfluence = 0
+	gui.Brightness = 1.2
+	gui.AlwaysOnTop = false
+	gui.Parent = part
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -8, 1, -8)
+	label.Position = UDim2.new(0, 4, 0, 4)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextColor3 = Color3.fromRGB(150, 214, 240)
+	label.TextStrokeTransparency = 0.75
+	label.Text = text
+	label.Parent = gui
+end
+
 type PortRef = {
 	portId: string,
 	portType: string,
@@ -205,6 +229,7 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 		color = FACE_DARK,
 	})
 	applyFaceTexture(faceplatePart, TEX_FACE_VENT)
+	applyNameLabel(faceplatePart, string.upper(defv.name))
 	faceplatePart.Parent = model
 	for _, side in ipairs({ -1, 1 }) do
 		for vi = 1, 3 do
@@ -1089,6 +1114,7 @@ function ModelFactory.BuildISPUplink(deviceId: string): (Model, Attachment, Part
 		color = SLATE_TRIM,
 	})
 	applyFaceTexture(ispBezelPart, TEX_FACE_VENT)
+	applyNameLabel(ispBezelPart, "ISP LINK")
 	ispBezelPart.Parent = model
 	newPart({
 		name = "FiberStripe",

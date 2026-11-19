@@ -11,6 +11,8 @@
 	  switch and bare-metal stay unwired - wiring them is the first objective),
 	  assembly workbench, NOC desk, loading dock, alarm beacon, AC unit
 	  (fan registered for Heartbeat-driven rotation)
+	- Outdoor environment: lawn, front parking lot with stall lines, sidewalks,
+	  trees, street lamps, "ARGA DATACENTER" site sign, condensers, back fence
 	- Door sign billboard ("SERVER LAB #n | <DisplayName>") and spawn CF refs
 	All geometry hangs under workspace.Plots.Plot<n> so SessionManager can
 	tear a whole lab down with a single root:Destroy(). Every part is anchored.
@@ -174,6 +176,39 @@ end
 -- Part helper
 ---------------------------------------------------------------------
 
+-- Albedo skins environment dari pipeline ArtCraft VM (tileable 1024px).
+local TEX_FLOOR = "rbxassetid://89253845579252"
+local TEX_WALL = "rbxassetid://107945148969183"
+local TEX_ASPHALT = "rbxassetid://127856414140892"
+local TEX_GRASS = "rbxassetid://112395333726131"
+
+-- Texture di satu face Top dengan tiling per studs.
+local function applyTopTexture(part: BasePart, asset: string, studs: number)
+	local tex = Instance.new("Texture")
+	tex.Name = "EnvSkin"
+	tex.Texture = asset
+	tex.Face = Enum.NormalId.Top
+	tex.StudsPerTileU = studs
+	tex.StudsPerTileV = studs
+	tex.Parent = part
+end
+
+-- Texture di dua face besar dinding (pilih sumbu tipis box).
+local function applyWallTexture(part: BasePart, asset: string, studs: number)
+	local faces = if part.Size.X >= part.Size.Z
+		then { Enum.NormalId.Front, Enum.NormalId.Back }
+		else { Enum.NormalId.Left, Enum.NormalId.Right }
+	for _, face in ipairs(faces) do
+		local tex = Instance.new("Texture")
+		tex.Name = "EnvSkin"
+		tex.Texture = asset
+		tex.Face = face
+		tex.StudsPerTileU = studs
+		tex.StudsPerTileV = studs
+		tex.Parent = part
+	end
+end
+
 local function newPart(props: { [string]: any }): Part
 	local p = Instance.new("Part")
 	p.Name = props.name or "Part"
@@ -208,6 +243,225 @@ local function makeWanPort(): any
 		vlanId = 1,
 		trafficLoadMbps = 0,
 	}
+end
+
+---------------------------------------------------------------------
+-- Outdoor environment
+---------------------------------------------------------------------
+
+--[[
+	BuildOutdoorEnvironment: exterior dressing around one facility plot —
+	lawn, front parking lot with stall lines, sidewalks, trees, street lamps,
+	site name sign, condenser units behind the back wall and a slim back fence.
+	Flat placeholder colors for now; future texture swaps are marked [TEX:..].
+	Everything hangs under `facility` so the plot teardown removes it too.
+]]
+function WorldAndAssetBuilder.BuildOutdoorEnvironment(facility: Folder, plotCF: (number, number, number) -> CFrame)
+	-- Lawn slab under the whole plot (top at y = 0, room floor sits on top).
+	local groundPart = newPart({
+		name = "OutdoorGround",
+		size = Vector3.new(300, 0.4, 300),
+		cf = plotCF(0, -0.2, 0),
+		color = Color3.fromRGB(84, 122, 58), -- [TEX:grass]
+		castShadow = false,
+	})
+	applyTopTexture(groundPart, TEX_GRASS, 16)
+	groundPart.Parent = facility
+
+	-- Front parking lot asphalt just outside the entrance (top ~y 0.45).
+	local parkingPart = newPart({
+		name = "OutdoorParking",
+		size = Vector3.new(56, 0.45, 22),
+		cf = plotCF(0, 0.22, 44),
+		color = Color3.fromRGB(45, 47, 50), -- [TEX:asphalt]
+		castShadow = false,
+	})
+	applyTopTexture(parkingPart, TEX_ASPHALT, 8)
+	parkingPart.Parent = facility
+
+	-- Concrete sidewalks: front strip along the facade + side aprons.
+	local sidewalkFront = newPart({
+		name = "OutdoorSidewalkFront",
+		size = Vector3.new(56, 0.5, 4),
+		cf = plotCF(0, 0.28, 33.5),
+		color = Color3.fromRGB(150, 150, 145), -- [TEX:concrete]
+		castShadow = false,
+	})
+	applyTopTexture(sidewalkFront, TEX_WALL, 6)
+	sidewalkFront.Parent = facility
+	for _, sx in ipairs({ -36.5, 36.5 }) do
+		local sidewalkSide = newPart({
+			name = "OutdoorSidewalkSide",
+			size = Vector3.new(8, 0.5, 64),
+			cf = plotCF(sx, 0.28, 0),
+			color = Color3.fromRGB(150, 150, 145), -- [TEX:concrete]
+			castShadow = false,
+		})
+		applyTopTexture(sidewalkSide, TEX_WALL, 6)
+		sidewalkSide.Parent = facility
+	end
+
+	-- White parking stall lines, two rows across the lot (paint, no collision).
+	for _, pz in ipairs({ 40, 49 }) do
+		for px = -20, 20, 6 do
+			newPart({
+				name = "ParkingLine",
+				size = Vector3.new(0.3, 0.02, 5),
+				cf = plotCF(px, 0.47, pz),
+				color = Color3.fromRGB(235, 235, 235),
+				canCollide = false,
+				castShadow = false,
+			}).Parent = facility
+		end
+	end
+
+	-- Four trees flanking the building (trunk cylinder + two foliage balls).
+	for _, tpos in ipairs({ { -38, 10 }, { 38, 10 }, { -38, 52 }, { 38, 52 } }) do
+		local tx, tz = tpos[1], tpos[2]
+		local trunk = newPart({
+			name = "TreeTrunk",
+			size = Vector3.new(3, 0.6, 0.6), -- cylinder axis is X; stood upright below
+			cf = plotCF(tx, 1.5, tz) * CFrame.Angles(0, 0, math.rad(90)),
+			color = Color3.fromRGB(92, 64, 40),
+		})
+		trunk.Shape = Enum.PartType.Cylinder
+		trunk.Parent = facility
+		local canopy = newPart({
+			name = "TreeCanopy",
+			size = Vector3.new(4, 4, 4),
+			cf = plotCF(tx, 3.9, tz),
+			color = Color3.fromRGB(58, 102, 48),
+			canCollide = false,
+		})
+		canopy.Shape = Enum.PartType.Ball
+		canopy.Parent = facility
+		local canopyTop = newPart({
+			name = "TreeCanopyTop",
+			size = Vector3.new(2.6, 2.6, 2.6),
+			cf = plotCF(tx + 0.7, 5.2, tz - 0.6),
+			color = Color3.fromRGB(58, 102, 48),
+			canCollide = false,
+		})
+		canopyTop.Shape = Enum.PartType.Ball
+		canopyTop.Parent = facility
+	end
+
+	-- Three street lamps at the lot edges; each arm reaches over the asphalt.
+	for _, lamp in ipairs({
+		{ x = -26, z = 36, dirX = 1, dirZ = 0 },
+		{ x = 26, z = 36, dirX = -1, dirZ = 0 },
+		{ x = 0, z = 56, dirX = 0, dirZ = -1 },
+	}) do
+		local pole = newPart({
+			name = "LampPole",
+			size = Vector3.new(7, 0.25, 0.25),
+			cf = plotCF(lamp.x, 3.5, lamp.z) * CFrame.Angles(0, 0, math.rad(90)),
+			color = Color3.fromRGB(70, 74, 80),
+		})
+		pole.Shape = Enum.PartType.Cylinder
+		pole.Parent = facility
+		newPart({
+			name = "LampArm",
+			size = if lamp.dirZ ~= 0 then Vector3.new(0.18, 0.18, 1.6) else Vector3.new(1.6, 0.18, 0.18),
+			cf = plotCF(lamp.x + lamp.dirX * 0.8, 6.85, lamp.z + lamp.dirZ * 0.8),
+			color = Color3.fromRGB(70, 74, 80),
+			canCollide = false,
+		}).Parent = facility
+		newPart({
+			name = "LampHead",
+			size = if lamp.dirZ ~= 0 then Vector3.new(0.5, 0.18, 0.9) else Vector3.new(0.9, 0.18, 0.5),
+			cf = plotCF(lamp.x + lamp.dirX * 1.15, 6.72, lamp.z + lamp.dirZ * 1.15),
+			color = Color3.fromRGB(255, 226, 180), -- warm white glow
+			material = Enum.Material.Neon,
+			canCollide = false,
+		}).Parent = facility
+	end
+
+	-- Site name sign by the road: two posts + dark panel with SurfaceGui text.
+	for _, sx in ipairs({ -4, 4 }) do
+		newPart({
+			name = "SignPost",
+			size = Vector3.new(0.3, 4.5, 0.3),
+			cf = plotCF(sx, 2.25, 57),
+			color = Color3.fromRGB(48, 54, 64),
+		}).Parent = facility
+	end
+	local signPanel = newPart({
+		name = "SiteSignPanel",
+		size = Vector3.new(9, 2.2, 0.25),
+		cf = plotCF(0, 5.6, 57),
+		color = Color3.fromRGB(24, 28, 34),
+	})
+	signPanel.Parent = facility
+	local siteGui = Instance.new("SurfaceGui")
+	siteGui.Name = "SiteSign"
+	siteGui.Face = Enum.NormalId.Front -- +Z face, readable from the road
+	siteGui.CanvasSize = Vector2.new(600, 150)
+	siteGui.MaxDistance = 120
+	siteGui.Parent = signPanel
+	local siteLabel = Instance.new("TextLabel")
+	siteLabel.Size = UDim2.new(1, 0, 1, 0)
+	siteLabel.BackgroundTransparency = 1
+	siteLabel.Font = Enum.Font.GothamBold
+	siteLabel.TextScaled = true
+	siteLabel.TextColor3 = PlotConstants.COLORS.accentCyan
+	siteLabel.Text = "ARGA DATACENTER"
+	siteLabel.Parent = siteGui
+	-- slim cyan accent bar under the lettering
+	newPart({
+		name = "SiteSignAccent",
+		size = Vector3.new(2.6, 0.09, 0.06),
+		cf = plotCF(0, 4.72, 57.14),
+		color = PlotConstants.COLORS.accentCyan,
+		material = Enum.Material.Neon,
+		canCollide = false,
+	}).Parent = facility
+
+	-- Condenser units behind the back wall: gray cabinet, dark fan disc,
+	-- thin neon ring as the "powered" tell.
+	for _, cx in ipairs({ -10, 10 }) do
+		newPart({
+			name = "OutdoorCondenser",
+			size = Vector3.new(3, 2.5, 1.5),
+			cf = plotCF(cx, 1.25, -38),
+			color = Color3.fromRGB(120, 126, 134),
+		}).Parent = facility
+		local fan = newPart({
+			name = "OutdoorCondenserFan",
+			size = Vector3.new(0.18, 1.9, 1.9),
+			cf = plotCF(cx, 1.25, -37.1) * CFrame.Angles(0, math.rad(90), 0),
+			color = Color3.fromRGB(40, 44, 50),
+			canCollide = false,
+		})
+		fan.Shape = Enum.PartType.Cylinder
+		fan.Parent = facility
+		newPart({
+			name = "OutdoorCondenserGlow",
+			size = Vector3.new(0.06, 2.1, 2.1),
+			cf = plotCF(cx, 1.25, -37.16) * CFrame.Angles(0, math.rad(90), 0),
+			color = Color3.fromRGB(170, 225, 255),
+			material = Enum.Material.Neon,
+			canCollide = false,
+		}).Parent = facility
+	end
+
+	-- Slim back fence: two rails + one post every 8 studs (11 parts total).
+	for _, fy in ipairs({ 1.2, 2.0 }) do
+		newPart({
+			name = "BackFenceRail",
+			size = Vector3.new(64, 0.12, 0.12),
+			cf = plotCF(0, fy, -36),
+			color = Color3.fromRGB(142, 148, 156),
+		}).Parent = facility
+	end
+	for px = -32, 32, 8 do
+		newPart({
+			name = "BackFencePost",
+			size = Vector3.new(0.3, 2.4, 0.3),
+			cf = plotCF(px, 1.2, -36),
+			color = Color3.fromRGB(142, 148, 156),
+		}).Parent = facility
+	end
 end
 
 ---------------------------------------------------------------------
@@ -263,7 +517,7 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		cf = plotCF(0, floorTopY / 2, 0),
 		color = colors.floor,
 		material = Enum.Material.SmoothPlastic,
-	})
+	})	applyTopTexture(floor, TEX_FLOOR, 4)
 	floor.Reflectance = 0.12
 	floor.Parent = facility
 
@@ -376,13 +630,15 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		end
 		if yHigh > lowerTop then
 			local h = yHigh - lowerTop
-			newPart({
+			local wallHigh = newPart({
 				name = namePrefix .. "_High",
 				size = Vector3.new(sizeX, h, sizeZ),
 				cf = plotCF(cx, lowerTop + h / 2, cz),
 				color = colors.wall,
 				material = Enum.Material.Concrete,
-			}).Parent = facility
+			})
+			applyWallTexture(wallHigh, TEX_WALL, 8)
+			wallHigh.Parent = facility
 		end
 	end
 
@@ -588,6 +844,9 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		{ size = Vector3.new(44, 0.2, 0.7), x = -2, z = -20, color = colors.accentAmber }, -- yellow fiber raceway
 		{ size = Vector3.new(2.2, 0.25, 36), x = 18, z = -2, color = colors.trim }, -- workbench to NOC trunk
 		{ size = Vector3.new(0.7, 0.2, 36), x = 18, z = -2, color = colors.accentAmber },
+		{ size = Vector3.new(24, 0.25, 2.2), x = -16, z = 27, color = colors.trim }, -- front ISP tray above the wall station (x -28..-4)
+		{ size = Vector3.new(22, 0.25, 2.2), x = 7, z = 27, color = colors.trim }, -- L-connector front tray to the right-trunk line (x -4..18)
+		{ size = Vector3.new(46, 0.2, 0.7), x = -5, z = 27, color = colors.accentAmber }, -- yellow fiber raceway following both front runs
 	}
 	for i, tdef in ipairs(trayDefs) do
 		newPart({
@@ -626,6 +885,20 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 			castShadow = false,
 		}).Parent = facility
 	end
+
+	-- Single amber service cable riding the front tray + connector run (x
+	-- -28..18), same thin profile as the TrunkCable_ bundles above.
+	newPart({
+		name = "FrontTrunkCable_1",
+		size = Vector3.new(45.5, 0.14, 0.16),
+		cf = plotCF(-5, trayY + 0.18, 26.3),
+		color = colors.accentAmber,
+		canCollide = false,
+		castShadow = false,
+	}).Parent = facility
+
+	-- ===== Outdoor environment around the plot (lawn, parking, signage, fence) =====
+	WorldAndAssetBuilder.BuildOutdoorEnvironment(facility, plotCF)
 
 	-- 6 high-output ceiling LED fixtures with wide SurfaceLight + PointLight fill.
 	for _, lx in ipairs({ -20, 0, 20 }) do
@@ -685,9 +958,11 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 	session.rackSlots["rack_main_1"] = rackSlots
 
 	-- ===== ISP uplink node (WAN junction, always powered) =====
+	-- Sits at the front wall (+Z, near the entrance); rotated 180° so the box
+	-- faces into the room (WAN port side points -Z toward the player).
 	local ispSpec = PlotConstants.STARTER.isp
 	local ispModel, _ispAttach, ispWanLed = ModelFactory.BuildISPUplink(ispSpec.id)
-	ispModel:PivotTo(plotCF(PlotConstants.ISP_POS.X, floorTopY, PlotConstants.ISP_POS.Z))
+	ispModel:PivotTo(plotCF(PlotConstants.ISP_POS.X, floorTopY, PlotConstants.ISP_POS.Z) * CFrame.Angles(0, math.pi, 0))
 	ispModel.Parent = devicesFolder
 
 	local ispNode = NetworkGraph.DefaultNode(ispSpec.id, ispSpec.name, "isp_uplink")

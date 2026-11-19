@@ -4,7 +4,7 @@
 	Authoritative network state store: devices, ports, cables and LEDs.
 	Implements:
 	- port layout + default node factory from the hardware catalog
-	- link validation with color-coded Beam visuals (droop, width 0.12)
+	- link validation with color-coded overhead Beam cables (tray route, 3 segments)
 	- BFS reachability with VLAN isolation through switches, unpowered
 	  nodes never forwarding, broadcast storm (topology loop) detection
 	- routing path extraction for traceroute
@@ -14,6 +14,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local HardwareCatalog = require(ReplicatedStorage.Shared.HardwareCatalog)
 local PlotConstants = require(ReplicatedStorage.Shared.PlotConstants)
 local NetworkUtils = require(ReplicatedStorage.Shared.NetworkUtils)
@@ -43,6 +44,10 @@ local BEAM_SHEATH_COLORS: { [string]: Color3 } = {
 local LED_GREEN = Color3.fromRGB(85, 255, 120)
 local LED_RED = Color3.fromRGB(255, 80, 80)
 local LED_OFF = Color3.fromRGB(70, 70, 70)
+
+-- Overhead cable trays sit at this height (matches WorldAndAssetBuilder's
+-- trayY); cable runs ride along just beneath the tray surface.
+local OVERHEAD_Y = 15.2
 
 local ISP_UPLINK_ID = "isp_uplink" -- WAN junction to the "internet"
 local FALLBACK_SWITCH_ID = "sw_main_1" -- auto-cable fallback target
@@ -343,10 +348,11 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 	pb.cableColor = cableColor
 	pb.linkUp = true
 
-	-- Beam visual with realistic patch-cord slack: the run leaves each port,
-	-- dips to a slack point in front of the devices and rises back. The dip
-	-- stands off along the ports' outward direction so cables arch in front of
-	-- shelves and rack frames instead of clipping straight through them.
+	-- Overhead cable route: the run leaves each port, climbs to the ceiling
+	-- cable trays (OVERHEAD_Y, matching WorldAndAssetBuilder's trayY) via two
+	-- invisible anchor parts, runs flat along the tray with a gentle sag and
+	-- drops back to the far port. Cabling no longer pulls straight across the
+	-- room; everything is patched through the overhead raceway.
 	local partA = findPortPart(session, devAId, portAId)
 	local partB = findPortPart(session, devBId, portBId)
 	local attachA = if partA ~= nil then partA:FindFirstChild("PortAttach") else nil
@@ -355,28 +361,16 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 	local sheath: Beam? = nil
 	local beam2: Beam? = nil
 	local sheath2: Beam? = nil
-	local anchor: BasePart? = nil
+	local beam3: Beam? = nil
+	local sheath3: Beam? = nil
+	local anchorA: BasePart? = nil
+	local anchorB: BasePart? = nil
 	if attachA ~= nil and attachB ~= nil and attachA:IsA("Attachment") and attachB:IsA("Attachment") then
 		local posA = attachA.WorldPosition
 		local posB = attachB.WorldPosition
-		local dist = (posA - posB).Magnitude
-		-- Slack scales with run length; longer runs dip deeper.
-		local sag = math.clamp(1.0 + dist * 0.10, 1.0, 2.4)
-		local forward = partA.CFrame.LookVector + partB.CFrame.LookVector
-		if forward.Magnitude < 0.1 then
-			forward = Vector3.new(0, 0, 1)
-		else
-			forward = forward.Unit
-		end
-		local slackPos = (posA + posB) / 2 - Vector3.new(0, sag, 0)
-			+ forward * math.clamp(0.5 + dist * 0.06, 0.5, 1.4)
-		-- Cross-depth runs (e.g. rack front port to a wall demark box) swing
-		-- wide of the device bodies: shift the slack point toward the far end.
-		local runXZ = Vector3.new(posB.X - posA.X, 0, posB.Z - posA.Z)
-		if runXZ.Magnitude > 5 then
-			slackPos += runXZ.Unit * math.min(runXZ.Magnitude * 0.25, 2.2)
-		end
-		slackPos = Vector3.new(slackPos.X, math.max(slackPos.Y, 1.2), slackPos.Z)
+		-- Anchors sit just below the tray surface, directly over each port.
+		local upA = Vector3.new(posA.X, OVERHEAD_Y - 0.35, posA.Z)
+		local upB = Vector3.new(posB.X, OVERHEAD_Y - 0.35, posB.Z)
 		local facility = session.facility
 		local cablesFolder = if facility ~= nil then facility.cables else nil
 		local cableParent = cablesFolder
@@ -386,35 +380,30 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 			cableParent = session.deviceModels[devAId]
 		end
 		if cableParent ~= nil then
-			-- Invisible anchored part holding the shared slack attachment.
-			anchor = Instance.new("Part")
-			anchor.Name = "CableAnchor_" .. cableId
-			anchor.Size = Vector3.new(0.2, 0.2, 0.2)
-			anchor.CFrame = CFrame.new(slackPos)
-			anchor.Anchored = true
-			anchor.CanCollide = false
-			anchor.CanQuery = false
-			anchor.CanTouch = false
-			anchor.CastShadow = false
-			anchor.Transparency = 1
-			local mid = Instance.new("Attachment")
-			mid.Name = "Mid"
-			mid.Parent = anchor
-			anchor.Parent = cableParent
-
-			-- CurveSize offsets only along an attachment's local Y; convert the
-			-- world-down drop into local units and skip the arc when the port's
-			-- Y axis is too horizontal to express it.
-			local function dropCurve(attach: Attachment, drop: number): number
-				local yAxisY = attach.CFrame.YVector.Y
-				if math.abs(yAxisY) < 0.35 then
-					return 0
-				end
-				return -drop / yAxisY
+			-- Invisible anchored parts holding the overhead routing attachments.
+			local function makeAnchor(name: string, hangPos: Vector3): (BasePart, Attachment)
+				local anchorPart = Instance.new("Part")
+				anchorPart.Name = name
+				anchorPart.Size = Vector3.new(0.2, 0.2, 0.2)
+				anchorPart.CFrame = CFrame.new(hangPos)
+				anchorPart.Anchored = true
+				anchorPart.CanCollide = false
+				anchorPart.CanQuery = false
+				anchorPart.CanTouch = false
+				anchorPart.CastShadow = false
+				anchorPart.Transparency = 1
+				local mid = Instance.new("Attachment")
+				mid.Name = "Mid"
+				mid.Parent = anchorPart
+				anchorPart.Parent = cableParent
+				return anchorPart, mid
 			end
-			local dropA = math.max(0.1, posA.Y - slackPos.Y)
-			local dropB = math.max(0.1, posB.Y - slackPos.Y)
-			local curveMid = -sag * 0.15
+			-- Start hanging just above each port; the tween below then climbs
+			-- both anchors to the tray so the connection visibly snakes up.
+			local anchorAPart, midA = makeAnchor("CableAnchorA_" .. cableId, posA + Vector3.new(0, 1.2, 0))
+			local anchorBPart, midB = makeAnchor("CableAnchorB_" .. cableId, posB + Vector3.new(0, 1.2, 0))
+			anchorA = anchorAPart
+			anchorB = anchorBPart
 
 			-- Segment helper: dark braided jacket under the coloured core so the
 			-- lead reads as a round two-tone cable, not a flat ribbon.
@@ -449,8 +438,19 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 				return segSheath, segCore
 			end
 
-			sheath, beam = cableSegment(attachA, mid, dropCurve(attachA, dropA), curveMid, cableId .. "_a")
-			sheath2, beam2 = cableSegment(mid, attachB, curveMid, dropCurve(attachB, dropB), cableId .. "_b")
+			-- Vertical risers get a tiny 0.3 bow at the port end for smoothness
+			-- (anchors are identity CFrame, so their Y axis is world up); the
+			-- horizontal tray run bends -1.2 on both ends = gentle downward sag.
+			sheath, beam = cableSegment(attachA, midA, 0.3, 0, cableId .. "_a")
+			sheath2, beam2 = cableSegment(midA, midB, -1.2, -1.2, cableId .. "_m")
+			sheath3, beam3 = cableSegment(midB, attachB, 0, 0.3, cableId .. "_b")
+
+			-- Hook-up animation: both anchors tween from their hang positions to
+			-- the tray together (0.5s ease-out); beams follow the attachments, so
+			-- the cable appears to climb up and settle into the overhead run.
+			local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			TweenService:Create(anchorAPart, tweenInfo, { CFrame = CFrame.new(upA) }):Play()
+			TweenService:Create(anchorBPart, tweenInfo, { CFrame = CFrame.new(upB) }):Play()
 		end
 	end
 
@@ -465,7 +465,10 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 		sheath = sheath,
 		beam2 = beam2,
 		sheath2 = sheath2,
-		anchor = anchor,
+		beam3 = beam3,
+		sheath3 = sheath3,
+		anchorA = anchorA,
+		anchorB = anchorB,
 	}
 
 	-- A fresh cable on this exact pair repairs an active Cable Fault incident.
@@ -498,7 +501,9 @@ function NetworkGraph.DisconnectPort(session: any, deviceId: string, portId: str
 		local match = (cable.aDeviceId == deviceId and cable.aPortId == portId)
 			or (cable.bDeviceId == deviceId and cable.bPortId == portId)
 		if match then
-			for _, visual in ipairs({ cable.beam, cable.sheath, cable.beam2, cable.sheath2, cable.anchor }) do
+			-- anchors go first so the hook-up tweens die with their targets; a
+			-- Tween targeting a Destroyed part stops on its own (no Cancel needed)
+			for _, visual in ipairs({ cable.anchorA, cable.anchorB, cable.beam, cable.sheath, cable.beam2, cable.sheath2, cable.beam3, cable.sheath3 }) do
 				if visual ~= nil then
 					visual:Destroy()
 				end

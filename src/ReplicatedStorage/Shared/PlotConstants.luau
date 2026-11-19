@@ -51,7 +51,7 @@ PlotConstants.FURNITURE_ZONES = {
 	{ name = "Workbench", position = Vector3.new(18, 0, -12), radius = 8 },
 	{ name = "NOCDesk", position = Vector3.new(18, 0, 16), radius = 8 },
 	{ name = "Dock", position = Vector3.new(0, 0, -24), radius = 8 },
-	{ name = "ISP", position = Vector3.new(-20, 0, -28), radius = 6 },
+	{ name = "ISP", position = Vector3.new(-16, 0, 30.2), radius = 6 },
 } :: { ZoneSpec }
 
 PlotConstants.RACK_POS = Vector3.new(-22, 0, -20)
@@ -59,7 +59,8 @@ PlotConstants.RACK_ROT_Y = 0
 PlotConstants.WORKBENCH_POS = Vector3.new(18, 0, -12)
 PlotConstants.NOCDESK_POS = Vector3.new(18, 0, 16)
 PlotConstants.DOCK_POS = Vector3.new(0, 0, -24)
-PlotConstants.ISP_POS = Vector3.new(-20, 0, -28)
+-- ISP uplink di dinding depan (+Z, dekat pintu masuk), box menghadap ke dalam ruangan.
+PlotConstants.ISP_POS = Vector3.new(-16, 0, 30.2)
 PlotConstants.BEACON_OFFSET = Vector3.new(0, 15.6, -6)
 PlotConstants.AC_OFFSET = Vector3.new(29.8, 7, -10)
 

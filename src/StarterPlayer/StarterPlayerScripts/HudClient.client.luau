@@ -43,6 +43,7 @@ local COLOR_YELLOW = Color3.fromRGB(255, 216, 102)
 local COLOR_GREY = Color3.fromRGB(139, 148, 158)
 local COLOR_TEXT = Color3.fromRGB(230, 237, 243)
 local COLOR_RESET = Color3.fromRGB(140, 45, 45)
+local COLOR_CYAN = Color3.fromRGB(44, 156, 208)
 
 -- ===== GUI build =====
 local gui = Instance.new("ScreenGui")
@@ -350,6 +351,232 @@ UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: 
 end)
 setObjectivesOpen(false)
 
+-- ===== Current step banner (top-center) =====
+-- Short Indonesian instruction for the first unfinished objective.
+local OBJECTIVE_HINTS: { [string]: string } = {
+	cableWired = "Dekati rak: klik port switch lalu port router/server untuk menyambung kabel LAN (klik port yang terpasang = lepas)",
+	ipSetStarter = "Klik laptop di hotbar [1], sambungkan console ke server, lalu di terminal: ip set 10.0.0.2 10.0.0.1",
+	osInstalledStarter = "Di terminal server: install-os ubuntu-22.04",
+	pingGateway = "Di terminal: ping 10.0.0.1",
+	vmCreated = "Di terminal: vm create --name web1 --cpu 4 --ram 8 --disk 200",
+	benchBuilt = "Ke workbench, beli komponen di Store [B], rakit: Chassis>Mobo>CPU>RAM>Storage>PSU",
+	benchOsInstalled = "Nyalakan bench, sambung console laptop ke bench server, install-os ubuntu-22.04",
+	stressPassed = "Di terminal bench: stress-test",
+	shipped = "Di workbench: ship crate, lalu ambil di dock dan kirim",
+}
+local STEP_DONE_TEXT = "Semua langkah selesai — kembangkan labmu! Income jalan tiap 15 detik."
+
+local bannerGui = Instance.new("ScreenGui")
+bannerGui.Name = "NetSimStepBanner"
+bannerGui.ResetOnSpawn = false
+bannerGui.DisplayOrder = 90
+bannerGui.Parent = playerGui
+
+local banner = Instance.new("Frame")
+banner.Name = "StepBanner"
+banner.AnchorPoint = Vector2.new(0.5, 0)
+banner.Position = UDim2.new(0.5, 0, 0, 8)
+banner.Size = UDim2.new(0, 560, 0, 46)
+banner.BackgroundColor3 = COLOR_BG
+banner.BackgroundTransparency = 0.06
+banner.BorderSizePixel = 0
+banner.Parent = bannerGui
+local bannerCorner = Instance.new("UICorner")
+bannerCorner.CornerRadius = UDim.new(0, 8)
+bannerCorner.Parent = banner
+local bannerStroke = Instance.new("UIStroke")
+bannerStroke.Color = COLOR_CYAN
+bannerStroke.Thickness = 1
+bannerStroke.Parent = banner
+
+local bannerTag = Instance.new("TextLabel")
+bannerTag.Name = "StepTag"
+bannerTag.Size = UDim2.new(0, 70, 1, 0)
+bannerTag.Position = UDim2.new(0, 10, 0, 0)
+bannerTag.BackgroundTransparency = 1
+bannerTag.Font = Enum.Font.GothamBold
+bannerTag.TextSize = 11
+bannerTag.TextXAlignment = Enum.TextXAlignment.Left
+bannerTag.TextColor3 = COLOR_CYAN
+bannerTag.Text = "LANGKAH"
+bannerTag.Parent = banner
+
+local bannerText = Instance.new("TextLabel")
+bannerText.Name = "StepText"
+bannerText.AnchorPoint = Vector2.new(0.5, 0.5)
+bannerText.Position = UDim2.new(0.5, 5, 0.5, 0)
+bannerText.Size = UDim2.new(1, -160, 1, -8)
+bannerText.BackgroundTransparency = 1
+bannerText.Font = Enum.Font.Gotham
+bannerText.TextSize = 14
+bannerText.TextColor3 = COLOR_TEXT
+bannerText.TextWrapped = true
+bannerText.TextTruncate = Enum.TextTruncate.AtEnd
+bannerText.Text = OBJECTIVE_HINTS.cableWired
+bannerText.Parent = banner
+
+local bannerKeyHint = Instance.new("TextLabel")
+bannerKeyHint.Name = "StepKeyHint"
+bannerKeyHint.AnchorPoint = Vector2.new(1, 0)
+bannerKeyHint.Position = UDim2.new(1, -10, 0, 0)
+bannerKeyHint.Size = UDim2.new(0, 60, 1, 0)
+bannerKeyHint.BackgroundTransparency = 1
+bannerKeyHint.Font = Enum.Font.Gotham
+bannerKeyHint.TextSize = 11
+bannerKeyHint.TextXAlignment = Enum.TextXAlignment.Right
+bannerKeyHint.TextColor3 = COLOR_GREY
+bannerKeyHint.Text = "lihat [O]"
+bannerKeyHint.Parent = banner
+
+-- Pick the first unfinished objective (OBJECTIVES order) and show its hint;
+-- when everything is done, switch the banner to a green "all clear" state.
+local function updateStepBanner(objectives: { [string]: boolean }?)
+	local doneMap: { [string]: boolean } = objectives or {}
+	local currentKey: string? = nil
+	for _, objDef in ipairs(OBJECTIVES) do
+		if doneMap[objDef.key] ~= true then
+			currentKey = objDef.key
+			break
+		end
+	end
+
+	if currentKey == nil then
+		bannerText.Text = STEP_DONE_TEXT
+		bannerText.TextColor3 = COLOR_GREEN
+		bannerStroke.Color = COLOR_GREEN
+		bannerTag.TextColor3 = COLOR_GREEN
+	else
+		bannerText.Text = OBJECTIVE_HINTS[currentKey] or OBJECTIVE_HINTS.cableWired
+		bannerText.TextColor3 = COLOR_TEXT
+		bannerStroke.Color = COLOR_CYAN
+		bannerTag.TextColor3 = COLOR_CYAN
+	end
+end
+
+-- ===== Welcome tutorial card (shown once per join) =====
+local welcomeGui = Instance.new("ScreenGui")
+welcomeGui.Name = "NetSimWelcome"
+welcomeGui.ResetOnSpawn = false
+welcomeGui.DisplayOrder = 110
+welcomeGui.Enabled = false
+welcomeGui.Parent = playerGui
+
+-- Clickable backdrop: clicking outside the panel closes the card.
+local welcomeDim = Instance.new("TextButton")
+welcomeDim.Name = "Backdrop"
+welcomeDim.Size = UDim2.new(1, 0, 1, 0)
+welcomeDim.BackgroundColor3 = Color3.new(0, 0, 0)
+welcomeDim.BackgroundTransparency = 0.55
+welcomeDim.BorderSizePixel = 0
+welcomeDim.Text = ""
+welcomeDim.AutoButtonColor = false
+welcomeDim.Parent = welcomeGui
+
+local welcomePanel = Instance.new("Frame")
+welcomePanel.Name = "Card"
+welcomePanel.AnchorPoint = Vector2.new(0.5, 0.5)
+welcomePanel.Position = UDim2.new(0.5, 0, 0.5, 0)
+welcomePanel.Size = UDim2.new(0, 520, 0, 400)
+welcomePanel.BackgroundColor3 = COLOR_BG
+welcomePanel.BackgroundTransparency = 0.06
+welcomePanel.BorderSizePixel = 0
+welcomePanel.Active = true
+welcomePanel.Parent = welcomeDim
+local welcomePanelCorner = Instance.new("UICorner")
+welcomePanelCorner.CornerRadius = UDim.new(0, 10)
+welcomePanelCorner.Parent = welcomePanel
+local welcomePanelStroke = Instance.new("UIStroke")
+welcomePanelStroke.Color = COLOR_CYAN
+welcomePanelStroke.Thickness = 1
+welcomePanelStroke.Parent = welcomePanel
+
+local welcomeTitle = Instance.new("TextLabel")
+welcomeTitle.Name = "Title"
+welcomeTitle.Size = UDim2.new(1, -32, 0, 28)
+welcomeTitle.Position = UDim2.new(0, 16, 0, 16)
+welcomeTitle.BackgroundTransparency = 1
+welcomeTitle.Font = Enum.Font.GothamBold
+welcomeTitle.TextSize = 20
+welcomeTitle.TextXAlignment = Enum.TextXAlignment.Center
+welcomeTitle.TextColor3 = COLOR_GREEN
+welcomeTitle.Text = "SELAMAT DATANG, SYSADMIN"
+welcomeTitle.Parent = welcomePanel
+
+local welcomeGoal = Instance.new("TextLabel")
+welcomeGoal.Name = "Goal"
+welcomeGoal.Size = UDim2.new(1, -32, 0, 44)
+welcomeGoal.Position = UDim2.new(0, 16, 0, 54)
+welcomeGoal.BackgroundTransparency = 1
+welcomeGoal.Font = Enum.Font.Gotham
+welcomeGoal.TextSize = 14
+welcomeGoal.TextXAlignment = Enum.TextXAlignment.Center
+welcomeGoal.TextColor3 = COLOR_TEXT
+welcomeGoal.TextWrapped = true
+welcomeGoal.Text = "Tujuan: bangun lab servermu — kabel, install OS, hosting VM, terima kontrak, dapat income."
+welcomeGoal.Parent = welcomePanel
+
+local welcomeControls = Instance.new("TextLabel")
+welcomeControls.Name = "Controls"
+welcomeControls.Size = UDim2.new(1, -32, 0, 150)
+welcomeControls.Position = UDim2.new(0, 16, 0, 108)
+welcomeControls.BackgroundTransparency = 1
+welcomeControls.Font = Enum.Font.Gotham
+welcomeControls.TextSize = 13
+welcomeControls.TextXAlignment = Enum.TextXAlignment.Left
+welcomeControls.TextYAlignment = Enum.TextYAlignment.Top
+welcomeControls.TextColor3 = COLOR_TEXT
+welcomeControls.TextWrapped = true
+welcomeControls.Text = table.concat({
+	"[WASD] — gerak",
+	"[Klik port] — pasang kabel LAN (klik port terpasang = lepas)",
+	"[Laptop 1] + [E] dekat device — console",
+	"[~] / [F2] — terminal",
+	"[B] — toko",
+	"[O] — objectives",
+	"[Tab] — menu (save / guide / reset)",
+}, "\n")
+welcomeControls.Parent = welcomePanel
+
+local welcomeNote = Instance.new("TextLabel")
+welcomeNote.Name = "Note"
+welcomeNote.Size = UDim2.new(1, -32, 0, 22)
+welcomeNote.Position = UDim2.new(0, 16, 0, 266)
+welcomeNote.BackgroundTransparency = 1
+welcomeNote.Font = Enum.Font.GothamBold
+welcomeNote.TextSize = 13
+welcomeNote.TextXAlignment = Enum.TextXAlignment.Center
+welcomeNote.TextColor3 = COLOR_CYAN
+welcomeNote.TextWrapped = true
+welcomeNote.Text = "Ikuti banner LANGKAH di atas — selalu menunjukkan langkah berikutnya."
+welcomeNote.Parent = welcomePanel
+
+local welcomeStartBtn = Instance.new("TextButton")
+welcomeStartBtn.Name = "StartButton"
+welcomeStartBtn.AnchorPoint = Vector2.new(0.5, 0)
+welcomeStartBtn.Position = UDim2.new(0.5, 0, 0, 330)
+welcomeStartBtn.Size = UDim2.new(0, 160, 0, 40)
+welcomeStartBtn.BackgroundColor3 = COLOR_GREEN
+welcomeStartBtn.Font = Enum.Font.GothamBold
+welcomeStartBtn.TextSize = 15
+welcomeStartBtn.TextColor3 = COLOR_BG
+welcomeStartBtn.Text = "MULAI"
+welcomeStartBtn.AutoButtonColor = true
+welcomeStartBtn.Parent = welcomePanel
+local welcomeStartCorner = Instance.new("UICorner")
+welcomeStartCorner.CornerRadius = UDim.new(0, 6)
+welcomeStartCorner.Parent = welcomeStartBtn
+
+local function closeWelcome()
+	welcomeGui.Enabled = false
+end
+welcomeStartBtn.MouseButton1Click:Connect(closeWelcome)
+welcomeDim.MouseButton1Click:Connect(closeWelcome)
+
+-- Reveal once per join, shortly after spawn so the HUD is ready first.
+task.delay(0.6, function()
+	welcomeGui.Enabled = true
+end)
+
 -- ===== Hint system: rotating PC tips + priority server hints =====
 local TIPS = {
 	"Press [~] or [F2] to open / close Terminal (or click X [~])",
@@ -488,5 +715,7 @@ stateSyncRemote.OnClientEvent:Connect(function(payload: any)
 		row.Text = (done and "✓ " or "o ") .. objectiveDefs[key]
 		row.TextColor3 = if done then COLOR_GREEN else COLOR_GREY
 	end
+	-- Step banner follows the same objectives payload.
+	updateStepBanner(objectives)
 
 end)
