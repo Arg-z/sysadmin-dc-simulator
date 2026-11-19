@@ -23,6 +23,7 @@ local CommandExecutor = require(script.Parent.Core.CommandExecutor)
 local RackAndCablingSystem = require(script.Parent.Physical.RackAndCablingSystem)
 local PlacementSystem = require(script.Parent.Physical.PlacementSystem)
 local WorkbenchBuilderSystem = require(script.Parent.Physical.WorkbenchBuilderSystem)
+local CarryAndMountSystem = require(script.Parent.Physical.CarryAndMountSystem)
 local ShiftAndEconomyManager = require(script.Parent.Gameplay.ShiftAndEconomyManager)
 local ContractAndIncidentManager = require(script.Parent.Gameplay.ContractAndIncidentManager)
 local DataPersistenceManager = require(script.Parent.Gameplay.DataPersistenceManager)
@@ -53,6 +54,15 @@ PlacementSystem.Init({
 	cabling = RackAndCablingSystem,
 	remotesFolder = remotes,
 })
+CarryAndMountSystem.Init({
+	sessions = SessionManager,
+	placement = PlacementSystem,
+	graph = NetworkGraph,
+	modelFactory = ModelFactory,
+	constants = PlotConstants,
+	catalog = HardwareCatalog,
+	remotesFolder = remotes,
+})
 ShiftAndEconomyManager.Init({
 	sessions = SessionManager,
 	graph = NetworkGraph,
@@ -66,6 +76,7 @@ ContractAndIncidentManager.Init({
 	constants = PlotConstants,
 	remotesFolder = remotes,
 	workbench = WorkbenchBuilderSystem,
+	carry = CarryAndMountSystem,
 })
 DataPersistenceManager.Init({
 	sessions = SessionManager,
@@ -83,6 +94,8 @@ CommandExecutor.Init({
 	constants = PlotConstants,
 	workbench = WorkbenchBuilderSystem,
 	cabling = RackAndCablingSystem,
+	placement = PlacementSystem,
+	carry = CarryAndMountSystem,
 	remotesFolder = remotes,
 })
 
@@ -99,6 +112,9 @@ end)
 -- Laptop tool ke StarterPack: setiap respawn otomatis dapat
 local starterLaptop = ModelFactory.BuildLaptop()
 starterLaptop.Parent = StarterPack
+-- Fase 2: wire cutter fisik (klik port tersambung = potong kabel)
+local starterCutter = ModelFactory.BuildWireCutter()
+starterCutter.Parent = StarterPack
 
 -- ===== Lifecycle pemain =====
 local function buildSession(player: Player)

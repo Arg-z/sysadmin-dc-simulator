@@ -66,6 +66,10 @@ type SnapTicket = {
 	rewardPayout: number,
 	status: string,
 	requirementsText: string,
+	slaRemainingSec: number?,
+	payoutIntervalSec: number?,
+	validationText: string?,
+	vlanId: number?,
 }
 
 type FacilitySnapshot = {
@@ -581,7 +585,7 @@ local function updateTickets(snap: FacilitySnapshot)
 			local isActive = ticket.status == "Active"
 			local row = Instance.new("Frame")
 			row.Name = "Ticket_" .. tostring(ticket.id)
-			row.Size = UDim2.new(1, -6, 0, 30)
+			row.Size = UDim2.new(1, -6, 0, 40)
 			row.BackgroundColor3 = COLOR_ROW
 			row.BorderSizePixel = 0
 			row.LayoutOrder = order
@@ -613,6 +617,38 @@ local function updateTickets(snap: FacilitySnapshot)
 			subLabel.TextXAlignment = Enum.TextXAlignment.Left
 			subLabel.Text = NetworkUtils.FormatCurrency(ticket.rewardPayout or 0) .. "  -  " .. tostring(ticket.category)
 			subLabel.Parent = row
+
+			local statusBits: { string } = {}
+			local running = false
+			if isActive then
+				if ticket.category == "Colocation" and ticket.vlanId ~= nil then
+					table.insert(statusBits, "VLAN " .. tostring(ticket.vlanId))
+				end
+				local note = ticket.validationText or ""
+				running = string.find(note, "Layanan jalan") ~= nil
+				if ticket.slaRemainingSec ~= nil and ticket.slaRemainingSec > 0 and not running then
+					table.insert(statusBits, string.format("SLA %ds", ticket.slaRemainingSec))
+				end
+				if note ~= "" then
+					table.insert(statusBits, note)
+				end
+			else
+				table.insert(statusBits, ticket.requirementsText or "")
+			end
+			if #statusBits > 0 then
+				local statusLabel = Instance.new("TextLabel")
+				statusLabel.Name = "TicketStatus"
+				statusLabel.Size = UDim2.new(1, -66, 0, 10)
+				statusLabel.Position = UDim2.new(0, 6, 0, 28)
+				statusLabel.BackgroundTransparency = 1
+				statusLabel.Font = Enum.Font.Gotham
+				statusLabel.TextSize = 10
+				statusLabel.TextColor3 = if running then COLOR_GREEN else COLOR_GREY
+				statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+				statusLabel.TextTruncate = Enum.TextTruncate.AtEnd
+				statusLabel.Text = table.concat(statusBits, "  |  ")
+				statusLabel.Parent = row
+			end
 
 			if isActive then
 				local activeLabel = Instance.new("TextLabel")

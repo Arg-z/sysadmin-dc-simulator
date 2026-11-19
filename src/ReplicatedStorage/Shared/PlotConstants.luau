@@ -91,6 +91,39 @@ PlotConstants.ECONOMY = {
 	vpsDiskRatePerPayout = 0.003,
 }
 
+-- ===== Fase 2: manual cabling & colour-coded spools =====
+-- One store purchase fills a spool with spoolYield patch cables.
+PlotConstants.CABLES = {
+	spoolYield = 5,
+	starter = {
+		LAN_Blue = 8,
+		WAN_Yellow = 2,
+		Mgmt_Red = 2,
+	},
+	colors = { "LAN_Blue", "WAN_Yellow", "Mgmt_Red" },
+	labels = {
+		LAN_Blue = "LAN Biru",
+		WAN_Yellow = "WAN Kuning",
+		Mgmt_Red = "Mgmt Merah",
+	},
+	itemByColor = {
+		LAN_Blue = "cable_lan_blue",
+		WAN_Yellow = "cable_wan_yellow",
+		Mgmt_Red = "cable_mgmt_red",
+	},
+}
+
+-- ===== Fase 2: colocation contracts =====
+PlotConstants.COLOCATION = {
+	vlanChoices = { 20, 30, 40 },
+	uSize = 2,
+	slaSeconds = 240, -- time to mount, cable, VLAN and power the client server
+	runtimeSeconds = 60, -- paid service window after validation
+	payoutIntervalSeconds = 10, -- one payout tick inside the service window
+	deliveryDelaySeconds = 3, -- crate appears at the dock after accepting
+	cleanupDelaySeconds = 15, -- client collects the server after completion
+}
+
 PlotConstants.COLORS = {
 	floor = Color3.fromRGB(214, 220, 228),
 	floorGrid = Color3.fromRGB(186, 195, 208),

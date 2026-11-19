@@ -9,8 +9,8 @@
 	  nodes never forwarding, broadcast storm (topology loop) detection
 	- routing path extraction for traceroute
 	- smart auto-cabling to the nearest free port
-	Fase 1 note: vlanId fields exist (default 1); explicit VLAN commands
-	are a Fase 2 feature and only referenced in comments.
+	Fase 2 adds explicit port VLANs, 802.1Q trunks and inter-VLAN routing
+	through routers (switches isolate VLANs; routers bridge them at L3).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -57,6 +57,7 @@ local function makePort(portId: string, portType: string): any
 		cableColor = nil,
 		linkUp = false,
 		vlanId = 1,
+		isTrunk = false,
 		trafficLoadMbps = 0,
 	}
 end
@@ -128,6 +129,8 @@ function NetworkGraph.DefaultNode(id: string, name: string, itemId: string): any
 		gateway = nil,
 		subnetMask = "255.255.255.0",
 		defaultVlan = 1,
+		interVlanRouting = deviceType == "Router",
+		contractId = nil,
 		ports = NetworkGraph.MakePortsForItem(itemId),
 		specs = specs,
 		vms = {},
@@ -255,8 +258,18 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 		return false, "Tipe port tidak kompatibel (" .. pa.portType .. " vs " .. pb.portType .. ")"
 	end
 
-	local cableId = SessionManager.NextCableId(session)
+	-- Fase 2 cable colours: yellow is reserved for WAN uplinks, LAN/Mgmt for
+	-- copper/fibre data ports. Persistence restores the recorded colour too.
+	local bothWan = pa.portType == "WAN" and pb.portType == "WAN"
 	local cableColor: string = if BEAM_COLORS[color] ~= nil then color else "LAN_Blue"
+	if bothWan and cableColor ~= "WAN_Yellow" then
+		return false, "Port WAN membutuhkan kabel kuning (WAN_Yellow)"
+	end
+	if not bothWan and cableColor == "WAN_Yellow" then
+		return false, "Kabel WAN kuning hanya untuk port WAN"
+	end
+
+	local cableId = SessionManager.NextCableId(session)
 
 	pa.connectedToDeviceId = devBId
 	pa.connectedToPortId = portBId
@@ -359,6 +372,98 @@ function NetworkGraph.DisconnectPort(session: any, deviceId: string, portId: str
 	end
 	NetworkGraph.UpdateDeviceLED(session, deviceId)
 	return true
+end
+
+---------------------------------------------------------------------
+-- VLAN controls (Fase 2)
+---------------------------------------------------------------------
+
+--[[ Set a port VLAN (1..4094). Only non-Console ports are configurable.
+	 Returns (ok, errorMessage). The simulation reads vlanId live, so no
+	 re-link is needed: the next ping/traceroute sees the new isolation. ]]
+function NetworkGraph.SetPortVlan(session: any, deviceId: string, portId: string, vlanId: number): (boolean, string)
+	local node = session.devices[deviceId]
+	if node == nil then
+		return false, "Device tidak ditemukan"
+	end
+	local port = node.ports[portId]
+	if port == nil then
+		return false, "Port tidak ditemukan"
+	end
+	if port.portType == "Console" then
+		return false, "Port console tidak punya VLAN"
+	end
+	if type(vlanId) ~= "number" or vlanId ~= vlanId then
+		return false, "VLAN harus angka"
+	end
+	local vlan = math.floor(vlanId)
+	if vlan < 1 or vlan > 4094 then
+		return false, "VLAN harus 1..4094"
+	end
+	port.vlanId = vlan
+	return true, ""
+end
+
+--[[ Marks a non-Console port as an 802.1Q trunk (all VLANs pass) or back to
+	 access mode. Returns (ok, errorMessage). ]]
+function NetworkGraph.SetPortTrunk(session: any, deviceId: string, portId: string, enabled: boolean): (boolean, string)
+	local node = session.devices[deviceId]
+	if node == nil then
+		return false, "Device tidak ditemukan"
+	end
+	local port = node.ports[portId]
+	if port == nil then
+		return false, "Port tidak ditemukan"
+	end
+	if port.portType == "Console" then
+		return false, "Port console tidak bisa dijadikan trunk"
+	end
+	port.isTrunk = enabled == true
+	return true, ""
+end
+
+--[[ The switch and port a device is physically plugged into, or nil when
+	 the device has no cable to a switch (routers/ISP count separately). ]]
+function NetworkGraph.GetAccessSwitchPort(session: any, deviceId: string): (any?, string?)
+	local node = session.devices[deviceId]
+	if node == nil then
+		return nil, nil
+	end
+	for _, port in pairs(node.ports) do
+		local peerId = port.connectedToDeviceId
+		if peerId ~= nil then
+			local peer = session.devices[peerId]
+			local peerPortId = port.connectedToPortId
+			if peer ~= nil and peer.deviceType == "Switch" and peerPortId ~= nil then
+				return peer, peerPortId
+			end
+		end
+	end
+	return nil, nil
+end
+
+--[[ Deterministic "port eth1 VLAN 20" rows for the terminal/badges. ]]
+function NetworkGraph.ListPortVlans(session: any, deviceId: string): { string }
+	local node = session.devices[deviceId]
+	if node == nil then
+		return { "Device tidak ditemukan" }
+	end
+	local ids: { string } = {}
+	for portId in pairs(node.ports) do
+		table.insert(ids, portId)
+	end
+	table.sort(ids)
+	local lines: { string } = {}
+	for _, portId in ipairs(ids) do
+		local port = node.ports[portId]
+		local state = if port.connectedToDeviceId ~= nil then "UP" else "down"
+		local mode = if port.isTrunk == true then "TRUNK" else string.format("VLAN %d", port.vlanId)
+		table.insert(lines, string.format("%s  %s  %s", portId, mode, state))
+	end
+	if #lines == 0 then
+		return { "Tidak ada port" }
+	end
+	return lines
 end
 
 ---------------------------------------------------------------------
@@ -494,10 +599,15 @@ local function bfsPath(session: any, sourceDeviceId: string, targetId: string): 
 			if not port.linkUp or port.connectedToDeviceId == nil then
 				continue
 			end
-			-- VLAN isolation while forwarding through a switch
-			if node.deviceType == "Switch" and current.inPortId ~= nil then
+			-- VLAN isolation while forwarding through a switch (and through a
+			-- router whose inter-VLAN routing is disabled). Routers route
+			-- between VLANs at L3, so they bridge VLANs by design.
+			local isolates = node.deviceType == "Switch"
+				or (node.deviceType == "Router" and node.interVlanRouting == false)
+			if isolates and current.inPortId ~= nil then
 				local inPort = node.ports[current.inPortId]
-				if inPort ~= nil and inPort.vlanId ~= port.vlanId then
+				local trunked = (inPort ~= nil and inPort.isTrunk == true) or port.isTrunk == true
+				if inPort ~= nil and inPort.vlanId ~= port.vlanId and not trunked then
 					continue
 				end
 			end

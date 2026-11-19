@@ -1,7 +1,7 @@
 --!strict
 --[[
 	DataPersistenceManager (ModuleScript, ServerScriptService/Gameplay)
-	AGENT C - Fase 1.
+	AGENT C - Fase 1 + 2.
 
 	DataStore "NetSimDC_v1", key "lab_"..UserId. Every DataStore access is
 	wrapped in pcall; if GetDataStore itself fails, a session-independent flag
@@ -15,29 +15,31 @@
 	this module only provides the autosave loop (Start, every 120s).
 
 	Saved payload:
-	  balance, reputation,
+	  balance, reputation, cableSpools, selectedCableColor,
+	  racks = freeform racks (item, world position, rotation, PDU state),
 	  devices  = array over session.devices EXCEPT "isp_uplink":
-	             { id, itemId, freeform, posX, posZ, rotY, rackId, uSlot, ip,
-	               gateway, subnetMask, osInstalled, isPowered,
-	               ports = { [portId] = { peer, peerPort, color } } (connected only),
+	             { id, name, itemId, deviceType, contractId, freeform, posX,
+	               posZ, rotY, rackId, uSlot, ip, gateway, subnetMask,
+	               osInstalled, isPowered,
+	               ports = { [portId] = { peer?, peerPort?, color?, vlan } },
 	               vms = { VMData... } }
 	             "bench_1" saves PORTS ONLY (the workbench payload covers the
 	             node itself; ports must survive for the link pass).
 	  workbench = WorkbenchBuilderSystem.Serialize(session)
-	  tickets   = Active tickets: { id, category, title, description,
-	              rewardPayout, requirements (cpu/ram/disk or nil), status,
-	              requirementsText, clientName }
+	  tickets   = Active CloudVPS/CustomBuild tickets (Colocation contracts are
+	              short-lived and reference a physical crate, so they are not
+	              persisted; mounted servers are saved as rack devices).
 
 	Apply(session, data):
 	  loadedFromSave = true FIRST (suppresses AutoCable during restore) ->
-	  balance/reputation -> starter device config (bm_starter_1, sw_main_1,
-	  isp_router_1: ip/gateway/mask/os/power/vms + vmIpCounter rebuild) ->
+	  balance/reputation/cable inventory -> freeform racks restored ->
+	  starter device config (bm_starter_1, sw_main_1, isp_router_1) ->
 	  freeform devices re-placed via PlacementSystem.PlaceDevice(config) ->
+	  rack devices re-mounted via PlacementSystem.MountDevice(config) ->
 	  workbench.ApplyState (so bench_1 exists before cables) -> link pass
 	  (graph.ConnectPorts per saved peer, deduped by sorted "dev|port" pair,
-	  covers starter + bench + placed links) -> tickets restore (Available stays
-	  Available, Active stays Active) -> loadedFromSave = false ->
-	  graph.UpdateDeviceLED for all devices -> ForceSync snapshot.
+	  covers starter + bench + placed links) -> VLAN restore -> tickets
+	  restore -> loadedFromSave = false -> graph.UpdateDeviceLED -> ForceSync.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -159,14 +161,16 @@ function DataPersistenceManager.Save(session: SessionLike)
 			continue -- ISP uplink is rebuilt fresh by BuildFacility every join
 		end
 
-		-- ports: only currently connected links are persisted
+		-- ports: connected links plus non-default VLANs (Fase 2 switch config)
 		local ports: { [string]: { [string]: any } } = {}
 		for portId, port in pairs(node.ports) do
-			if port.connectedToDeviceId ~= nil then
+			if port.connectedToDeviceId ~= nil or port.vlanId ~= 1 or port.isTrunk == true then
 				ports[portId] = {
 					peer = port.connectedToDeviceId,
 					peerPort = port.connectedToPortId,
 					color = port.cableColor,
+					vlan = port.vlanId,
+					trunk = port.isTrunk == true,
 				}
 			end
 		end
@@ -187,7 +191,10 @@ function DataPersistenceManager.Save(session: SessionLike)
 
 		table.insert(devices, {
 			id = id,
+			name = node.name,
 			itemId = node.itemId,
+			deviceType = node.deviceType,
+			contractId = node.contractId,
 			freeform = node.freeform == true,
 			posX = node.posX,
 			posZ = node.posZ,
@@ -204,9 +211,32 @@ function DataPersistenceManager.Save(session: SessionLike)
 		})
 	end
 
+	-- Freeform racks (the starter rack is rebuilt by WorldAndAssetBuilder).
+	local racks: { any } = {}
+	for rackId, rack in pairs(session.racks) do
+		if rackId ~= "rack_main_1" then
+			local model = session.rackModels[rackId]
+			if model ~= nil then
+				local cf = model:GetPivot()
+				local _rx, rotY, _rz = cf:ToOrientation()
+				table.insert(racks, {
+					rackId = rackId,
+					itemId = rack.itemId,
+					posX = cf.Position.X,
+					posZ = cf.Position.Z,
+					rotY = rotY,
+					pduPowered = rack.pduPowered == true,
+				})
+			end
+		end
+	end
+
 	local tickets: { any } = {}
 	for _, t in ipairs(session.tickets or {}) do
-		if t.status == "Active" then
+		-- Colocation contracts are short live sessions and reference a physical
+		-- crate; they are not persisted. The mounted server itself is saved as a
+		-- normal rack device above.
+		if t.status == "Active" and t.category ~= "Colocation" then
 			table.insert(tickets, {
 				id = t.id,
 				category = t.category,
@@ -225,6 +255,9 @@ function DataPersistenceManager.Save(session: SessionLike)
 		balance = session.balance,
 		reputation = session.reputation,
 		devices = devices,
+		racks = racks,
+		cableSpools = session.cableSpools,
+		selectedCableColor = session.selectedCableColor,
 		workbench = (workbench ~= nil and type(workbench.Serialize) == "function") and workbench.Serialize(session) or nil,
 		tickets = tickets,
 	}
@@ -297,12 +330,30 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 		session.reputation = tonumber(data.reputation) :: number
 	end
 
-	-- saved device id -> live device id (starters keep their fixed ids)
+	-- Fase 2 cable inventory.
+	if type(data.cableSpools) == "table" then
+		for _, color in ipairs(constants.CABLES.colors) do
+			local count = tonumber(data.cableSpools[color])
+			if count ~= nil then
+				session.cableSpools[color] = math.max(0, math.floor(count))
+			end
+		end
+	end
+	if type(data.selectedCableColor) == "string" then
+		for _, color in ipairs(constants.CABLES.colors) do
+			if color == data.selectedCableColor then
+				session.selectedCableColor = color
+			end
+		end
+	end
+
+	-- saved device / rack id -> live id (starters keep their fixed ids)
 	local restoredIds: { [string]: string } = {
 		[ISP_ID] = ISP_ID,
 		["isp_router_1"] = "isp_router_1",
 		["sw_main_1"] = "sw_main_1",
 		["bm_starter_1"] = "bm_starter_1",
+		["rack_main_1"] = "rack_main_1",
 		[BENCH_ID] = BENCH_ID,
 	}
 	local starterSet: { [string]: boolean } = {
@@ -313,7 +364,30 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 
 	local savedDevices: { any } = if type(data.devices) == "table" then data.devices else {}
 
-	-- 1) Starter device config + freeform device re-placement.
+	-- 0) Freeform racks must exist before their mounted devices are restored.
+	if type(data.racks) == "table" and placement ~= nil then
+		for _, entry in ipairs(data.racks) do
+			if type(entry) ~= "table" or type(entry.rackId) ~= "string" or type(entry.itemId) ~= "string" then
+				continue
+			end
+			if entry.rackId == "rack_main_1" then
+				continue
+			end
+			local posX = tonumber(entry.posX) or 0
+			local posZ = tonumber(entry.posZ) or 0
+			local rotY = tonumber(entry.rotY) or 0
+			local ok, newRackId = pcall(function()
+				return placement.RestoreRack(session, entry.itemId :: string, posX, posZ, rotY, entry.pduPowered == true)
+			end)
+			if ok and type(newRackId) == "string" and newRackId ~= "" then
+				restoredIds[entry.rackId] = newRackId
+			else
+				warn("[DataPersistenceManager] could not restore rack '" .. entry.rackId .. "'")
+			end
+		end
+	end
+
+	-- 1) Starter device config + freeform / rack-mounted device re-placement.
 	for _, entry in ipairs(savedDevices) do
 		if type(entry) ~= "table" or type(entry.id) ~= "string" then
 			continue
@@ -391,9 +465,34 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 			else
 				warn("[DataPersistenceManager] could not restore device '" .. savedId .. "' (" .. tostring(entry.itemId) .. ")")
 			end
+		elseif type(entry.rackId) == "string" and entry.uSlot ~= nil and type(entry.itemId) == "string" and placement ~= nil then
+			-- Fase 2: rack-mounted devices (colocation servers, purchased units)
+			local rackId = restoredIds[entry.rackId] or entry.rackId
+			if session.racks[rackId] == nil then
+				warn("[DataPersistenceManager] missing rack '" .. tostring(entry.rackId) .. "' for device '" .. savedId .. "'")
+				continue
+			end
+			local ok, mounted, result = pcall(placement.MountDevice, session, entry.itemId, rackId, entry.uSlot, {
+				name = entry.name,
+				deviceType = entry.deviceType,
+				ip = entry.ip,
+				gateway = entry.gateway,
+				subnetMask = entry.subnetMask,
+				osInstalled = entry.osInstalled,
+				isPowered = if entry.isPowered ~= nil then entry.isPowered == true else nil,
+				contractId = entry.contractId,
+				noAutoCable = true,
+			})
+			if ok and mounted == true then
+				restoredIds[savedId] = result
+				local node = session.devices[result]
+				if node ~= nil then
+					restoreVMs(session, node, result, entry.vms)
+				end
+			else
+				warn("[DataPersistenceManager] could not restore rack device '" .. savedId .. "': " .. tostring(result))
+			end
 		else
-			-- Rack-mounted non-starter devices cannot be re-mounted in Fase 1
-			-- (carry & mount is Fase 2); recorded as a known limitation.
 			warn("[DataPersistenceManager] skipping non-restorable device '" .. savedId .. "'")
 		end
 	end
@@ -433,6 +532,29 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 					-- Mostly benign: pre-wired starter links (wan1<->isp_uplink)
 					-- already exist from BuildFacility and are rejected here.
 					_ = err
+				end
+			end
+		end
+	end
+
+	-- 3b) VLAN restore: applies to connected and unconnected ports alike.
+	for _, entry in ipairs(savedDevices) do
+		if type(entry) ~= "table" or type(entry.id) ~= "string" or type(entry.ports) ~= "table" then
+			continue
+		end
+		local devA = restoredIds[entry.id]
+		if devA == nil then
+			continue
+		end
+		for portA, conn in pairs(entry.ports :: { [string]: any }) do
+			if type(conn) == "table" and type(portA) == "string" then
+				if tonumber(conn.vlan) ~= nil then
+					local okVlan = graph.SetPortVlan(session, devA, portA, tonumber(conn.vlan) :: number)
+					_ = okVlan
+				end
+				if conn.trunk == true then
+					local okTrunk = graph.SetPortTrunk(session, devA, portA, true)
+					_ = okTrunk
 				end
 			end
 		end

@@ -99,6 +99,7 @@ TREE = {
     ("ServerScriptService", "Physical", "RackAndCablingSystem"): "ServerScriptService/Physical/RackAndCablingSystem.luau",
     ("ServerScriptService", "Physical", "PlacementSystem"): "ServerScriptService/Physical/PlacementSystem.luau",
     ("ServerScriptService", "Physical", "WorkbenchBuilderSystem"): "ServerScriptService/Physical/WorkbenchBuilderSystem.luau",
+    ("ServerScriptService", "Physical", "CarryAndMountSystem"): "ServerScriptService/Physical/CarryAndMountSystem.luau",
     ("ServerScriptService", "Gameplay"): None,
     ("ServerScriptService", "Gameplay", "ShiftAndEconomyManager"): "ServerScriptService/Gameplay/ShiftAndEconomyManager.luau",
     ("ServerScriptService", "Gameplay", "ContractAndIncidentManager"): "ServerScriptService/Gameplay/ContractAndIncidentManager.luau",
@@ -321,7 +322,7 @@ def audit_facility():
 
 def audit_cli():
     text = read("ServerScriptService/Core/CommandExecutor.luau")
-    for c in ["help", "clear", "ping", "traceroute", "ip", "ssh", "exit", "top", "vm", "install-os", "stress-test"]:
+    for c in ["help", "clear", "ping", "traceroute", "ip", "ssh", "exit", "top", "vm", "install-os", "stress-test", "cable", "vlan", "switch", "mount"]:
         check(f"G: command '{c}' dispatched", re.search(r'cmd == "' + re.escape(c) + r'"', text) is not None)
     for sub in ['"a"', '"addr"', '"set"']:
         check(f"G: ip subcommand {sub}", re.search(r"sub == " + sub, text) is not None)
@@ -351,6 +352,37 @@ def audit_client_refs():
     check("H: 5 client LocalScripts present", len(client_files) == 5, str(client_files))
 
 
+def audit_fase2():
+    """Fase 2 surface: VLAN/trunk, colored spools, carry & mount, colocation."""
+    graph = read("ServerScriptService/Core/NetworkGraph.luau")
+    check("F2: NetworkGraph.SetPortVlan exists", "function NetworkGraph.SetPortVlan" in graph)
+    check("F2: NetworkGraph.SetPortTrunk exists", "function NetworkGraph.SetPortTrunk" in graph)
+    check("F2: BFS honours trunks", "isTrunk" in graph and "trunked" in graph)
+    check("F2: router inter-VLAN routing flag", "interVlanRouting" in graph)
+
+    placement = read("ServerScriptService/Physical/PlacementSystem.luau")
+    for api in ["MountDevice", "UnmountDevice", "FindFreeUSlot", "RestoreRack"]:
+        check(f"F2: PlacementSystem.{api} exists", f"function PlacementSystem.{api}" in placement)
+
+    carry = read("ServerScriptService/Physical/CarryAndMountSystem.luau")
+    for api in ["SpawnCrate", "BeginCarry", "MountCarried", "DropCarried", "EvaluateColo", "CleanupTicket"]:
+        check(f"F2: CarryAndMountSystem.{api} exists", f"function CarryAndMountSystem.{api}" in carry)
+
+    contract = read("ServerScriptService/Gameplay/ContractAndIncidentManager.luau")
+    check("F2: Colocation ticket factory", "makeColocationTicket" in contract)
+    check("F2: colocation payout interval", "payoutIntervalSec" in contract)
+    check("F2: SLA failure path", "failColocation" in contract)
+
+    session = read("ServerScriptService/Core/SessionManager.luau")
+    check("F2: session cableSpools", "cableSpools" in session)
+    check("F2: session colocation state", "colocation" in session)
+
+    persistence = read("ServerScriptService/Gameplay/DataPersistenceManager.luau")
+    check("F2: persistence saves racks", "racks = racks" in persistence)
+    check("F2: persistence restores rack devices", "placement.MountDevice" in persistence)
+    check("F2: persistence saves port VLANs", "trunk = port.isTrunk" in persistence)
+
+
 def main():
     print("=== Cross-file consistency audit (static) ===")
     audit_requires()
@@ -361,6 +393,7 @@ def main():
     audit_facility()
     audit_cli()
     audit_client_refs()
+    audit_fase2()
     print()
     print(f"SUMMARY: {passed} passed, {failed} failed, {passed + failed} total")
     if failed > 0:

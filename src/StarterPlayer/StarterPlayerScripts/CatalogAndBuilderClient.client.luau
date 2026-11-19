@@ -4,12 +4,13 @@
 	Hardware Store (tombol keyboard B / tombol "STORE [B]" di HUD via BindableEvent
 	"NetSimToggleStore" yang dibuat script ini) + ghost placement mode.
 
-	Store 620x420 center: kolom kategori (Rack/Network/Server/Component dari
+	Store 740x470 center: kolom kategori (Rack/Network/Server/Component/Cable dari
 	HardwareCatalog.StoreCategories), daftar item (nama/harga/specs + tombol BELI),
 	dan panel kanan "PANDUAN BUILD".
 
 	Buy behavior (CONTRACT.md Section 3, PurchaseHardwareRemote):
 	- Component -> FireServer(itemId, "buy")
+	- Cable spool -> FireServer(itemId, "buy") (server menambah 5 kabel)
 	- Placeable (Rack/Network/Server) -> FireServer(itemId, "prepare") lalu ghost mode:
 	  RenderStepped mouse raycast (player:GetMouse(), TargetFilter=ghost), snap 2-grid
 	  relatif PLOT_POSITIONS[ownPlotIndex], validasi lokal = bounds + furniture zones
@@ -112,6 +113,8 @@ local function specsLine(def: any): string
 		return string.format("%d RJ45  -  %d WAN  -  %d SFP  -  %dW", s.ports or 0, s.wanPorts or 0, s.sfpPorts or 0, s.powerWatts or 0)
 	elseif def.category == "Server" then
 		return string.format("%d vCPU  -  %dGB RAM  -  %dGB Disk  -  %dW", s.cpu or 0, s.ram or 0, s.disk or 0, s.powerWatts or 0)
+	elseif def.category == "Cable" then
+		return string.format("1 spool = %d kabel  -  klik dua port untuk pasang", PlotConstants.CABLES.spoolYield)
 	end
 	-- Components
 	if string.sub(id, 1, 8) == "chassis_" then
@@ -398,6 +401,10 @@ onBuy = function(def: any)
 		-- Components go straight to the workbench (server validates order + proximity)
 		purchaseRemote:FireServer(def.id, "buy")
 		showStatus("Komponen dibeli: " .. tostring(def.name) .. " (pasang di bench)")
+	elseif def.category == "Cable" then
+		-- Fase 2: a spool fills the matching cable inventory server-side.
+		purchaseRemote:FireServer(def.id, "buy")
+		showStatus("Spool dibeli: " .. tostring(def.name) .. " (+" .. tostring(PlotConstants.CABLES.spoolYield) .. " kabel)")
 	else
 		if lastBalance ~= nil and lastBalance < (def.price or 0) then
 			showStatus("Saldo tidak cukup untuk " .. tostring(def.name))

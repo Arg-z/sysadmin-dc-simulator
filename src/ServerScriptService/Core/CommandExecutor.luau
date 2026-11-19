@@ -2,9 +2,11 @@
 --[[
 	CommandExecutor (ModuleScript, ServerScriptService/Core)
 	Server-side handler of the terminal. Binds ExecuteCommand.OnServerInvoke
-	(CONTRACT section 3) and implements the Fase 1 CLI:
+	(CONTRACT section 3) and implements the Fase 1 + Fase 2 CLI:
 		help, clear, ping, traceroute, ip a/addr/set, ssh, exit, top,
-		vm create/list/throttle/delete, install-os, stress-test.
+		vm create/list/throttle/delete, install-os, stress-test, ship,
+		vlan list/set/trunk, switch port <p> vlan|trunk, cable
+		list/use/buy/cut, mount list/<rackId>.
 	Terminal context: Disconnected mode runs against the laptop management
 	bridge ("__laptop__"); LocalConsole / RemoteSSH run against
 	session.terminal.targetDeviceId.
@@ -27,6 +29,8 @@ local Catalog: any = nil -- HardwareCatalog module (kept for future expansion)
 local Constants: any = nil -- PlotConstants module
 local Workbench: any = nil -- WorkbenchBuilderSystem module (bench state lives on session)
 local Cabling: any = nil -- RackAndCablingSystem module (DetachConsole)
+local Placement: any = nil -- PlacementSystem module (cable spool purchase, mount)
+local Carry: any = nil -- CarryAndMountSystem module (colocation crate)
 local Remotes: any = nil -- ReplicatedStorage.Remotes folder
 
 ---------------------------------------------------------------------
@@ -186,6 +190,18 @@ local function cmdHelp(): { string }
 	table.insert(lines, b("-- Jaringan --"))
 	table.insert(lines, "  " .. g("ping <ip>") .. gr("                  uji koneksi (4 packet ICMP)"))
 	table.insert(lines, "  " .. g("traceroute <ip>") .. gr("              telusuri rute hop-per-hop"))
+	table.insert(lines, "  " .. g("vlan list") .. gr("                    VLAN tiap port switch/router aktif"))
+	table.insert(lines, "  " .. g("vlan set <port> <id>") .. gr("        set VLAN port (contoh: vlan set eth2 20)"))
+	table.insert(lines, "  " .. g("switch port <port> vlan <id>") .. gr("  alias VLAN untuk port switch"))
+	table.insert(lines, "  " .. g("switch port <port> trunk on") .. gr("    trunk 802.1Q (semua VLAN lewat)"))
+	table.insert(lines, b("-- Kabel (Fase 2) --"))
+	table.insert(lines, "  " .. g("cable") .. gr("                        stok spool + warna aktif"))
+	table.insert(lines, "  " .. g("cable use <warna>") .. gr("            LAN_Blue | WAN_Yellow | Mgmt_Red"))
+	table.insert(lines, "  " .. g("cable buy <warna>") .. gr("            beli 1 spool (5 kabel)"))
+	table.insert(lines, "  " .. g("cable cut <port>") .. gr("             potong kabel di port device aktif"))
+	table.insert(lines, b("-- Colocation (Fase 2) --"))
+	table.insert(lines, "  " .. g("mount list") .. gr("                   rack + sisa slot U"))
+	table.insert(lines, "  " .. g("mount [rackId]") .. gr("               pasang crate yang sedang dibawa"))
 	table.insert(lines, b("-- Interface --"))
 	table.insert(lines, "  " .. g("ip a | ip addr") .. gr("                info hostname, IP, mask, gateway, port"))
 	table.insert(lines, "  " .. g("ip set <ip> <gw> [mask]") .. gr("      set IP statis device aktif"))
@@ -877,6 +893,291 @@ local function cmdShip(session: any): { string }
 end
 
 ---------------------------------------------------------------------
+-- Fase 2: cable spools, VLAN, carry & mount
+---------------------------------------------------------------------
+
+local CABLE_ALIASES: { [string]: string } = {
+	lan = "LAN_Blue",
+	blue = "LAN_Blue",
+	biru = "LAN_Blue",
+	wan = "WAN_Yellow",
+	yellow = "WAN_Yellow",
+	kuning = "WAN_Yellow",
+	mgmt = "Mgmt_Red",
+	red = "Mgmt_Red",
+	merah = "Mgmt_Red",
+}
+
+local function normalizeCableColor(raw: string?): string?
+	if raw == nil then
+		return nil
+	end
+	for _, color in ipairs(Constants.CABLES.colors) do
+		if string.lower(color) == string.lower(raw) then
+			return color
+		end
+	end
+	return CABLE_ALIASES[string.lower(raw)]
+end
+
+local function vlanDeviceId(session: any): string
+	local target = session.terminal.targetDeviceId
+	if type(target) == "string" then
+		local node = session.devices[target]
+		if node ~= nil and (node.deviceType == "Switch" or node.deviceType == "Router") then
+			return target
+		end
+	end
+	return "sw_main_1"
+end
+
+local function cableStockLines(session: any): { string }
+	local selected = session.selectedCableColor or "LAN_Blue"
+	local lines: { string } = {
+		b("=== SPOOL KABEL ==="),
+		string.format("  Warna aktif : %s", selected),
+	}
+	for _, color in ipairs(Constants.CABLES.colors) do
+		local label = Constants.CABLES.labels[color] or color
+		local count = tonumber(session.cableSpools[color]) or 0
+		table.insert(lines, string.format("  %-10s : %d kabel  (%s)", color, count, label))
+	end
+	table.insert(lines, gr("cable use <warna> | cable buy <warna> | cable cut <port>"))
+	return lines
+end
+
+local function cmdCable(player: Player, session: any, tokens: { string }): { string }
+	local sub = if tokens[2] ~= nil then string.lower(tokens[2]) else nil
+	if sub == nil or sub == "list" or sub == "status" then
+		return cableStockLines(session)
+	end
+
+	if sub == "use" then
+		local color = normalizeCableColor(tokens[3])
+		if color == nil then
+			return { r("cable use: pilih LAN_Blue | WAN_Yellow | Mgmt_Red") }
+		end
+		session.selectedCableColor = color
+		playSfx(player, "key")
+		return { g("Warna kabel aktif: " .. color .. " (" .. (Constants.CABLES.labels[color] or color) .. ")") }
+	end
+
+	if sub == "buy" then
+		local color = normalizeCableColor(tokens[3]) or session.selectedCableColor or "LAN_Blue"
+		local itemId = Constants.CABLES.itemByColor[color]
+		if itemId == nil then
+			return { r("cable buy: warna tidak dikenal") }
+		end
+		if Placement == nil then
+			return { r("cable buy: sistem store tidak tersedia") }
+		end
+		Placement.OnPurchase(player, itemId, "buy", nil, nil)
+		return { gr("Pembelian spool " .. color .. " diproses.") }
+	end
+
+	if sub == "cut" then
+		local deviceId = vlanDeviceId(session)
+		local portId = tokens[3]
+		if tokens[4] ~= nil then
+			deviceId = tokens[3] :: string
+			portId = tokens[4]
+		end
+		if portId == nil then
+			return { r("cable cut: usage: cable cut <port>  |  cable cut <deviceId> <port>") }
+		end
+		local node = session.devices[deviceId]
+		if node == nil then
+			return { r("cable cut: device tidak ditemukan") }
+		end
+		local port = node.ports[portId]
+		if port == nil then
+			return { r("cable cut: port tidak ditemukan") }
+		end
+		if port.connectedToDeviceId == nil then
+			return { r(string.format("%s:%s tidak tersambung", node.name, portId)) }
+		end
+		Graph.DisconnectPort(session, deviceId, portId)
+		playSfx(player, "plug")
+		return { g(string.format("Kabel di %s:%s dipotong.", node.name, portId)) }
+	end
+
+	return { r("cable: usage: cable | cable use <warna> | cable buy <warna> | cable cut <port>") }
+end
+
+local function vlanUsage(): { string }
+	return { r("vlan: usage: vlan list | vlan set <port> <id> | vlan trunk <port> on|off | vlan set <deviceId> <port> <id>") }
+end
+
+local function cmdVlan(session: any, tokens: { string }): { string }
+	local sub = if tokens[2] ~= nil then string.lower(tokens[2]) else nil
+	if sub == nil or sub == "list" or sub == "show" then
+		local deviceId = vlanDeviceId(session)
+		local node = session.devices[deviceId]
+		if node == nil then
+			return { r("vlan: device aktif tidak ditemukan") }
+		end
+		local lines: { string } = { b(string.format("=== VLAN %s (%s) ===", node.name, deviceId)) }
+		for _, line in ipairs(Graph.ListPortVlans(session, deviceId)) do
+			table.insert(lines, "  " .. line)
+		end
+		table.insert(lines, gr("Set: vlan set <port> <id>   contoh: vlan set eth2 20"))
+		return lines
+	end
+
+	if sub == "trunk" then
+		local deviceId = vlanDeviceId(session)
+		local portId = tokens[3]
+		local modeRaw = tokens[4]
+		if tokens[5] ~= nil then
+			deviceId = tokens[3] :: string
+			portId = tokens[4]
+			modeRaw = tokens[5]
+		end
+		if portId == nil then
+			return { r("vlan trunk: usage: vlan trunk <port> on|off") }
+		end
+		local mode = string.lower(modeRaw or "on")
+		local enabled = mode == "on" or mode == "true" or mode == "1"
+		local okTrunk, trunkErr = Graph.SetPortTrunk(session, deviceId, portId, enabled)
+		if not okTrunk then
+			return { r("vlan trunk: " .. trunkErr) }
+		end
+		return { g(string.format("%s:%s trunk %s", deviceId, portId, if enabled then "ON" else "OFF")) }
+	end
+
+	if sub ~= "set" then
+		return vlanUsage()
+	end
+
+	local deviceId = vlanDeviceId(session)
+	local portId = tokens[3]
+	local vlanRaw = tokens[4]
+	if tokens[5] ~= nil then
+		deviceId = tokens[3] :: string
+		portId = tokens[4]
+		vlanRaw = tokens[5]
+	end
+	if portId == nil or vlanRaw == nil then
+		return vlanUsage()
+	end
+	local node = session.devices[deviceId]
+	if node == nil then
+		return { r("vlan: device tidak ditemukan") }
+	end
+	if node.deviceType ~= "Switch" and node.deviceType ~= "Router" then
+		return { r("vlan: hanya port switch/router yang punya VLAN") }
+	end
+	local vlan = tonumber(vlanRaw)
+	if vlan == nil then
+		return { r("vlan: id harus angka 1..4094") }
+	end
+	local ok, err = Graph.SetPortVlan(session, deviceId, portId, vlan)
+	if not ok then
+		return { r("vlan: " .. err) }
+	end
+	return { g(string.format("VLAN %s:%s -> %d", node.name, portId, math.floor(vlan))) }
+end
+
+local function cmdSwitch(session: any, tokens: { string }): { string }
+	local deviceId = vlanDeviceId(session)
+	local index = 2
+	local candidate = tokens[2]
+	if candidate ~= nil and candidate ~= "port" and candidate ~= "list" and session.devices[candidate] ~= nil then
+		deviceId = candidate
+		index = 3
+	end
+	local node = session.devices[deviceId]
+	if node == nil then
+		return { r("switch: device tidak ditemukan") }
+	end
+	if node.deviceType ~= "Switch" and node.deviceType ~= "Router" then
+		return { r("switch: perintah ini hanya untuk switch/router") }
+	end
+
+	local action = tokens[index]
+	if action == nil or action == "list" then
+		local lines: { string } = { b(string.format("=== PORT %s (%s) ===", node.name, deviceId)) }
+		for _, line in ipairs(Graph.ListPortVlans(session, deviceId)) do
+			table.insert(lines, "  " .. line)
+		end
+		return lines
+	end
+	if action ~= "port" then
+		return { r("switch: usage: switch [deviceId] port <port> vlan <id> | switch [deviceId] port <port> trunk on|off | switch [deviceId] list") }
+	end
+	local portId = tokens[index + 1]
+	local keyword = tokens[index + 2]
+	local value = tokens[index + 3]
+	if portId == nil or keyword == nil then
+		return { r("switch: usage: switch [deviceId] port <port> vlan <id> | switch [deviceId] port <port> trunk on|off") }
+	end
+	if keyword == "trunk" then
+		local mode = string.lower(value or "on")
+		local enabled = mode == "on" or mode == "true" or mode == "1"
+		local okTrunk, trunkErr = Graph.SetPortTrunk(session, deviceId, portId, enabled)
+		if not okTrunk then
+			return { r("switch: " .. trunkErr) }
+		end
+		return { g(string.format("%s:%s trunk %s", node.name, portId, if enabled then "ON" else "OFF")) }
+	end
+	if keyword ~= "vlan" or value == nil then
+		return { r("switch: usage: switch [deviceId] port <port> vlan <id> | switch [deviceId] port <port> trunk on|off") }
+	end
+	local vlan = tonumber(value)
+	if vlan == nil then
+		return { r("switch: id VLAN harus angka 1..4094") }
+	end
+	local ok, err = Graph.SetPortVlan(session, deviceId, portId, vlan)
+	if not ok then
+		return { r("switch: " .. err) }
+	end
+	return { g(string.format("VLAN %s:%s -> %d", node.name, portId, math.floor(vlan))) }
+end
+
+local function cmdMount(session: any, tokens: { string }): { string }
+	local sub = tokens[2]
+	if sub == "list" or sub == nil then
+		local rackIds: { string } = {}
+		for rackId in pairs(session.racks) do
+			table.insert(rackIds, rackId)
+		end
+		table.sort(rackIds)
+		local lines: { string } = { b("=== RACK & SLOT ===") }
+		for _, rackId in ipairs(rackIds) do
+			local rack = session.racks[rackId]
+			local used = 0
+			for _ in pairs(rack.occupiedSlots) do
+				used += 1
+			end
+			local free = Placement.FindFreeUSlot(session, rackId, Constants.COLOCATION.uSize)
+			table.insert(lines, string.format(
+				"  %s  %s  %d/%dU  PDU %s  %s",
+				rackId,
+				rack.name,
+				used,
+				rack.maxU,
+				if rack.pduPowered then "ON" else "OFF",
+				if free ~= nil then string.format("muat %dU di U%d", Constants.COLOCATION.uSize, free) else "penuh"
+			))
+		end
+		table.insert(lines, gr("Angkat crate colocation, lalu: mount <rackId>"))
+		return lines
+	end
+
+	if Carry == nil then
+		return { r("mount: sistem carry tidak tersedia") }
+	end
+	local rackId = sub
+	if session.racks[rackId] == nil then
+		return { r("mount: rack tidak ditemukan (" .. tostring(rackId) .. ")") }
+	end
+	if Carry.MountCarried(session, rackId) then
+		return { g("Crate dipasang di " .. rackId) }
+	end
+	return {}
+end
+
+---------------------------------------------------------------------
 -- Dispatcher & remote binding
 ---------------------------------------------------------------------
 
@@ -906,6 +1207,14 @@ local function dispatch(player: Player, session: any, tokens: { string }): { str
 		return cmdStressTest(player, session, tokens)
 	elseif cmd == "ship" then
 		return cmdShip(session)
+	elseif cmd == "cable" then
+		return cmdCable(player, session, tokens)
+	elseif cmd == "vlan" then
+		return cmdVlan(session, tokens)
+	elseif cmd == "switch" then
+		return cmdSwitch(session, tokens)
+	elseif cmd == "mount" then
+		return cmdMount(session, tokens)
 	end
 	return { r("command not found: " .. cmd) .. gr("  (ketik 'help')") }
 end
@@ -945,6 +1254,8 @@ function CommandExecutor.Init(deps: { [string]: any })
 	Constants = deps.constants
 	Workbench = deps.workbench
 	Cabling = deps.cabling
+	Placement = deps.placement
+	Carry = deps.carry
 	Remotes = deps.remotesFolder
 
 	local executeRemote = Remotes:FindFirstChild("ExecuteCommand")

@@ -233,9 +233,11 @@ hintLabel.Parent = gui
 local TIPS = {
 	"Tekan [~] atau [F2] untuk buka / tutup Terminal (klik X [~] juga bisa)",
 	"Tekan [B] untuk buka / tutup Hardware Store",
-	"Pegang Laptop [1] lalu dekati device + tekan [E] = Kabel Console",
+	"Pegang TechnicianLaptop (hotbar) lalu dekati device + tekan [E] = Kabel Console",
 	"Klik 2 port berbeda untuk kabel LAN | Klik port terhubung = cabut",
 	"Mode placement: [R] Putar 90 deg | Klik Kiri = Pasang | Klik Kanan/[Esc] = Batal",
+	"Kabel berwarna: port WAN otomatis pakai spool kuning, port data pakai biru/merah",
+	"Colocation: terima kontrak, angkat crate di dock, mount ke rack, atur VLAN + PDU",
 }
 local tipIndex = 1
 local priorityActive = false

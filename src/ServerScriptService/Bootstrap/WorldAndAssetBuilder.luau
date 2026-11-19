@@ -639,6 +639,7 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		pduPowered = true,
 	}
 	session.rackModels["rack_main_1"] = rackModel
+	session.rackSlots["rack_main_1"] = rackSlots
 
 	-- ===== ISP uplink node (WAN junction, always powered) =====
 	local ispSpec = PlotConstants.STARTER.isp

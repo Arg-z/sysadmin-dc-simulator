@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build NetworkSimulator.rbxlx for the SysAdmin & Cloud DC Simulator (Fase 1).
 
-Reads all 21 .luau sources under /data/workspace/netsim/src, guards them
+Reads all 22 .luau sources under /data/workspace/netsim/src, guards them
 (no forbidden markers, valid UTF-8, ASCII policy with warnings), XML-escapes
 each source into a ProtectedString and emits a valid Roblox XML place file:
   <roblox version="4"> with unique referents RBX0..N
@@ -68,6 +68,7 @@ SSS_TREE = [
         ("ModuleScript", "RackAndCablingSystem", "ServerScriptService/Physical/RackAndCablingSystem.luau"),
         ("ModuleScript", "PlacementSystem", "ServerScriptService/Physical/PlacementSystem.luau"),
         ("ModuleScript", "WorkbenchBuilderSystem", "ServerScriptService/Physical/WorkbenchBuilderSystem.luau"),
+        ("ModuleScript", "CarryAndMountSystem", "ServerScriptService/Physical/CarryAndMountSystem.luau"),
     ]),
     ("Folder", "Gameplay", None, [
         ("ModuleScript", "ShiftAndEconomyManager", "ServerScriptService/Gameplay/ShiftAndEconomyManager.luau"),
@@ -370,7 +371,7 @@ def validate(xml_text, sources):
 
 def main():
     all_srcs = all_source_files()
-    assert len(all_srcs) == 21, f"expected 21 sources, got {len(all_srcs)}"
+    assert len(all_srcs) == 22, f"expected 22 sources, got {len(all_srcs)}"
 
     sources = {}
     print("=== Loading & guarding sources ===")

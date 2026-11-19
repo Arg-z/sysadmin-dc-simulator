@@ -2,9 +2,12 @@
 --[[
 	RackAndCablingSystem (ModuleScript, ServerScriptService/Physical)
 	Physical interaction layer for cabling, console links and power:
-	- Two-click port cabling: first click marks the port with a yellow
-	  SelectionBox "PendingCableSel" (15 s timeout), second click on another
-	  free port connects them ("LAN_Blue" Beam); clicking a connected port
+	- Two-click port cabling with Fase 2 colour-coded spools: WAN ports always
+	  use the yellow spool, data ports use the selected LAN/Mgmt spool; the
+	  spool is consumed only when the link is created
+	- WireCutter tool equipped: clicking a connected port cuts its cable
+	- First click marks the port with a yellow SelectionBox "PendingCableSel"
+	  (15 s timeout), second click connects; clicking a connected port
 	  disconnects it; clicking the same port cancels the pending selection
 	- Laptop console cable: ProximityPrompt on the device ConsolePort attaches
 	  a blue Beam from the equipped TechnicianLaptop to the device and opens
@@ -85,6 +88,37 @@ local function clearPendingCable(session: any)
 	session.pendingCableHighlight = nil
 	session.pendingCableDeviceId = nil
 	session.pendingCablePortId = nil
+	session.pendingCableColor = nil
+end
+
+local function hasWireCutter(player: Player): boolean
+	local char = player.Character
+	if char == nil then
+		return false
+	end
+	local tool = char:FindFirstChild("WireCutter")
+	return tool ~= nil and tool:IsA("Tool")
+end
+
+local function hint(player: Player, message: string)
+	openTerminal(player, { action = "hint", message = message })
+end
+
+--[[ Fase 2: pick the cable colour for a pending link. WAN ports always use
+	 the yellow spool; data ports use the player's selected spool (never WAN). ]]
+local function cableColorFor(session: any, port: any): string
+	if port.portType == "WAN" then
+		return "WAN_Yellow"
+	end
+	local selected = session.selectedCableColor
+	if selected == "Mgmt_Red" then
+		return "Mgmt_Red"
+	end
+	return "LAN_Blue"
+end
+
+local function spoolCount(session: any, color: string): number
+	return tonumber(session.cableSpools[color]) or 0
 end
 
 ---------------------------------------------------------------------
@@ -112,6 +146,19 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 		return
 	end
 
+	-- WireCutter equipped: click a connected port to cut its cable.
+	if hasWireCutter(player) then
+		if port.connectedToDeviceId ~= nil then
+			Graph.DisconnectPort(session, deviceId, portId)
+			playSFX(player, "plug")
+			hint(player, "Kabel dipotong dengan WireCutter.")
+		else
+			playSFX(player, "error")
+			hint(player, "WireCutter: klik port yang tersambung untuk memotong kabel.")
+		end
+		return
+	end
+
 	-- Connected port: click = unplug.
 	if port.connectedToDeviceId ~= nil then
 		Graph.DisconnectPort(session, deviceId, portId)
@@ -121,8 +168,15 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 
 	-- Empty port, no pending selection yet: start one.
 	if session.pendingCableDeviceId == nil or session.pendingCablePortId == nil then
+		local color = cableColorFor(session, port)
+		if spoolCount(session, color) <= 0 then
+			playSFX(player, "error")
+			hint(player, "Spool " .. color .. " habis. Beli di Store > Cable (1 spool = 5 kabel).")
+			return
+		end
 		session.pendingCableDeviceId = deviceId
 		session.pendingCablePortId = portId
+		session.pendingCableColor = color
 		local model = session.deviceModels[deviceId]
 		if model ~= nil then
 			for _, desc in ipairs(model:GetDescendants()) do
@@ -155,12 +209,24 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 		return
 	end
 
-	-- Second endpoint: connect (NetworkGraph validates type compatibility).
+	-- Second endpoint: connect (NetworkGraph validates type + colour rules).
 	local fromDev = session.pendingCableDeviceId :: string
 	local fromPort = session.pendingCablePortId :: string
+	local color = session.pendingCableColor or "LAN_Blue"
 	clearPendingCable(session)
-	local ok = Graph.ConnectPorts(session, fromDev, fromPort, deviceId, portId, "LAN_Blue")
+	if spoolCount(session, color) <= 0 then
+		playSFX(player, "error")
+		hint(player, "Spool " .. color .. " habis. Beli di Store > Cable.")
+		return
+	end
+	local ok, err = Graph.ConnectPorts(session, fromDev, fromPort, deviceId, portId, color)
+	if ok then
+		session.cableSpools[color] = spoolCount(session, color) - 1
+	end
 	playSFX(player, if ok then "plug" else "error")
+	if not ok and err ~= "" then
+		hint(player, err)
+	end
 end
 
 ---------------------------------------------------------------------

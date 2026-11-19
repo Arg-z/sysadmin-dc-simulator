@@ -66,6 +66,7 @@ export type PortData = {
 	cableColor: CableColorType?,
 	linkUp: boolean,
 	vlanId: number,
+	isTrunk: boolean?,
 	trafficLoadMbps: number,
 }
 
@@ -99,6 +100,8 @@ export type DeviceNode = {
 	gateway: string?,
 	subnetMask: string,
 	defaultVlan: number,
+	interVlanRouting: boolean?,
+	contractId: string?,
 	ports: { [string]: PortData },
 	specs: DeviceSpecs,
 	vms: { [string]: VMData },
@@ -138,6 +141,11 @@ export type ContractTicket = {
 	rewardPayout: number,
 	payoutIntervalSec: number?,
 	slaRemainingSec: number?,
+	runtimeRemainingSec: number?,
+	vlanId: number?,
+	targetIp: string?,
+	phase: string?,
+	validationText: string?,
 	targetDeviceId: string?,
 	targetRackId: string?,
 	targetUSlot: number?,
@@ -217,7 +225,7 @@ export type FacilitySnapshot = {
 	devices: { DeviceSnapshot },
 	vms: { { name: string, hostId: string, cpu: number, ram: number, disk: number, ip: string?, status: VMStatus, loadPercent: number } },
 	objectives: { [string]: boolean },
-	tickets: { { id: string, category: string, title: string, description: string, rewardPayout: number, status: string, requirementsText: string } },
+	tickets: { { id: string, category: string, title: string, description: string, rewardPayout: number, status: string, requirementsText: string, slaRemainingSec: number?, payoutIntervalSec: number?, validationText: string?, vlanId: number? } },
 }
 
 export type Session = {
@@ -248,6 +256,11 @@ export type Session = {
 	loadedFromSave: boolean,
 	noSaveWarned: boolean,
 	tickets: { any },
+	cableSpools: { [string]: number },
+	selectedCableColor: CableColorType,
+	carry: any?,
+	colocation: { [string]: any },
+	rackSlots: { [string]: any },
 }
 
 return nil
@@ -636,7 +649,7 @@ addItem({
 	category = "Cable",
 	price = 15,
 	uSize = 0,
-	description = "Kabel patch LAN biru (Fase 2: manual cabling).",
+	description = "Kabel patch LAN biru. Satu spool = 5 kabel RJ45/SFP.",
 	specs = {},
 	visualColor = Color3.fromRGB(70, 130, 255),
 })
@@ -646,7 +659,7 @@ addItem({
 	category = "Cable",
 	price = 15,
 	uSize = 0,
-	description = "Kabel WAN kuning (Fase 2: manual cabling).",
+	description = "Kabel WAN kuning untuk uplink router. Satu spool = 5 kabel.",
 	specs = {},
 	visualColor = Color3.fromRGB(240, 210, 70),
 })
@@ -656,7 +669,7 @@ addItem({
 	category = "Cable",
 	price = 15,
 	uSize = 0,
-	description = "Kabel management merah (Fase 2: manual cabling).",
+	description = "Kabel management merah untuk trunk/link khusus. Satu spool = 5 kabel.",
 	specs = {},
 	visualColor = Color3.fromRGB(230, 80, 80),
 })
@@ -675,7 +688,7 @@ function Catalog.IsPlaceable(itemId: string): boolean
 	return def.category == "Rack" or def.category == "Network" or def.category == "Server"
 end
 
-Catalog.StoreCategories = { "Rack", "Network", "Server", "Component" }
+Catalog.StoreCategories = { "Rack", "Network", "Server", "Component", "Cable" }
 
 function Catalog.ListByCategory(category: ItemCategory): { ItemDef }
 	local out: { ItemDef } = {}
@@ -788,6 +801,39 @@ PlotConstants.ECONOMY = {
 	vpsCpuRatePerPayout = 0.15,
 	vpsRamRatePerPayout = 0.02,
 	vpsDiskRatePerPayout = 0.003,
+}
+
+-- ===== Fase 2: manual cabling & colour-coded spools =====
+-- One store purchase fills a spool with spoolYield patch cables.
+PlotConstants.CABLES = {
+	spoolYield = 5,
+	starter = {
+		LAN_Blue = 8,
+		WAN_Yellow = 2,
+		Mgmt_Red = 2,
+	},
+	colors = { "LAN_Blue", "WAN_Yellow", "Mgmt_Red" },
+	labels = {
+		LAN_Blue = "LAN Biru",
+		WAN_Yellow = "WAN Kuning",
+		Mgmt_Red = "Mgmt Merah",
+	},
+	itemByColor = {
+		LAN_Blue = "cable_lan_blue",
+		WAN_Yellow = "cable_wan_yellow",
+		Mgmt_Red = "cable_mgmt_red",
+	},
+}
+
+-- ===== Fase 2: colocation contracts =====
+PlotConstants.COLOCATION = {
+	vlanChoices = { 20, 30, 40 },
+	uSize = 2,
+	slaSeconds = 240, -- time to mount, cable, VLAN and power the client server
+	runtimeSeconds = 60, -- paid service window after validation
+	payoutIntervalSeconds = 10, -- one payout tick inside the service window
+	deliveryDelaySeconds = 3, -- crate appears at the dock after accepting
+	cleanupDelaySeconds = 15, -- client collects the server after completion
 }
 
 PlotConstants.COLORS = {
@@ -1977,6 +2023,79 @@ function ModelFactory.BuildLaptop(): Tool
 	return tool
 end
 
+--[[
+	BuildWireCutter: gunting kabel teknisi (grip hitam + rahang oranye).
+	Equipped: klik port yang tersambung untuk memotong kabel.
+]]
+function ModelFactory.BuildWireCutter(): Tool
+	local tool = Instance.new("Tool")
+	tool.Name = "WireCutter"
+	tool.ToolTip = "Klik port tersambung untuk memotong kabel"
+	tool.CanBeDropped = false
+
+	local handle = newPart({
+		name = "Handle",
+		size = Vector3.new(0.28, 1.35, 0.28),
+		cf = CFrame.new(0, 0, 0),
+		color = Color3.fromRGB(34, 40, 50),
+		material = Enum.Material.Rubber,
+		anchored = false,
+		canCollide = false,
+	})
+	handle.Parent = tool
+	tool.Grip = CFrame.new(0, -0.15, 0.2)
+	tool.GripPos = Vector3.new(0, -0.15, 0.2)
+
+	-- Pivot bolt + two jaw halves at the head of the tool.
+	local bolt = newPart({
+		name = "PivotBolt",
+		size = Vector3.new(0.34, 0.18, 0.34),
+		cf = CFrame.new(0, 0.78, 0),
+		color = ALU_LIGHT,
+		shape = "Cylinder",
+		anchored = false,
+		canCollide = false,
+	})
+	bolt.Parent = tool
+	local weldBolt = Instance.new("WeldConstraint")
+	weldBolt.Part0 = handle
+	weldBolt.Part1 = bolt
+	weldBolt.Parent = handle
+
+	for side = -1, 1, 2 do
+		local jaw = newPart({
+			name = "Jaw",
+			size = Vector3.new(0.16, 0.62, 0.22),
+			cf = CFrame.new(side * 0.18, 1.14, 0) * CFrame.Angles(0, 0, math.rad(side * -14)),
+			color = Color3.fromRGB(240, 120, 44),
+			material = Enum.Material.Metal,
+			anchored = false,
+			canCollide = false,
+		})
+		jaw.Parent = tool
+		local weldJaw = Instance.new("WeldConstraint")
+		weldJaw.Part0 = handle
+		weldJaw.Part1 = jaw
+		weldJaw.Parent = handle
+	end
+
+	local light = neon({
+		name = "CutterLED",
+		size = Vector3.new(0.1, 0.1, 0.1),
+		cf = CFrame.new(0, 0.55, 0.16),
+		color = CYAN_ACCENT,
+		anchored = false,
+		canCollide = false,
+	})
+	light.Parent = tool
+	local weldLight = Instance.new("WeldConstraint")
+	weldLight.Part0 = handle
+	weldLight.Part1 = light
+	weldLight.Parent = handle
+
+	return tool
+end
+
 function ModelFactory.BuildCrate(label: string): Model
 	local model = Instance.new("Model")
 	model.Name = "Crate"
@@ -2175,6 +2294,7 @@ local CommandExecutor = require(script.Parent.Core.CommandExecutor)
 local RackAndCablingSystem = require(script.Parent.Physical.RackAndCablingSystem)
 local PlacementSystem = require(script.Parent.Physical.PlacementSystem)
 local WorkbenchBuilderSystem = require(script.Parent.Physical.WorkbenchBuilderSystem)
+local CarryAndMountSystem = require(script.Parent.Physical.CarryAndMountSystem)
 local ShiftAndEconomyManager = require(script.Parent.Gameplay.ShiftAndEconomyManager)
 local ContractAndIncidentManager = require(script.Parent.Gameplay.ContractAndIncidentManager)
 local DataPersistenceManager = require(script.Parent.Gameplay.DataPersistenceManager)
@@ -2205,6 +2325,15 @@ PlacementSystem.Init({
 	cabling = RackAndCablingSystem,
 	remotesFolder = remotes,
 })
+CarryAndMountSystem.Init({
+	sessions = SessionManager,
+	placement = PlacementSystem,
+	graph = NetworkGraph,
+	modelFactory = ModelFactory,
+	constants = PlotConstants,
+	catalog = HardwareCatalog,
+	remotesFolder = remotes,
+})
 ShiftAndEconomyManager.Init({
 	sessions = SessionManager,
 	graph = NetworkGraph,
@@ -2218,6 +2347,7 @@ ContractAndIncidentManager.Init({
 	constants = PlotConstants,
 	remotesFolder = remotes,
 	workbench = WorkbenchBuilderSystem,
+	carry = CarryAndMountSystem,
 })
 DataPersistenceManager.Init({
 	sessions = SessionManager,
@@ -2235,6 +2365,8 @@ CommandExecutor.Init({
 	constants = PlotConstants,
 	workbench = WorkbenchBuilderSystem,
 	cabling = RackAndCablingSystem,
+	placement = PlacementSystem,
+	carry = CarryAndMountSystem,
 	remotesFolder = remotes,
 })
 
@@ -2251,6 +2383,9 @@ end)
 -- Laptop tool ke StarterPack: setiap respawn otomatis dapat
 local starterLaptop = ModelFactory.BuildLaptop()
 starterLaptop.Parent = StarterPack
+-- Fase 2: wire cutter fisik (klik port tersambung = potong kabel)
+local starterCutter = ModelFactory.BuildWireCutter()
+starterCutter.Parent = StarterPack
 
 -- ===== Lifecycle pemain =====
 local function buildSession(player: Player)
@@ -2998,6 +3133,7 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 		pduPowered = true,
 	}
 	session.rackModels["rack_main_1"] = rackModel
+	session.rackSlots["rack_main_1"] = rackSlots
 
 	-- ===== ISP uplink node (WAN junction, always powered) =====
 	local ispSpec = PlotConstants.STARTER.isp
@@ -3243,6 +3379,7 @@ function SessionManager.CreateSession(player: Player, plotIndex: number): any
 		pendingCableDeviceId = nil,
 		pendingCablePortId = nil,
 		pendingCableHighlight = nil,
+		pendingCableColor = nil,
 		consoleLink = nil,
 		pendingPlacementItemId = nil,
 		workbench = {
@@ -3281,6 +3418,15 @@ function SessionManager.CreateSession(player: Player, plotIndex: number): any
 		loadedFromSave = false,
 		noSaveWarned = false,
 		tickets = {}, -- ContractTicket-like rows (filled by ContractAndIncidentManager)
+		cableSpools = {
+			LAN_Blue = Constants.CABLES.starter.LAN_Blue,
+			WAN_Yellow = Constants.CABLES.starter.WAN_Yellow,
+			Mgmt_Red = Constants.CABLES.starter.Mgmt_Red,
+		},
+		selectedCableColor = "LAN_Blue",
+		carry = nil,
+		colocation = { crates = {}, byTicket = {} },
+		rackSlots = {},
 	}
 	Sessions[player] = session
 	UsedPlots[plotIndex] = player
@@ -3303,6 +3449,10 @@ function SessionManager.DeleteSession(player: Player)
 		session.consoleLink.beam:Destroy()
 	end
 	session.consoleLink = nil
+	if session.carry ~= nil and session.carry.conn ~= nil then
+		session.carry.conn:Disconnect()
+	end
+	session.carry = nil
 	local facility = session.facility
 	if facility ~= nil and facility.root ~= nil then
 		facility.root:Destroy()
@@ -3346,8 +3496,8 @@ return SessionManager
 	  nodes never forwarding, broadcast storm (topology loop) detection
 	- routing path extraction for traceroute
 	- smart auto-cabling to the nearest free port
-	Fase 1 note: vlanId fields exist (default 1); explicit VLAN commands
-	are a Fase 2 feature and only referenced in comments.
+	Fase 2 adds explicit port VLANs, 802.1Q trunks and inter-VLAN routing
+	through routers (switches isolate VLANs; routers bridge them at L3).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3394,6 +3544,7 @@ local function makePort(portId: string, portType: string): any
 		cableColor = nil,
 		linkUp = false,
 		vlanId = 1,
+		isTrunk = false,
 		trafficLoadMbps = 0,
 	}
 end
@@ -3465,6 +3616,8 @@ function NetworkGraph.DefaultNode(id: string, name: string, itemId: string): any
 		gateway = nil,
 		subnetMask = "255.255.255.0",
 		defaultVlan = 1,
+		interVlanRouting = deviceType == "Router",
+		contractId = nil,
 		ports = NetworkGraph.MakePortsForItem(itemId),
 		specs = specs,
 		vms = {},
@@ -3592,8 +3745,18 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 		return false, "Tipe port tidak kompatibel (" .. pa.portType .. " vs " .. pb.portType .. ")"
 	end
 
-	local cableId = SessionManager.NextCableId(session)
+	-- Fase 2 cable colours: yellow is reserved for WAN uplinks, LAN/Mgmt for
+	-- copper/fibre data ports. Persistence restores the recorded colour too.
+	local bothWan = pa.portType == "WAN" and pb.portType == "WAN"
 	local cableColor: string = if BEAM_COLORS[color] ~= nil then color else "LAN_Blue"
+	if bothWan and cableColor ~= "WAN_Yellow" then
+		return false, "Port WAN membutuhkan kabel kuning (WAN_Yellow)"
+	end
+	if not bothWan and cableColor == "WAN_Yellow" then
+		return false, "Kabel WAN kuning hanya untuk port WAN"
+	end
+
+	local cableId = SessionManager.NextCableId(session)
 
 	pa.connectedToDeviceId = devBId
 	pa.connectedToPortId = portBId
@@ -3696,6 +3859,98 @@ function NetworkGraph.DisconnectPort(session: any, deviceId: string, portId: str
 	end
 	NetworkGraph.UpdateDeviceLED(session, deviceId)
 	return true
+end
+
+---------------------------------------------------------------------
+-- VLAN controls (Fase 2)
+---------------------------------------------------------------------
+
+--[[ Set a port VLAN (1..4094). Only non-Console ports are configurable.
+	 Returns (ok, errorMessage). The simulation reads vlanId live, so no
+	 re-link is needed: the next ping/traceroute sees the new isolation. ]]
+function NetworkGraph.SetPortVlan(session: any, deviceId: string, portId: string, vlanId: number): (boolean, string)
+	local node = session.devices[deviceId]
+	if node == nil then
+		return false, "Device tidak ditemukan"
+	end
+	local port = node.ports[portId]
+	if port == nil then
+		return false, "Port tidak ditemukan"
+	end
+	if port.portType == "Console" then
+		return false, "Port console tidak punya VLAN"
+	end
+	if type(vlanId) ~= "number" or vlanId ~= vlanId then
+		return false, "VLAN harus angka"
+	end
+	local vlan = math.floor(vlanId)
+	if vlan < 1 or vlan > 4094 then
+		return false, "VLAN harus 1..4094"
+	end
+	port.vlanId = vlan
+	return true, ""
+end
+
+--[[ Marks a non-Console port as an 802.1Q trunk (all VLANs pass) or back to
+	 access mode. Returns (ok, errorMessage). ]]
+function NetworkGraph.SetPortTrunk(session: any, deviceId: string, portId: string, enabled: boolean): (boolean, string)
+	local node = session.devices[deviceId]
+	if node == nil then
+		return false, "Device tidak ditemukan"
+	end
+	local port = node.ports[portId]
+	if port == nil then
+		return false, "Port tidak ditemukan"
+	end
+	if port.portType == "Console" then
+		return false, "Port console tidak bisa dijadikan trunk"
+	end
+	port.isTrunk = enabled == true
+	return true, ""
+end
+
+--[[ The switch and port a device is physically plugged into, or nil when
+	 the device has no cable to a switch (routers/ISP count separately). ]]
+function NetworkGraph.GetAccessSwitchPort(session: any, deviceId: string): (any?, string?)
+	local node = session.devices[deviceId]
+	if node == nil then
+		return nil, nil
+	end
+	for _, port in pairs(node.ports) do
+		local peerId = port.connectedToDeviceId
+		if peerId ~= nil then
+			local peer = session.devices[peerId]
+			local peerPortId = port.connectedToPortId
+			if peer ~= nil and peer.deviceType == "Switch" and peerPortId ~= nil then
+				return peer, peerPortId
+			end
+		end
+	end
+	return nil, nil
+end
+
+--[[ Deterministic "port eth1 VLAN 20" rows for the terminal/badges. ]]
+function NetworkGraph.ListPortVlans(session: any, deviceId: string): { string }
+	local node = session.devices[deviceId]
+	if node == nil then
+		return { "Device tidak ditemukan" }
+	end
+	local ids: { string } = {}
+	for portId in pairs(node.ports) do
+		table.insert(ids, portId)
+	end
+	table.sort(ids)
+	local lines: { string } = {}
+	for _, portId in ipairs(ids) do
+		local port = node.ports[portId]
+		local state = if port.connectedToDeviceId ~= nil then "UP" else "down"
+		local mode = if port.isTrunk == true then "TRUNK" else string.format("VLAN %d", port.vlanId)
+		table.insert(lines, string.format("%s  %s  %s", portId, mode, state))
+	end
+	if #lines == 0 then
+		return { "Tidak ada port" }
+	end
+	return lines
 end
 
 ---------------------------------------------------------------------
@@ -3831,10 +4086,15 @@ local function bfsPath(session: any, sourceDeviceId: string, targetId: string): 
 			if not port.linkUp or port.connectedToDeviceId == nil then
 				continue
 			end
-			-- VLAN isolation while forwarding through a switch
-			if node.deviceType == "Switch" and current.inPortId ~= nil then
+			-- VLAN isolation while forwarding through a switch (and through a
+			-- router whose inter-VLAN routing is disabled). Routers route
+			-- between VLANs at L3, so they bridge VLANs by design.
+			local isolates = node.deviceType == "Switch"
+				or (node.deviceType == "Router" and node.interVlanRouting == false)
+			if isolates and current.inPortId ~= nil then
 				local inPort = node.ports[current.inPortId]
-				if inPort ~= nil and inPort.vlanId ~= port.vlanId then
+				local trunked = (inPort ~= nil and inPort.isTrunk == true) or port.isTrunk == true
+				if inPort ~= nil and inPort.vlanId ~= port.vlanId and not trunked then
 					continue
 				end
 			end
@@ -4081,9 +4341,11 @@ return NetworkGraph
 --[[
 	CommandExecutor (ModuleScript, ServerScriptService/Core)
 	Server-side handler of the terminal. Binds ExecuteCommand.OnServerInvoke
-	(CONTRACT section 3) and implements the Fase 1 CLI:
+	(CONTRACT section 3) and implements the Fase 1 + Fase 2 CLI:
 		help, clear, ping, traceroute, ip a/addr/set, ssh, exit, top,
-		vm create/list/throttle/delete, install-os, stress-test.
+		vm create/list/throttle/delete, install-os, stress-test, ship,
+		vlan list/set/trunk, switch port <p> vlan|trunk, cable
+		list/use/buy/cut, mount list/<rackId>.
 	Terminal context: Disconnected mode runs against the laptop management
 	bridge ("__laptop__"); LocalConsole / RemoteSSH run against
 	session.terminal.targetDeviceId.
@@ -4106,6 +4368,8 @@ local Catalog: any = nil -- HardwareCatalog module (kept for future expansion)
 local Constants: any = nil -- PlotConstants module
 local Workbench: any = nil -- WorkbenchBuilderSystem module (bench state lives on session)
 local Cabling: any = nil -- RackAndCablingSystem module (DetachConsole)
+local Placement: any = nil -- PlacementSystem module (cable spool purchase, mount)
+local Carry: any = nil -- CarryAndMountSystem module (colocation crate)
 local Remotes: any = nil -- ReplicatedStorage.Remotes folder
 
 ---------------------------------------------------------------------
@@ -4265,6 +4529,18 @@ local function cmdHelp(): { string }
 	table.insert(lines, b("-- Jaringan --"))
 	table.insert(lines, "  " .. g("ping <ip>") .. gr("                  uji koneksi (4 packet ICMP)"))
 	table.insert(lines, "  " .. g("traceroute <ip>") .. gr("              telusuri rute hop-per-hop"))
+	table.insert(lines, "  " .. g("vlan list") .. gr("                    VLAN tiap port switch/router aktif"))
+	table.insert(lines, "  " .. g("vlan set <port> <id>") .. gr("        set VLAN port (contoh: vlan set eth2 20)"))
+	table.insert(lines, "  " .. g("switch port <port> vlan <id>") .. gr("  alias VLAN untuk port switch"))
+	table.insert(lines, "  " .. g("switch port <port> trunk on") .. gr("    trunk 802.1Q (semua VLAN lewat)"))
+	table.insert(lines, b("-- Kabel (Fase 2) --"))
+	table.insert(lines, "  " .. g("cable") .. gr("                        stok spool + warna aktif"))
+	table.insert(lines, "  " .. g("cable use <warna>") .. gr("            LAN_Blue | WAN_Yellow | Mgmt_Red"))
+	table.insert(lines, "  " .. g("cable buy <warna>") .. gr("            beli 1 spool (5 kabel)"))
+	table.insert(lines, "  " .. g("cable cut <port>") .. gr("             potong kabel di port device aktif"))
+	table.insert(lines, b("-- Colocation (Fase 2) --"))
+	table.insert(lines, "  " .. g("mount list") .. gr("                   rack + sisa slot U"))
+	table.insert(lines, "  " .. g("mount [rackId]") .. gr("               pasang crate yang sedang dibawa"))
 	table.insert(lines, b("-- Interface --"))
 	table.insert(lines, "  " .. g("ip a | ip addr") .. gr("                info hostname, IP, mask, gateway, port"))
 	table.insert(lines, "  " .. g("ip set <ip> <gw> [mask]") .. gr("      set IP statis device aktif"))
@@ -4956,6 +5232,291 @@ local function cmdShip(session: any): { string }
 end
 
 ---------------------------------------------------------------------
+-- Fase 2: cable spools, VLAN, carry & mount
+---------------------------------------------------------------------
+
+local CABLE_ALIASES: { [string]: string } = {
+	lan = "LAN_Blue",
+	blue = "LAN_Blue",
+	biru = "LAN_Blue",
+	wan = "WAN_Yellow",
+	yellow = "WAN_Yellow",
+	kuning = "WAN_Yellow",
+	mgmt = "Mgmt_Red",
+	red = "Mgmt_Red",
+	merah = "Mgmt_Red",
+}
+
+local function normalizeCableColor(raw: string?): string?
+	if raw == nil then
+		return nil
+	end
+	for _, color in ipairs(Constants.CABLES.colors) do
+		if string.lower(color) == string.lower(raw) then
+			return color
+		end
+	end
+	return CABLE_ALIASES[string.lower(raw)]
+end
+
+local function vlanDeviceId(session: any): string
+	local target = session.terminal.targetDeviceId
+	if type(target) == "string" then
+		local node = session.devices[target]
+		if node ~= nil and (node.deviceType == "Switch" or node.deviceType == "Router") then
+			return target
+		end
+	end
+	return "sw_main_1"
+end
+
+local function cableStockLines(session: any): { string }
+	local selected = session.selectedCableColor or "LAN_Blue"
+	local lines: { string } = {
+		b("=== SPOOL KABEL ==="),
+		string.format("  Warna aktif : %s", selected),
+	}
+	for _, color in ipairs(Constants.CABLES.colors) do
+		local label = Constants.CABLES.labels[color] or color
+		local count = tonumber(session.cableSpools[color]) or 0
+		table.insert(lines, string.format("  %-10s : %d kabel  (%s)", color, count, label))
+	end
+	table.insert(lines, gr("cable use <warna> | cable buy <warna> | cable cut <port>"))
+	return lines
+end
+
+local function cmdCable(player: Player, session: any, tokens: { string }): { string }
+	local sub = if tokens[2] ~= nil then string.lower(tokens[2]) else nil
+	if sub == nil or sub == "list" or sub == "status" then
+		return cableStockLines(session)
+	end
+
+	if sub == "use" then
+		local color = normalizeCableColor(tokens[3])
+		if color == nil then
+			return { r("cable use: pilih LAN_Blue | WAN_Yellow | Mgmt_Red") }
+		end
+		session.selectedCableColor = color
+		playSfx(player, "key")
+		return { g("Warna kabel aktif: " .. color .. " (" .. (Constants.CABLES.labels[color] or color) .. ")") }
+	end
+
+	if sub == "buy" then
+		local color = normalizeCableColor(tokens[3]) or session.selectedCableColor or "LAN_Blue"
+		local itemId = Constants.CABLES.itemByColor[color]
+		if itemId == nil then
+			return { r("cable buy: warna tidak dikenal") }
+		end
+		if Placement == nil then
+			return { r("cable buy: sistem store tidak tersedia") }
+		end
+		Placement.OnPurchase(player, itemId, "buy", nil, nil)
+		return { gr("Pembelian spool " .. color .. " diproses.") }
+	end
+
+	if sub == "cut" then
+		local deviceId = vlanDeviceId(session)
+		local portId = tokens[3]
+		if tokens[4] ~= nil then
+			deviceId = tokens[3] :: string
+			portId = tokens[4]
+		end
+		if portId == nil then
+			return { r("cable cut: usage: cable cut <port>  |  cable cut <deviceId> <port>") }
+		end
+		local node = session.devices[deviceId]
+		if node == nil then
+			return { r("cable cut: device tidak ditemukan") }
+		end
+		local port = node.ports[portId]
+		if port == nil then
+			return { r("cable cut: port tidak ditemukan") }
+		end
+		if port.connectedToDeviceId == nil then
+			return { r(string.format("%s:%s tidak tersambung", node.name, portId)) }
+		end
+		Graph.DisconnectPort(session, deviceId, portId)
+		playSfx(player, "plug")
+		return { g(string.format("Kabel di %s:%s dipotong.", node.name, portId)) }
+	end
+
+	return { r("cable: usage: cable | cable use <warna> | cable buy <warna> | cable cut <port>") }
+end
+
+local function vlanUsage(): { string }
+	return { r("vlan: usage: vlan list | vlan set <port> <id> | vlan trunk <port> on|off | vlan set <deviceId> <port> <id>") }
+end
+
+local function cmdVlan(session: any, tokens: { string }): { string }
+	local sub = if tokens[2] ~= nil then string.lower(tokens[2]) else nil
+	if sub == nil or sub == "list" or sub == "show" then
+		local deviceId = vlanDeviceId(session)
+		local node = session.devices[deviceId]
+		if node == nil then
+			return { r("vlan: device aktif tidak ditemukan") }
+		end
+		local lines: { string } = { b(string.format("=== VLAN %s (%s) ===", node.name, deviceId)) }
+		for _, line in ipairs(Graph.ListPortVlans(session, deviceId)) do
+			table.insert(lines, "  " .. line)
+		end
+		table.insert(lines, gr("Set: vlan set <port> <id>   contoh: vlan set eth2 20"))
+		return lines
+	end
+
+	if sub == "trunk" then
+		local deviceId = vlanDeviceId(session)
+		local portId = tokens[3]
+		local modeRaw = tokens[4]
+		if tokens[5] ~= nil then
+			deviceId = tokens[3] :: string
+			portId = tokens[4]
+			modeRaw = tokens[5]
+		end
+		if portId == nil then
+			return { r("vlan trunk: usage: vlan trunk <port> on|off") }
+		end
+		local mode = string.lower(modeRaw or "on")
+		local enabled = mode == "on" or mode == "true" or mode == "1"
+		local okTrunk, trunkErr = Graph.SetPortTrunk(session, deviceId, portId, enabled)
+		if not okTrunk then
+			return { r("vlan trunk: " .. trunkErr) }
+		end
+		return { g(string.format("%s:%s trunk %s", deviceId, portId, if enabled then "ON" else "OFF")) }
+	end
+
+	if sub ~= "set" then
+		return vlanUsage()
+	end
+
+	local deviceId = vlanDeviceId(session)
+	local portId = tokens[3]
+	local vlanRaw = tokens[4]
+	if tokens[5] ~= nil then
+		deviceId = tokens[3] :: string
+		portId = tokens[4]
+		vlanRaw = tokens[5]
+	end
+	if portId == nil or vlanRaw == nil then
+		return vlanUsage()
+	end
+	local node = session.devices[deviceId]
+	if node == nil then
+		return { r("vlan: device tidak ditemukan") }
+	end
+	if node.deviceType ~= "Switch" and node.deviceType ~= "Router" then
+		return { r("vlan: hanya port switch/router yang punya VLAN") }
+	end
+	local vlan = tonumber(vlanRaw)
+	if vlan == nil then
+		return { r("vlan: id harus angka 1..4094") }
+	end
+	local ok, err = Graph.SetPortVlan(session, deviceId, portId, vlan)
+	if not ok then
+		return { r("vlan: " .. err) }
+	end
+	return { g(string.format("VLAN %s:%s -> %d", node.name, portId, math.floor(vlan))) }
+end
+
+local function cmdSwitch(session: any, tokens: { string }): { string }
+	local deviceId = vlanDeviceId(session)
+	local index = 2
+	local candidate = tokens[2]
+	if candidate ~= nil and candidate ~= "port" and candidate ~= "list" and session.devices[candidate] ~= nil then
+		deviceId = candidate
+		index = 3
+	end
+	local node = session.devices[deviceId]
+	if node == nil then
+		return { r("switch: device tidak ditemukan") }
+	end
+	if node.deviceType ~= "Switch" and node.deviceType ~= "Router" then
+		return { r("switch: perintah ini hanya untuk switch/router") }
+	end
+
+	local action = tokens[index]
+	if action == nil or action == "list" then
+		local lines: { string } = { b(string.format("=== PORT %s (%s) ===", node.name, deviceId)) }
+		for _, line in ipairs(Graph.ListPortVlans(session, deviceId)) do
+			table.insert(lines, "  " .. line)
+		end
+		return lines
+	end
+	if action ~= "port" then
+		return { r("switch: usage: switch [deviceId] port <port> vlan <id> | switch [deviceId] port <port> trunk on|off | switch [deviceId] list") }
+	end
+	local portId = tokens[index + 1]
+	local keyword = tokens[index + 2]
+	local value = tokens[index + 3]
+	if portId == nil or keyword == nil then
+		return { r("switch: usage: switch [deviceId] port <port> vlan <id> | switch [deviceId] port <port> trunk on|off") }
+	end
+	if keyword == "trunk" then
+		local mode = string.lower(value or "on")
+		local enabled = mode == "on" or mode == "true" or mode == "1"
+		local okTrunk, trunkErr = Graph.SetPortTrunk(session, deviceId, portId, enabled)
+		if not okTrunk then
+			return { r("switch: " .. trunkErr) }
+		end
+		return { g(string.format("%s:%s trunk %s", node.name, portId, if enabled then "ON" else "OFF")) }
+	end
+	if keyword ~= "vlan" or value == nil then
+		return { r("switch: usage: switch [deviceId] port <port> vlan <id> | switch [deviceId] port <port> trunk on|off") }
+	end
+	local vlan = tonumber(value)
+	if vlan == nil then
+		return { r("switch: id VLAN harus angka 1..4094") }
+	end
+	local ok, err = Graph.SetPortVlan(session, deviceId, portId, vlan)
+	if not ok then
+		return { r("switch: " .. err) }
+	end
+	return { g(string.format("VLAN %s:%s -> %d", node.name, portId, math.floor(vlan))) }
+end
+
+local function cmdMount(session: any, tokens: { string }): { string }
+	local sub = tokens[2]
+	if sub == "list" or sub == nil then
+		local rackIds: { string } = {}
+		for rackId in pairs(session.racks) do
+			table.insert(rackIds, rackId)
+		end
+		table.sort(rackIds)
+		local lines: { string } = { b("=== RACK & SLOT ===") }
+		for _, rackId in ipairs(rackIds) do
+			local rack = session.racks[rackId]
+			local used = 0
+			for _ in pairs(rack.occupiedSlots) do
+				used += 1
+			end
+			local free = Placement.FindFreeUSlot(session, rackId, Constants.COLOCATION.uSize)
+			table.insert(lines, string.format(
+				"  %s  %s  %d/%dU  PDU %s  %s",
+				rackId,
+				rack.name,
+				used,
+				rack.maxU,
+				if rack.pduPowered then "ON" else "OFF",
+				if free ~= nil then string.format("muat %dU di U%d", Constants.COLOCATION.uSize, free) else "penuh"
+			))
+		end
+		table.insert(lines, gr("Angkat crate colocation, lalu: mount <rackId>"))
+		return lines
+	end
+
+	if Carry == nil then
+		return { r("mount: sistem carry tidak tersedia") }
+	end
+	local rackId = sub
+	if session.racks[rackId] == nil then
+		return { r("mount: rack tidak ditemukan (" .. tostring(rackId) .. ")") }
+	end
+	if Carry.MountCarried(session, rackId) then
+		return { g("Crate dipasang di " .. rackId) }
+	end
+	return {}
+end
+
+---------------------------------------------------------------------
 -- Dispatcher & remote binding
 ---------------------------------------------------------------------
 
@@ -4985,6 +5546,14 @@ local function dispatch(player: Player, session: any, tokens: { string }): { str
 		return cmdStressTest(player, session, tokens)
 	elseif cmd == "ship" then
 		return cmdShip(session)
+	elseif cmd == "cable" then
+		return cmdCable(player, session, tokens)
+	elseif cmd == "vlan" then
+		return cmdVlan(session, tokens)
+	elseif cmd == "switch" then
+		return cmdSwitch(session, tokens)
+	elseif cmd == "mount" then
+		return cmdMount(session, tokens)
 	end
 	return { r("command not found: " .. cmd) .. gr("  (ketik 'help')") }
 end
@@ -5024,6 +5593,8 @@ function CommandExecutor.Init(deps: { [string]: any })
 	Constants = deps.constants
 	Workbench = deps.workbench
 	Cabling = deps.cabling
+	Placement = deps.placement
+	Carry = deps.carry
 	Remotes = deps.remotesFolder
 
 	local executeRemote = Remotes:FindFirstChild("ExecuteCommand")
@@ -5053,9 +5624,12 @@ return CommandExecutor
 --[[
 	RackAndCablingSystem (ModuleScript, ServerScriptService/Physical)
 	Physical interaction layer for cabling, console links and power:
-	- Two-click port cabling: first click marks the port with a yellow
-	  SelectionBox "PendingCableSel" (15 s timeout), second click on another
-	  free port connects them ("LAN_Blue" Beam); clicking a connected port
+	- Two-click port cabling with Fase 2 colour-coded spools: WAN ports always
+	  use the yellow spool, data ports use the selected LAN/Mgmt spool; the
+	  spool is consumed only when the link is created
+	- WireCutter tool equipped: clicking a connected port cuts its cable
+	- First click marks the port with a yellow SelectionBox "PendingCableSel"
+	  (15 s timeout), second click connects; clicking a connected port
 	  disconnects it; clicking the same port cancels the pending selection
 	- Laptop console cable: ProximityPrompt on the device ConsolePort attaches
 	  a blue Beam from the equipped TechnicianLaptop to the device and opens
@@ -5136,6 +5710,37 @@ local function clearPendingCable(session: any)
 	session.pendingCableHighlight = nil
 	session.pendingCableDeviceId = nil
 	session.pendingCablePortId = nil
+	session.pendingCableColor = nil
+end
+
+local function hasWireCutter(player: Player): boolean
+	local char = player.Character
+	if char == nil then
+		return false
+	end
+	local tool = char:FindFirstChild("WireCutter")
+	return tool ~= nil and tool:IsA("Tool")
+end
+
+local function hint(player: Player, message: string)
+	openTerminal(player, { action = "hint", message = message })
+end
+
+--[[ Fase 2: pick the cable colour for a pending link. WAN ports always use
+	 the yellow spool; data ports use the player's selected spool (never WAN). ]]
+local function cableColorFor(session: any, port: any): string
+	if port.portType == "WAN" then
+		return "WAN_Yellow"
+	end
+	local selected = session.selectedCableColor
+	if selected == "Mgmt_Red" then
+		return "Mgmt_Red"
+	end
+	return "LAN_Blue"
+end
+
+local function spoolCount(session: any, color: string): number
+	return tonumber(session.cableSpools[color]) or 0
 end
 
 ---------------------------------------------------------------------
@@ -5163,6 +5768,19 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 		return
 	end
 
+	-- WireCutter equipped: click a connected port to cut its cable.
+	if hasWireCutter(player) then
+		if port.connectedToDeviceId ~= nil then
+			Graph.DisconnectPort(session, deviceId, portId)
+			playSFX(player, "plug")
+			hint(player, "Kabel dipotong dengan WireCutter.")
+		else
+			playSFX(player, "error")
+			hint(player, "WireCutter: klik port yang tersambung untuk memotong kabel.")
+		end
+		return
+	end
+
 	-- Connected port: click = unplug.
 	if port.connectedToDeviceId ~= nil then
 		Graph.DisconnectPort(session, deviceId, portId)
@@ -5172,8 +5790,15 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 
 	-- Empty port, no pending selection yet: start one.
 	if session.pendingCableDeviceId == nil or session.pendingCablePortId == nil then
+		local color = cableColorFor(session, port)
+		if spoolCount(session, color) <= 0 then
+			playSFX(player, "error")
+			hint(player, "Spool " .. color .. " habis. Beli di Store > Cable (1 spool = 5 kabel).")
+			return
+		end
 		session.pendingCableDeviceId = deviceId
 		session.pendingCablePortId = portId
+		session.pendingCableColor = color
 		local model = session.deviceModels[deviceId]
 		if model ~= nil then
 			for _, desc in ipairs(model:GetDescendants()) do
@@ -5206,12 +5831,24 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 		return
 	end
 
-	-- Second endpoint: connect (NetworkGraph validates type compatibility).
+	-- Second endpoint: connect (NetworkGraph validates type + colour rules).
 	local fromDev = session.pendingCableDeviceId :: string
 	local fromPort = session.pendingCablePortId :: string
+	local color = session.pendingCableColor or "LAN_Blue"
 	clearPendingCable(session)
-	local ok = Graph.ConnectPorts(session, fromDev, fromPort, deviceId, portId, "LAN_Blue")
+	if spoolCount(session, color) <= 0 then
+		playSFX(player, "error")
+		hint(player, "Spool " .. color .. " habis. Beli di Store > Cable.")
+		return
+	end
+	local ok, err = Graph.ConnectPorts(session, fromDev, fromPort, deviceId, portId, color)
+	if ok then
+		session.cableSpools[color] = spoolCount(session, color) - 1
+	end
 	playSFX(player, if ok then "plug" else "error")
+	if not ok and err ~= "" then
+		hint(player, err)
+	end
 end
 
 ---------------------------------------------------------------------
@@ -5555,8 +6192,9 @@ return RackAndCablingSystem
 	  DataPersistenceManager to restore saved devices (session.loadedFromSave
 	  suppresses auto-cabling; restored cables are linked explicitly)
 	- OnPurchase: PurchaseHardwareRemote dispatcher - "prepare"/"place"/
-	  "cancel" for placeables, "buy" for components (workbench), cable spools
-	  answered with a Fase 2 hint
+	  "cancel" for placeables, "buy" for components (workbench) and cable
+	  spools (Fase 2 inventory), plus MountDevice/UnmountDevice for the carry
+	  system and save restore.
 	All rejections reach the client as OpenTerminalEvent {action="hint"}.
 ]]
 
@@ -5690,6 +6328,155 @@ end
 -- Placement
 ---------------------------------------------------------------------
 
+--[[ Builds and registers one rack at the given world CFrame. Shared by the
+	 store placement flow and the save-restore path so both keep the same
+	 rack data, slot attachments and PDU hooks. Returns the new rack id. ]]
+local function createRack(session: any, itemId: string, snappedCF: CFrame, rotY: number): string
+	local def = Catalog.Get(itemId)
+	if def == nil then
+		return ""
+	end
+	local rackId = SessionManager.NextDeviceId(session, "rack")
+	local model, slots, pduPart = ModelFactory.BuildRack(itemId, rackId)
+	model:PivotTo(snappedCF * CFrame.Angles(0, rotY, 0))
+	model.Parent = session.facility.devices
+
+	session.racks[rackId] = {
+		rackId = rackId,
+		name = def.name,
+		itemId = itemId,
+		maxU = def.specs.maxU,
+		occupiedSlots = {},
+		totalPowerWatts = 0,
+		maxPowerWatts = def.specs.maxPowerWatts,
+		pduPowered = false,
+	}
+	session.rackModels[rackId] = model
+	session.rackSlots[rackId] = slots
+
+	session.facility.pduParts = session.facility.pduParts or {}
+	session.facility.pduParts[rackId] = pduPart
+	Cabling.HookFacility(session) -- wires the new PDU (guard attr skips old ones)
+	return rackId
+end
+
+--[[ Restores a rack saved by DataPersistenceManager (including PDU state). ]]
+function PlacementSystem.RestoreRack(session: any, itemId: string, posX: number, posZ: number, rotY: number, pduPowered: boolean): string
+	local rackId = createRack(session, itemId, CFrame.new(Vector3.new(posX, Constants.ROOM.floorTopY, posZ)), rotY)
+	local rack = session.racks[rackId]
+	if rack ~= nil then
+		rack.pduPowered = pduPowered
+	end
+	return rackId
+end
+
+--[[ First free contiguous U block of uSize (top slot number), or nil. ]]
+function PlacementSystem.FindFreeUSlot(session: any, rackId: string, uSize: number): number?
+	local rack = session.racks[rackId]
+	if rack == nil then
+		return nil
+	end
+	local size = math.max(1, math.floor(uSize))
+	for top = rack.maxU, size, -1 do
+		local free = true
+		for u = top - size + 1, top do
+			if rack.occupiedSlots[u] ~= nil then
+				free = false
+				break
+			end
+		end
+		if free then
+			return top
+		end
+	end
+	return nil
+end
+
+--[[ Mounts a catalog device into a rack U slot and registers its graph node.
+	 Used by the Fase 2 carry system, colocation delivery and save restore.
+	 config: { name?, deviceType?, ip?, gateway?, subnetMask?, osInstalled?,
+	           isPowered?, contractId?, noAutoCable?, idPrefix? }
+	 Returns (ok, deviceId or errorMessage). ]]
+function PlacementSystem.MountDevice(session: any, itemId: string, rackId: string, uSlot: number, config: any?): (boolean, string)
+	local def = Catalog.Get(itemId)
+	if def == nil then
+		return false, "Item tidak dikenal"
+	end
+	local rack = session.racks[rackId]
+	if rack == nil then
+		return false, "Rack tidak ditemukan"
+	end
+	local nodeSize = math.max(1, math.floor(def.uSize or 1))
+	if uSlot < nodeSize or uSlot > rack.maxU then
+		return false, "Slot U di luar batas rack"
+	end
+	for u = uSlot - nodeSize + 1, uSlot do
+		if rack.occupiedSlots[u] ~= nil then
+			return false, "Slot U" .. tostring(uSlot) .. " sudah terpakai"
+		end
+	end
+
+	local cfg = if type(config) == "table" then config else {}
+	local prefix = if type(cfg.idPrefix) == "string" then cfg.idPrefix else "srv"
+	local deviceId = SessionManager.NextDeviceId(session, prefix)
+	local model, _ports, _consoleAttach, _led, _smoke = ModelFactory.BuildDeviceModel(itemId, deviceId)
+	local slots = session.rackSlots[rackId]
+	local slot = if type(slots) == "table" then slots[uSlot] else nil
+	if slot ~= nil and slot:IsA("Attachment") then
+		model:PivotTo((slot :: Attachment).WorldCFrame * CFrame.new(0, 0, 0.95))
+	else
+		local rackModel = session.rackModels[rackId]
+		if rackModel ~= nil then
+			model:PivotTo(rackModel:GetPivot() * CFrame.new(0, 1.2, 0.2))
+		end
+	end
+	model.Parent = session.facility.devices
+
+	local node = Graph.DefaultNode(deviceId, if type(cfg.name) == "string" then cfg.name else def.name, itemId)
+	node.rackId = rackId
+	node.uSlot = uSlot
+	node.freeform = false
+	if type(cfg.deviceType) == "string" then
+		node.deviceType = cfg.deviceType
+	end
+	node.ip = cfg.ip
+	node.gateway = cfg.gateway
+	node.subnetMask = if type(cfg.subnetMask) == "string" then cfg.subnetMask else "255.255.255.0"
+	node.osInstalled = cfg.osInstalled
+	node.contractId = cfg.contractId
+	node.isPowered = if cfg.isPowered ~= nil then cfg.isPowered == true else rack.pduPowered
+
+	for u = uSlot - nodeSize + 1, uSlot do
+		rack.occupiedSlots[u] = deviceId
+	end
+	rack.totalPowerWatts += node.specs.powerWatts
+
+	Graph.RegisterDevice(session, node, model)
+	if cfg.noAutoCable ~= true and not session.loadedFromSave then
+		Graph.AutoCable(session, deviceId)
+	end
+	Cabling.HookDevice(session, deviceId)
+	return true, deviceId
+end
+
+--[[ Removes a rack-mounted device, frees its U block and adjusts rack power. ]]
+function PlacementSystem.UnmountDevice(session: any, deviceId: string)
+	local node = session.devices[deviceId]
+	if node == nil then
+		return
+	end
+	local rack = if node.rackId ~= nil then session.racks[node.rackId] else nil
+	if rack ~= nil and node.uSlot ~= nil then
+		for u = node.uSlot - node.uSize + 1, node.uSlot do
+			if rack.occupiedSlots[u] == deviceId then
+				rack.occupiedSlots[u] = nil
+			end
+		end
+		rack.totalPowerWatts = math.max(0, rack.totalPowerWatts - node.specs.powerWatts)
+	end
+	Graph.RemoveDevice(session, deviceId)
+end
+
 --[[
 	PlaceDevice(session, itemId, snappedCF, rotY, config?) -> id
 	Rack category: builds the rack model, session.racks entry (pduPowered =
@@ -5707,27 +6494,7 @@ function PlacementSystem.PlaceDevice(session: any, itemId: string, snappedCF: CF
 	end
 
 	if def.category == "Rack" then
-		local rackId = SessionManager.NextDeviceId(session, "rack")
-		local model, _slots, pduPart = ModelFactory.BuildRack(itemId, rackId)
-		model:PivotTo(snappedCF * CFrame.Angles(0, rotY, 0))
-		model.Parent = session.facility.devices
-
-		session.racks[rackId] = {
-			rackId = rackId,
-			name = def.name,
-			itemId = itemId,
-			maxU = def.specs.maxU,
-			occupiedSlots = {},
-			totalPowerWatts = 0,
-			maxPowerWatts = def.specs.maxPowerWatts,
-			pduPowered = false,
-		}
-		session.rackModels[rackId] = model
-
-		session.facility.pduParts = session.facility.pduParts or {}
-		session.facility.pduParts[rackId] = pduPart
-		Cabling.HookFacility(session) -- wires the new PDU (guard attr skips old ones)
-		return rackId
+		return createRack(session, itemId, snappedCF, rotY)
 	end
 
 	local deviceId = SessionManager.NextDeviceId(session, prefixFor(def))
@@ -5794,7 +6561,34 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 	end
 
 	if def.category == "Cable" then
-		hint(player, "Cable spools hadir di Fase 2. Fase 1 memakai auto-cable + klik dua port.")
+		if action ~= "buy" then
+			hint(player, "Kabel dibeli sebagai spool: tekan BELI pada kategori Cable.")
+			return
+		end
+		local color: string? = nil
+		for candidate, item in pairs(Constants.CABLES.itemByColor) do
+			if item == itemId then
+				color = candidate
+				break
+			end
+		end
+		if color == nil then
+			return
+		end
+		if session.balance < def.price then
+			hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
+			return
+		end
+		session.balance -= def.price
+		local current = tonumber(session.cableSpools[color]) or 0
+		session.cableSpools[color] = current + Constants.CABLES.spoolYield
+		playSFX(player, "cash")
+		hint(player, string.format(
+			"Spool %s dibeli: +%d kabel (stok %d).",
+			Constants.CABLES.labels[color] or color,
+			Constants.CABLES.spoolYield,
+			session.cableSpools[color]
+		))
 		return
 	end
 
@@ -6431,12 +7225,440 @@ return WorkbenchBuilderSystem
 ]]></ProtectedString>
 </Properties>
 </Item>
+<Item class="ModuleScript" referent="RBX23">
+<Properties>
+<string name="Name">CarryAndMountSystem</string>
+<ProtectedString name="Source"><![CDATA[--!strict
+--[[
+	CarryAndMountSystem (ModuleScript, ServerScriptService/Physical)
+	Fase 2 physical layer for colocation deliveries:
+	- SpawnCrate: a client server crate appears on the loading dock when a
+	  Colocation contract is accepted (label + "Angkat Crate" prompt)
+	- BeginCarry / EndCarry: the crate follows the player's HumanoidRootPart
+	  on Heartbeat while every rack exposes a "Pasang Server" prompt
+	- MountCarried: validates a free U block, calls PlacementSystem.MountDevice
+	  (ColocationServer node, client IP, rack power) and links the ticket
+	- DropCarried: puts the crate back on the dock (prompt on the crate)
+	- EvaluateColo: ticket acceptance test = powered + switch access VLAN match
+	  + reachable from the ISP gateway
+	- CleanupTicket: removes the crate and the rack-mounted client server
+	No remotes are introduced: every action is a ProximityPrompt on the server.
+]]
+
+local RunService = game:GetService("RunService")
+
+local CarryAndMountSystem = {}
+
+local Sessions: any = nil
+local Placement: any = nil
+local Graph: any = nil
+local ModelFactory: any = nil
+local Constants: any = nil
+local Remotes: any = nil
+local Catalog: any = nil
+
+local GATEWAY_DEVICE_ID = "isp_router_1"
+
+---------------------------------------------------------------------
+-- Init
+---------------------------------------------------------------------
+
+function CarryAndMountSystem.Init(deps: { [string]: any })
+	Sessions = deps.sessions
+	Placement = deps.placement
+	Graph = deps.graph
+	ModelFactory = deps.modelFactory
+	Constants = deps.constants
+	Remotes = deps.remotesFolder
+	Catalog = deps.catalog
+end
+
+---------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------
+
+local function playSFX(player: Player, name: string)
+	local remote = if Remotes ~= nil then Remotes:FindFirstChild("PlaySFXRemote") else nil
+	if remote ~= nil then
+		(remote :: any):FireClient(player, name)
+	end
+end
+
+local function hint(player: Player, message: string)
+	local remote = if Remotes ~= nil then Remotes:FindFirstChild("OpenTerminalEvent") else nil
+	if remote ~= nil then
+		(remote :: any):FireClient(player, { action = "hint", message = message })
+	end
+end
+
+local function findTicket(session: any, ticketId: string): any?
+	for _, ticket in ipairs(session.tickets or {}) do
+		if ticket.id == ticketId then
+			return ticket
+		end
+	end
+	return nil
+end
+
+local function cratePart(crate: Model): BasePart?
+	local box = crate:FindFirstChild("CrateBox")
+	if box ~= nil and box:IsA("BasePart") then
+		return box :: BasePart
+	end
+	for _, desc in ipairs(crate:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			return desc :: BasePart
+		end
+	end
+	return nil
+end
+
+local function removeMountPrompts(session: any)
+	for _, rackModel in pairs(session.rackModels) do
+		local frame = rackModel:FindFirstChild("SlotFrame", true)
+		if frame ~= nil then
+			local prompt = frame:FindFirstChild("MountPrompt")
+			if prompt ~= nil then
+				prompt:Destroy()
+			end
+		end
+	end
+end
+
+local function addMountPrompts(session: any)
+	local player = session.player
+	for rackId, rackModel in pairs(session.rackModels) do
+		local frame = rackModel:FindFirstChild("SlotFrame", true)
+		if frame ~= nil and frame:IsA("BasePart") and frame:FindFirstChild("MountPrompt") == nil then
+			local rack = session.racks[rackId]
+			local prompt = Instance.new("ProximityPrompt")
+			prompt.Name = "MountPrompt"
+			prompt.ActionText = "Pasang Server"
+			prompt.ObjectText = if rack ~= nil then rack.name else rackId
+			prompt.HoldDuration = 0.35
+			prompt.MaxActivationDistance = 18
+			prompt.RequiresLineOfSight = false
+			prompt.Parent = frame
+			prompt.Triggered:Connect(function(triggerer: Player)
+				if triggerer ~= player then
+					return
+				end
+				CarryAndMountSystem.MountCarried(session, rackId)
+			end)
+		end
+	end
+end
+
+local function setCratePromptText(crate: Model, text: string)
+	local part = cratePart(crate)
+	if part == nil then
+		return
+	end
+	local prompt = part:FindFirstChildOfClass("ProximityPrompt")
+	if prompt ~= nil and prompt:IsA("ProximityPrompt") then
+		prompt.ActionText = text
+	end
+end
+
+local function updateCarry(session: any)
+	local carry = session.carry
+	if carry == nil then
+		return
+	end
+	local crate = carry.crate
+	if crate == nil or crate.Parent == nil then
+		CarryAndMountSystem.EndCarry(session)
+		return
+	end
+	local char = session.player.Character
+	local hrp = if char ~= nil then char:FindFirstChild("HumanoidRootPart") else nil
+	if hrp == nil or not hrp:IsA("BasePart") then
+		CarryAndMountSystem.DropCarried(session)
+		return
+	end
+	crate:PivotTo((hrp :: BasePart).CFrame * CFrame.new(0, -1.25, -2.35))
+end
+
+---------------------------------------------------------------------
+-- Crate lifecycle
+---------------------------------------------------------------------
+
+--[[ Creates the client server crate for an accepted Colocation ticket at the
+	 loading dock. Returns false when the dock/CF is missing or a crate
+	 already exists for this ticket. ]]
+function CarryAndMountSystem.SpawnCrate(session: any, ticket: any): boolean
+	if session == nil or ticket == nil or type(ticket.id) ~= "string" then
+		return false
+	end
+	if session.colocation.crates[ticket.id] ~= nil then
+		return false
+	end
+	local facility = session.facility
+	local dockCF = if type(facility) == "table" then facility.dockCF else nil
+	if dockCF == nil then
+		return false
+	end
+
+	local crate = ModelFactory.BuildCrate("COLOCATION\n" .. tostring(ticket.clientName))
+	crate.Name = "ColoCrate_" .. ticket.id
+	for _, desc in ipairs(crate:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			desc.Anchored = true
+			desc.CanCollide = false
+		end
+	end
+	-- Keep multiple deliveries side by side on the dock pad.
+	local occupied = 0
+	for _ in pairs(session.colocation.crates) do
+		occupied += 1
+	end
+	crate:PivotTo((dockCF :: CFrame) * CFrame.new(occupied * 2.9, 0, 0))
+
+	local box = cratePart(crate)
+	if box ~= nil then
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "CarryPrompt"
+		prompt.ActionText = "Angkat Crate"
+		prompt.ObjectText = tostring(ticket.clientName) .. " Colo Server"
+		prompt.HoldDuration = 0.2
+		prompt.MaxActivationDistance = 14
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = box
+		prompt.Triggered:Connect(function(triggerer: Player)
+			if triggerer ~= session.player then
+				return
+			end
+			if session.carry ~= nil and session.carry.crate == crate then
+				CarryAndMountSystem.DropCarried(session)
+			else
+				CarryAndMountSystem.BeginCarry(session, crate, ticket.id)
+			end
+		end)
+	end
+
+	local cratesFolder = if type(facility) == "table" then facility.crates else nil
+	crate.Parent = if cratesFolder ~= nil then cratesFolder else facility.root
+	session.colocation.crates[ticket.id] = crate
+	session.colocation.byTicket[ticket.id] = crate
+	hint(session.player, "Crate colocation tiba di Loading Dock. Angkat lalu pasang di rack.")
+	playSFX(session.player, "key")
+	return true
+end
+
+function CarryAndMountSystem.BeginCarry(session: any, crate: Model, ticketId: string)
+	if session.carry ~= nil then
+		hint(session.player, "Kamu sudah membawa crate. Pasang dulu di rack.")
+		return
+	end
+	local char = session.player.Character
+	local hrp = if char ~= nil then char:FindFirstChild("HumanoidRootPart") else nil
+	if hrp == nil then
+		hint(session.player, "Karakter belum siap.")
+		return
+	end
+
+	session.carry = {
+		crate = crate,
+		ticketId = ticketId,
+		conn = RunService.Heartbeat:Connect(function()
+			updateCarry(session)
+		end),
+	}
+	setCratePromptText(crate, "Turunkan Crate")
+	addMountPrompts(session)
+	updateCarry(session)
+	playSFX(session.player, "key")
+	hint(session.player, "Crate diangkat. Dekati rack dan tekan 'Pasang Server'.")
+end
+
+function CarryAndMountSystem.EndCarry(session: any)
+	local carry = session.carry
+	if carry == nil then
+		return
+	end
+	if carry.conn ~= nil then
+		carry.conn:Disconnect()
+	end
+	if carry.crate ~= nil and carry.crate.Parent ~= nil then
+		setCratePromptText(carry.crate, "Angkat Crate")
+	end
+	session.carry = nil
+	removeMountPrompts(session)
+end
+
+--[[ Puts the carried crate back on the dock (or in front of the player). ]]
+function CarryAndMountSystem.DropCarried(session: any)
+	local carry = session.carry
+	if carry == nil then
+		return
+	end
+	local crate = carry.crate
+	local dockCF = if type(session.facility) == "table" then session.facility.dockCF else nil
+	if crate ~= nil and crate.Parent ~= nil and dockCF ~= nil then
+		crate:PivotTo(dockCF :: CFrame)
+	end
+	CarryAndMountSystem.EndCarry(session)
+	hint(session.player, "Crate diturunkan di Loading Dock.")
+	playSFX(session.player, "plug")
+end
+
+--[[ Mounts the carried crate into the first free U block of a rack. ]]
+function CarryAndMountSystem.MountCarried(session: any, rackId: string): boolean
+	local carry = session.carry
+	if carry == nil then
+		hint(session.player, "Tidak ada crate yang dibawa.")
+		return false
+	end
+	local ticket = findTicket(session, carry.ticketId)
+	if ticket == nil or ticket.status ~= "Active" then
+		hint(session.player, "Kontrak colocation tidak aktif.")
+		return false
+	end
+	local rack = session.racks[rackId]
+	if rack == nil then
+		hint(session.player, "Rack tidak ditemukan.")
+		return false
+	end
+
+	local colo = Constants.COLOCATION
+	local uSize = colo.uSize
+	local uSlot = Placement.FindFreeUSlot(session, rackId, uSize)
+	if uSlot == nil then
+		hint(session.player, string.format("Rack %s tidak punya ruang %dU kosong.", rack.name, uSize))
+		playSFX(session.player, "error")
+		return false
+	end
+
+	local itemId = "bm_starter"
+	local def = Catalog.Get(itemId)
+	local displayName = tostring(ticket.clientName) .. " Colo Server"
+	local ok, result = Placement.MountDevice(session, itemId, rackId, uSlot, {
+		name = displayName,
+		deviceType = "ColocationServer",
+		ip = ticket.targetIp,
+		gateway = "192.168.1.1",
+		subnetMask = "255.255.255.0",
+		osInstalled = "ubuntu-22.04",
+		isPowered = rack.pduPowered,
+		contractId = ticket.id,
+		noAutoCable = true,
+		idPrefix = "colo",
+	})
+	if not ok then
+		hint(session.player, "Gagal mount: " .. tostring(result))
+		playSFX(session.player, "error")
+		return false
+	end
+
+	ticket.targetDeviceId = result
+	ticket.targetRackId = rackId
+	ticket.targetUSlot = uSlot
+	ticket.phase = "mounted"
+	ticket.validationText = "Terpasang - kabel ke switch, atur VLAN, PDU ON"
+
+	local crate = carry.crate
+	if crate ~= nil then
+		crate:Destroy()
+	end
+	session.colocation.crates[ticket.id] = nil
+	session.colocation.byTicket[ticket.id] = nil
+	CarryAndMountSystem.EndCarry(session)
+
+	playSFX(session.player, "plug")
+	local ourU = uSlot - (def ~= nil and def.uSize or uSize) + 1
+	hint(session.player, string.format(
+		"Server klien terpasang di %s U%d-%d. Kabel ke switch, set VLAN %d, nyalakan PDU.",
+		rack.name,
+		math.max(1, ourU),
+		uSlot,
+		ticket.vlanId or 1
+	))
+	return true
+end
+
+---------------------------------------------------------------------
+-- Colocation validation & cleanup
+---------------------------------------------------------------------
+
+--[[ Returns (ready, validationText) for an active Colocation ticket. ]]
+function CarryAndMountSystem.EvaluateColo(session: any, ticket: any): (boolean, string)
+	local deviceId = ticket.targetDeviceId
+	if deviceId == nil then
+		return false, "Crate belum dipasang di rack"
+	end
+	local node = session.devices[deviceId]
+	if node == nil then
+		return false, "Server klien tidak ditemukan"
+	end
+	if not node.isPowered then
+		return false, "PDU rack OFF - nyalakan PDU"
+	end
+	local accessSwitch, accessPortId = Graph.GetAccessSwitchPort(session, deviceId)
+	if accessSwitch == nil or accessPortId == nil then
+		return false, "Belum ada kabel ke switch"
+	end
+	local port = accessSwitch.ports[accessPortId]
+	if port == nil then
+		return false, "Port switch tidak ditemukan"
+	end
+	local wanted = ticket.vlanId or 1
+	if port.isTrunk == true then
+		return false, "Port access masih trunk - set mode access + VLAN " .. tostring(wanted)
+	end
+	if port.vlanId ~= wanted then
+		return false, string.format("VLAN switch %d != %d", port.vlanId, wanted)
+	end
+	if node.ip == nil then
+		return false, "Server klien belum punya IP"
+	end
+	local reachable = Graph.CanReachIP(session, GATEWAY_DEVICE_ID, node.ip)
+	if not reachable then
+		return false, "Tidak reachable dari gateway - cek kabel uplink/VLAN"
+	end
+	return true, string.format("Reachable dari gateway di VLAN %d", port.vlanId)
+end
+
+--[[ Removes every physical trace of a ticket: crate and mounted server. ]]
+function CarryAndMountSystem.CleanupTicket(session: any, ticket: any)
+	if session == nil or ticket == nil then
+		return
+	end
+	local crate = session.colocation.crates[ticket.id]
+	if crate ~= nil then
+		crate:Destroy()
+		session.colocation.crates[ticket.id] = nil
+		session.colocation.byTicket[ticket.id] = nil
+	end
+	local deviceId = ticket.targetDeviceId
+	if type(deviceId) == "string" and session.devices[deviceId] ~= nil then
+		Placement.UnmountDevice(session, deviceId)
+	end
+	ticket.targetDeviceId = nil
+	ticket.targetRackId = nil
+	ticket.targetUSlot = nil
+end
+
+--[[ Tick guard: if the carried character disappears, drop the crate. ]]
+function CarryAndMountSystem.Update(session: any)
+	if session.carry == nil then
+		return
+	end
+	local char = session.player.Character
+	if char == nil or char:FindFirstChild("HumanoidRootPart") == nil then
+		CarryAndMountSystem.DropCarried(session)
+	end
+end
+
+return CarryAndMountSystem
+]]></ProtectedString>
+</Properties>
 </Item>
-<Item class="Folder" referent="RBX23">
+</Item>
+<Item class="Folder" referent="RBX24">
 <Properties>
 <string name="Name">Gameplay</string>
 </Properties>
-<Item class="ModuleScript" referent="RBX24">
+<Item class="ModuleScript" referent="RBX25">
 <Properties>
 <string name="Name">ShiftAndEconomyManager</string>
 <ProtectedString name="Source"><![CDATA[--!strict
@@ -6747,6 +7969,10 @@ function ShiftAndEconomyManager.BuildSnapshot(session: SessionLike): FacilitySna
 			rewardPayout = t.rewardPayout,
 			status = t.status,
 			requirementsText = t.requirementsText or "",
+			slaRemainingSec = t.slaRemainingSec,
+			payoutIntervalSec = t.payoutIntervalSec,
+			validationText = t.validationText or "",
+			vlanId = t.vlanId,
 		})
 	end
 
@@ -6831,36 +8057,41 @@ return ShiftAndEconomyManager
 ]]></ProtectedString>
 </Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX25">
+<Item class="ModuleScript" referent="RBX26">
 <Properties>
 <string name="Name">ContractAndIncidentManager</string>
 <ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	ContractAndIncidentManager (ModuleScript, ServerScriptService/Gameplay)
-	AGENT C - Fase 1.
+	AGENT C - Fase 1 + Fase 2 contract pool.
 
-	FASE 1 SCOPE: CloudVPS + CustomBuild tickets only. There is intentionally
-	NO incident engine in this file: Cable Fault, DDoS Flood, Noisy Neighbor
-	and Remote Hands Drive Failure are Fase 3 scope per CONTRACT.md Section 9
-	(the AlarmBeacon stays decorative in Fase 1). This comment is the explicit
-	scope marker required by the contract.
+	FASE 2 SCOPE: three contract pillars (CloudVPS, Colocation, CustomBuild)
+	with a live SLA. There is still intentionally NO incident engine in this
+	file: Cable Fault, DDoS Flood, Noisy Neighbor and Remote Hands Drive
+	Failure are Fase 3 scope per CONTRACT.md Section 9 (the AlarmBeacon stays
+	decorative).
 
 	Ticket flow (tickets live in session.tickets as an array of
 	ContractTicket-like tables, plus a requirementsText field for the UI):
-	  - Loop every 10s per session: top up to 3 Available tickets, alternating
-	    CloudVPS / CustomBuild, with random invented client names.
+	  - Loop every 5s per session: top up to 3 Available tickets, always
+	    filling the category with the fewest Available rows.
 	  - CloudVPS specs: cpu 2..8, ram 4..32, disk 50..500; reward scaled
 	    (cpu*60 + ram*2 + disk*0.1, minimum 120).
 	  - CustomBuild: reward 250..600, fixed requirementsText.
+	  - Colocation: client wants a server hosted in the player's rack on a
+	    dedicated VLAN. Accept -> crate spawns at the dock after 3s ->
+	    carry/mount -> cable + switch VLAN + PDU ON -> reachable from the
+	    gateway. SLA 240s. While running, the client pays rewardPayout every
+	    10s for 60s, then collects the server.
 	  - ContractActionRemote {action="accept", ticketId}: Available -> Active,
 	    max 2 Active tickets per session.
 	  - Active validation each pass:
-	      CloudVPS  = any powered BareMetal with an OS installed hosts a VM with
-	                  cpu >= req.cpu and ram >= req.ram and disk >= req.disk.
+	      CloudVPS    = any powered BareMetal with an OS hosts a big-enough VM.
 	      CustomBuild = session.workbench.shipped.
-	  - On completion: balance += rewardPayout, reputation += 1, status
-	    "Completed", PlaySFXRemote "cash", hint via OpenTerminalEvent, and the
-	    ticket is removed from session.tickets after a short delay (next syncs).
+	      Colocation  = CarryAndMountSystem.EvaluateColo (powered, VLAN match,
+	                    gateway reachability).
+	  - Completion pays the reward, reputation and SFX; Failed (SLA expiry)
+	    plays the error SFX. Both linger briefly before removal.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6881,14 +8112,17 @@ type SessionLike = any
 
 local MAX_AVAILABLE_TICKETS = 3
 local MAX_ACTIVE_TICKETS = 2
-local LOOP_SECONDS = 10
+local LOOP_SECONDS = 5
 local COMPLETED_LINGER_SECONDS = 8
+local DEFAULT_SLA_SECONDS = 300
+local CATEGORY_ORDER: { string } = { "CloudVPS", "Colocation", "CustomBuild" }
 
 local sessions: any = nil
 local graph: any = nil
 local constants: any = nil
 local remotesFolder: any = nil
 local workbench: any = nil
+local carry: any = nil
 
 local contractRemote: any = nil
 local playSFXRemote: any = nil
@@ -6943,6 +8177,10 @@ local function nextTicketId(): string
 	return string.format("tkt_%d_%d", math.floor(os.clock() * 1000), ticketCounter)
 end
 
+---------------------------------------------------------------------
+-- Ticket factories
+---------------------------------------------------------------------
+
 local function makeCloudVPSTicket(): TicketRow
 	local clientName = randomChoice(CLIENT_NAMES) :: string
 	local cpu = rng:NextInteger(2, 8)
@@ -6956,16 +8194,22 @@ local function makeCloudVPSTicket(): TicketRow
 		clientName = clientName,
 		title = string.format("Cloud VPS %d vCPU", cpu),
 		description = string.format(
-			"%s sewa VPS: %d vCPU / %dGB RAM / %dGB disk. Jalankan VM-nya di bare-metal kamu.",
+			"%s sewa VPS: %d vCPU / %dGB RAM / %dGB disk. Jalankan VM-nya di bare-metal kamu. SLA %d detik.",
 			clientName,
 			cpu,
 			ram,
-			disk
+			disk,
+			DEFAULT_SLA_SECONDS
 		),
 		requirements = { cpu = cpu, ram = ram, disk = disk },
 		rewardPayout = reward,
 		payoutIntervalSec = nil,
 		slaRemainingSec = nil,
+		runtimeRemainingSec = nil,
+		vlanId = nil,
+		targetIp = nil,
+		phase = nil,
+		validationText = "Menunggu VM yang cocok",
 		targetDeviceId = nil,
 		targetRackId = nil,
 		targetUSlot = nil,
@@ -6990,13 +8234,19 @@ local function makeCustomBuildTicket(): TicketRow
 		clientName = clientName,
 		title = "Custom Server Build",
 		description = string.format(
-			"%s pesan server rakitan custom, bayaran di depan setelah unit dikirim dari dock.",
-			clientName
+			"%s pesan server rakitan custom, bayaran di depan setelah unit dikirim dari dock. SLA %d detik.",
+			clientName,
+			DEFAULT_SLA_SECONDS
 		),
 		requirements = {},
 		rewardPayout = reward,
 		payoutIntervalSec = nil,
 		slaRemainingSec = nil,
+		runtimeRemainingSec = nil,
+		vlanId = nil,
+		targetIp = nil,
+		phase = nil,
+		validationText = "Rakit + install OS + stress test + ship",
 		targetDeviceId = nil,
 		targetRackId = nil,
 		targetUSlot = nil,
@@ -7006,27 +8256,88 @@ local function makeCustomBuildTicket(): TicketRow
 	return ticket
 end
 
---[[ Top up to MAX_AVAILABLE_TICKETS Available tickets, alternating categories
-	 by always filling the category that currently has fewer Available tickets. ]]
+local function makeColocationTicket(): TicketRow
+	local clientName = randomChoice(CLIENT_NAMES) :: string
+	local vlanChoices: { number } = constants.COLOCATION.vlanChoices
+	local vlanId = randomChoice(vlanChoices) :: number
+	local ip = string.format("10.20.%d.%d", vlanId, rng:NextInteger(10, 200))
+	local reward = rng:NextInteger(35, 70)
+	local colo = constants.COLOCATION
+
+	local ticket: TicketRow = {
+		id = nextTicketId(),
+		category = "Colocation" :: TicketCategory,
+		clientName = clientName,
+		title = string.format("Colocation VLAN %d", vlanId),
+		description = string.format(
+			"%s kirim server fisik untuk di-hosting di rack kamu. Pasang unit, kabel ke switch VLAN %d, nyalakan PDU, lalu pastikan reachable dari gateway. Kontrak $%d tiap %d detik selama %d detik.",
+			clientName,
+			vlanId,
+			reward,
+			colo.payoutIntervalSeconds,
+			colo.runtimeSeconds
+		),
+		requirements = { vlanId = vlanId, ip = ip },
+		rewardPayout = reward,
+		payoutIntervalSec = colo.payoutIntervalSeconds,
+		slaRemainingSec = nil,
+		runtimeRemainingSec = nil,
+		vlanId = vlanId,
+		targetIp = ip,
+		phase = nil,
+		validationText = "Terima kontrak untuk memanggil crate ke dock",
+		targetDeviceId = nil,
+		targetRackId = nil,
+		targetUSlot = nil,
+		status = "Available" :: TicketStatus,
+		requirementsText = string.format(
+			"Mount crate %dU di rack, kabel ke switch VLAN %d, PDU ON, ping dari gateway OK. SLA %d detik.",
+			colo.uSize,
+			vlanId,
+			colo.slaSeconds
+		),
+	}
+	return ticket
+end
+
+--[[ Top up Available tickets, always filling the category with the fewest
+	 Available rows so the three pillars rotate naturally. ]]
 local function generateTickets(session: SessionLike)
-	local available: { [string]: number } = { CloudVPS = 0, CustomBuild = 0 }
+	local available: { [string]: number } = { CloudVPS = 0, Colocation = 0, CustomBuild = 0 }
 	for _, t in ipairs(session.tickets) do
-		if t.status == "Available" and (t.category == "CloudVPS" or t.category == "CustomBuild") then
+		if t.status == "Available" and available[t.category] ~= nil then
 			available[t.category] += 1
 		end
 	end
 
-	local totalAvailable = available.CloudVPS + available.CustomBuild
+	local totalAvailable = available.CloudVPS + available.Colocation + available.CustomBuild
 	while totalAvailable < MAX_AVAILABLE_TICKETS do
-		local category: TicketCategory = if available.CloudVPS <= available.CustomBuild
-			then "CloudVPS"
-			else "CustomBuild"
-		local ticket = if category == "CloudVPS" then makeCloudVPSTicket() else makeCustomBuildTicket()
+		local category = CATEGORY_ORDER[1]
+		local lowest = available[category]
+		for _, candidate in ipairs(CATEGORY_ORDER) do
+			if available[candidate] < lowest then
+				lowest = available[candidate]
+				category = candidate
+			end
+		end
+
+		local ticket: TicketRow
+		if category == "CloudVPS" then
+			ticket = makeCloudVPSTicket()
+		elseif category == "Colocation" then
+			ticket = makeColocationTicket()
+		else
+			ticket = makeCustomBuildTicket()
+		end
 		table.insert(session.tickets, ticket)
 		available[category] += 1
 		totalAvailable += 1
 	end
 end
+
+---------------------------------------------------------------------
+-- Validation
+---------------------------------------------------------------------
 
 --[[ CloudVPS done when a powered BareMetal with an OS hosts a big-enough VM. ]]
 local function cloudVPSComplete(session: SessionLike, requirements: any): boolean
@@ -7045,6 +8356,69 @@ local function cloudVPSComplete(session: SessionLike, requirements: any): boolea
 	return false
 end
 
+--[[ Keep a finished row visible for one or two syncs, then remove it. ]]
+local function scheduleRemoval(session: SessionLike, ticketId: string)
+	local player = session.player
+	task.delay(COMPLETED_LINGER_SECONDS, function()
+		if sessions.GetSession(player) ~= session then
+			return
+		end
+		for idx = #session.tickets, 1, -1 do
+			local row = session.tickets[idx]
+			if row.id == ticketId and (row.status == "Completed" or row.status == "Failed") then
+				table.remove(session.tickets, idx)
+			end
+		end
+	end)
+end
+
+local function completeColocation(session: SessionLike, ticket: any)
+	ticket.status = "Completed"
+	ticket.phase = "closed"
+	ticket.validationText = "Kontrak selesai - klien mengambil server"
+	session.reputation += 2
+	playSFX(session, "cash")
+	sendHint(session, string.format("Kontrak colocation selesai: %s (semua payout sudah dibayar)", ticket.title))
+	local coloCleanup = constants.COLOCATION.cleanupDelaySeconds
+	task.delay(coloCleanup, function()
+		if sessions.GetSession(session.player) == session then
+			if carry ~= nil then
+				carry.CleanupTicket(session, ticket)
+			end
+		end
+	end)
+	scheduleRemoval(session, ticket.id)
+end
+
+--[[ Counts down a non-colocation SLA. Returns true when it just expired. ]]
+local function tickSla(ticket: any): boolean
+	if ticket.slaRemainingSec == nil then
+		ticket.slaRemainingSec = DEFAULT_SLA_SECONDS
+	end
+	ticket.slaRemainingSec = math.max(0, ticket.slaRemainingSec - LOOP_SECONDS)
+	return ticket.slaRemainingSec <= 0
+end
+
+local function failContract(session: SessionLike, ticket: any, reason: string)
+	ticket.status = "Failed"
+	ticket.validationText = reason
+	playSFX(session, "error")
+	sendHint(session, string.format("Kontrak gagal: %s (%s)", ticket.title, reason))
+	scheduleRemoval(session, ticket.id)
+end
+
+local function failColocation(session: SessionLike, ticket: any, reason: string)
+	ticket.status = "Failed"
+	ticket.phase = "closed"
+	ticket.validationText = reason
+	playSFX(session, "error")
+	sendHint(session, string.format("Kontrak colocation gagal: %s (%s)", ticket.title, reason))
+	if carry ~= nil then
+		carry.CleanupTicket(session, ticket)
+	end
+	scheduleRemoval(session, ticket.id)
+end
+
 --[[ Mark completed Active tickets, pay out, and schedule removal from the list. ]]
 local function validateActiveTickets(session: SessionLike)
 	for _, t in ipairs(session.tickets) do
@@ -7052,39 +8426,82 @@ local function validateActiveTickets(session: SessionLike)
 			continue
 		end
 
-		local done = false
 		if t.category == "CloudVPS" then
-			done = cloudVPSComplete(session, t.requirements)
+			if cloudVPSComplete(session, t.requirements) then
+				t.status = "Completed"
+				session.balance += t.rewardPayout
+				session.reputation += 1
+				playSFX(session, "cash")
+				sendHint(session, string.format("Kontrak selesai: %s +$%d", t.title, t.rewardPayout))
+				scheduleRemoval(session, t.id)
+			elseif tickSla(t) then
+				failContract(session, t, "SLA habis sebelum VM siap")
+				continue
+			else
+				t.validationText = string.format("Menunggu VM yang cocok - SLA %ds", t.slaRemainingSec)
+			end
 		elseif t.category == "CustomBuild" then
 			-- session.workbench is the live state source (deps.workbench is the
 			-- module handle kept for API compliance with the contract).
-			done = session.workbench.shipped == true
-		end
-
-		if done then
-			t.status = "Completed"
-			session.balance += t.rewardPayout
-			session.reputation += 1
-			playSFX(session, "cash")
-			sendHint(session, string.format("Kontrak selesai: %s +$%d", t.title, t.rewardPayout))
-
-			-- Keep the Completed row visible for one or two syncs, then remove it.
-			local ticketId = t.id
-			local player = session.player
-			task.delay(COMPLETED_LINGER_SECONDS, function()
-				if sessions.GetSession(player) ~= session then
-					return
+			if session.workbench.shipped == true then
+				t.status = "Completed"
+				session.balance += t.rewardPayout
+				session.reputation += 1
+				playSFX(session, "cash")
+				sendHint(session, string.format("Kontrak selesai: %s +$%d", t.title, t.rewardPayout))
+				scheduleRemoval(session, t.id)
+			elseif tickSla(t) then
+				failContract(session, t, "SLA habis sebelum build dikirim")
+				continue
+			else
+				t.validationText = string.format("Menunggu build dikirim - SLA %ds", t.slaRemainingSec)
+			end
+		elseif t.category == "Colocation" then
+			if t.phase == "running" then
+				t.runtimeRemainingSec = math.max(0, (t.runtimeRemainingSec or 0) - LOOP_SECONDS)
+				t.payoutTimer = (t.payoutTimer or 0) + LOOP_SECONDS
+				local interval = t.payoutIntervalSec or constants.COLOCATION.payoutIntervalSeconds
+				if t.payoutTimer >= interval then
+					t.payoutTimer -= interval
+					session.balance += t.rewardPayout
+					playSFX(session, "cash")
+					sendHint(session, string.format("%s: payout colocation +$%d", t.title, t.rewardPayout))
 				end
-				for idx = #session.tickets, 1, -1 do
-					local row = session.tickets[idx]
-					if row.id == ticketId and row.status == "Completed" then
-						table.remove(session.tickets, idx)
+				if t.runtimeRemainingSec <= 0 then
+					completeColocation(session, t)
+				else
+					t.validationText = string.format("Layanan jalan - sisa %d dtk", t.runtimeRemainingSec)
+				end
+			elseif t.status == "Active" then
+				if t.slaRemainingSec == nil then
+					t.slaRemainingSec = constants.COLOCATION.slaSeconds
+				end
+				t.slaRemainingSec = math.max(0, t.slaRemainingSec - LOOP_SECONDS)
+				if t.slaRemainingSec <= 0 then
+					failColocation(session, t, "SLA habis sebelum server valid")
+					continue
+				end
+				if carry ~= nil then
+					local ready, message = carry.EvaluateColo(session, t)
+					t.validationText = message
+					if ready then
+						t.phase = "running"
+						t.runtimeRemainingSec = constants.COLOCATION.runtimeSeconds
+						t.payoutTimer = 0
+						playSFX(session, "cash")
+						sendHint(session, string.format("Colocation aktif: %s - payout tiap %d dtk", t.title, t.payoutIntervalSec or 10))
+					elseif t.phase == "mounted" and t.slaRemainingSec <= 30 then
+						sendHint(session, string.format("SLA %s tinggal %d dtk: %s", t.title, t.slaRemainingSec, message))
 					end
 				end
-			end)
+			end
 		end
 	end
 end
+
+---------------------------------------------------------------------
+-- Accept
+---------------------------------------------------------------------
 
 --[[ ContractActionRemote handler: {action="accept", ticketId} -> Available -> Active. ]]
 local function onAccept(player: Player, payload: any)
@@ -7115,7 +8532,39 @@ local function onAccept(player: Player, payload: any)
 		if t.id == ticketId and t.status == "Available" then
 			t.status = "Active"
 			playSFX(session, "key")
-			sendHint(session, "Kontrak diterima: " .. t.title)
+
+			if t.category == "Colocation" then
+				t.phase = "delivery"
+				t.slaRemainingSec = constants.COLOCATION.slaSeconds
+				t.runtimeRemainingSec = constants.COLOCATION.runtimeSeconds
+				t.validationText = "Crate sedang dikirim ke dock"
+				local delivery = constants.COLOCATION.deliveryDelaySeconds
+				task.delay(delivery, function()
+					if sessions.GetSession(player) ~= session then
+						return
+					end
+					local live: any? = nil
+					for _, row in ipairs(session.tickets) do
+						if row.id == ticketId and row.status == "Active" then
+							live = row
+							break
+						end
+					end
+					if live == nil then
+						return
+					end
+					if carry ~= nil then
+						carry.SpawnCrate(session, live)
+					end
+					live.phase = "crate"
+					live.validationText = "Angkat crate di dock, lalu pasang di rack"
+				end)
+				sendHint(session, string.format("Kontrak colocation diterima: %s. Crate tiba %d detik lagi.", t.title, delivery))
+			else
+				t.slaRemainingSec = DEFAULT_SLA_SECONDS
+				t.validationText = "Kontrak aktif - selesaikan sebelum SLA habis"
+				sendHint(session, string.format("Kontrak diterima: %s (SLA %d dtk)", t.title, DEFAULT_SLA_SECONDS))
+			end
 			return
 		end
 	end
@@ -7138,12 +8587,13 @@ function ContractAndIncidentManager.Init(deps: { [string]: any })
 	constants = deps.constants
 	remotesFolder = deps.remotesFolder
 	workbench = deps.workbench
+	carry = deps.carry
 	getRemotes()
 	bindAccept()
 end
 
---[[ Main loop: every 10s per session, top up Available tickets and validate
-	 Active tickets. (Incident generation/SLA countdown joins this loop in Fase 3.) ]]
+--[[ Main loop: every 5s per session, top up Available tickets and validate
+	 Active tickets. (Incident generation joins this loop in Fase 3.) ]]
 function ContractAndIncidentManager.Start()
 	bindAccept()
 	task.spawn(function()
@@ -7170,13 +8620,13 @@ return ContractAndIncidentManager
 ]]></ProtectedString>
 </Properties>
 </Item>
-<Item class="ModuleScript" referent="RBX26">
+<Item class="ModuleScript" referent="RBX27">
 <Properties>
 <string name="Name">DataPersistenceManager</string>
 <ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	DataPersistenceManager (ModuleScript, ServerScriptService/Gameplay)
-	AGENT C - Fase 1.
+	AGENT C - Fase 1 + 2.
 
 	DataStore "NetSimDC_v1", key "lab_"..UserId. Every DataStore access is
 	wrapped in pcall; if GetDataStore itself fails, a session-independent flag
@@ -7190,29 +8640,31 @@ return ContractAndIncidentManager
 	this module only provides the autosave loop (Start, every 120s).
 
 	Saved payload:
-	  balance, reputation,
+	  balance, reputation, cableSpools, selectedCableColor,
+	  racks = freeform racks (item, world position, rotation, PDU state),
 	  devices  = array over session.devices EXCEPT "isp_uplink":
-	             { id, itemId, freeform, posX, posZ, rotY, rackId, uSlot, ip,
-	               gateway, subnetMask, osInstalled, isPowered,
-	               ports = { [portId] = { peer, peerPort, color } } (connected only),
+	             { id, name, itemId, deviceType, contractId, freeform, posX,
+	               posZ, rotY, rackId, uSlot, ip, gateway, subnetMask,
+	               osInstalled, isPowered,
+	               ports = { [portId] = { peer?, peerPort?, color?, vlan } },
 	               vms = { VMData... } }
 	             "bench_1" saves PORTS ONLY (the workbench payload covers the
 	             node itself; ports must survive for the link pass).
 	  workbench = WorkbenchBuilderSystem.Serialize(session)
-	  tickets   = Active tickets: { id, category, title, description,
-	              rewardPayout, requirements (cpu/ram/disk or nil), status,
-	              requirementsText, clientName }
+	  tickets   = Active CloudVPS/CustomBuild tickets (Colocation contracts are
+	              short-lived and reference a physical crate, so they are not
+	              persisted; mounted servers are saved as rack devices).
 
 	Apply(session, data):
 	  loadedFromSave = true FIRST (suppresses AutoCable during restore) ->
-	  balance/reputation -> starter device config (bm_starter_1, sw_main_1,
-	  isp_router_1: ip/gateway/mask/os/power/vms + vmIpCounter rebuild) ->
+	  balance/reputation/cable inventory -> freeform racks restored ->
+	  starter device config (bm_starter_1, sw_main_1, isp_router_1) ->
 	  freeform devices re-placed via PlacementSystem.PlaceDevice(config) ->
+	  rack devices re-mounted via PlacementSystem.MountDevice(config) ->
 	  workbench.ApplyState (so bench_1 exists before cables) -> link pass
 	  (graph.ConnectPorts per saved peer, deduped by sorted "dev|port" pair,
-	  covers starter + bench + placed links) -> tickets restore (Available stays
-	  Available, Active stays Active) -> loadedFromSave = false ->
-	  graph.UpdateDeviceLED for all devices -> ForceSync snapshot.
+	  covers starter + bench + placed links) -> VLAN restore -> tickets
+	  restore -> loadedFromSave = false -> graph.UpdateDeviceLED -> ForceSync.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7334,14 +8786,16 @@ function DataPersistenceManager.Save(session: SessionLike)
 			continue -- ISP uplink is rebuilt fresh by BuildFacility every join
 		end
 
-		-- ports: only currently connected links are persisted
+		-- ports: connected links plus non-default VLANs (Fase 2 switch config)
 		local ports: { [string]: { [string]: any } } = {}
 		for portId, port in pairs(node.ports) do
-			if port.connectedToDeviceId ~= nil then
+			if port.connectedToDeviceId ~= nil or port.vlanId ~= 1 or port.isTrunk == true then
 				ports[portId] = {
 					peer = port.connectedToDeviceId,
 					peerPort = port.connectedToPortId,
 					color = port.cableColor,
+					vlan = port.vlanId,
+					trunk = port.isTrunk == true,
 				}
 			end
 		end
@@ -7362,7 +8816,10 @@ function DataPersistenceManager.Save(session: SessionLike)
 
 		table.insert(devices, {
 			id = id,
+			name = node.name,
 			itemId = node.itemId,
+			deviceType = node.deviceType,
+			contractId = node.contractId,
 			freeform = node.freeform == true,
 			posX = node.posX,
 			posZ = node.posZ,
@@ -7379,9 +8836,32 @@ function DataPersistenceManager.Save(session: SessionLike)
 		})
 	end
 
+	-- Freeform racks (the starter rack is rebuilt by WorldAndAssetBuilder).
+	local racks: { any } = {}
+	for rackId, rack in pairs(session.racks) do
+		if rackId ~= "rack_main_1" then
+			local model = session.rackModels[rackId]
+			if model ~= nil then
+				local cf = model:GetPivot()
+				local _rx, rotY, _rz = cf:ToOrientation()
+				table.insert(racks, {
+					rackId = rackId,
+					itemId = rack.itemId,
+					posX = cf.Position.X,
+					posZ = cf.Position.Z,
+					rotY = rotY,
+					pduPowered = rack.pduPowered == true,
+				})
+			end
+		end
+	end
+
 	local tickets: { any } = {}
 	for _, t in ipairs(session.tickets or {}) do
-		if t.status == "Active" then
+		-- Colocation contracts are short live sessions and reference a physical
+		-- crate; they are not persisted. The mounted server itself is saved as a
+		-- normal rack device above.
+		if t.status == "Active" and t.category ~= "Colocation" then
 			table.insert(tickets, {
 				id = t.id,
 				category = t.category,
@@ -7400,6 +8880,9 @@ function DataPersistenceManager.Save(session: SessionLike)
 		balance = session.balance,
 		reputation = session.reputation,
 		devices = devices,
+		racks = racks,
+		cableSpools = session.cableSpools,
+		selectedCableColor = session.selectedCableColor,
 		workbench = (workbench ~= nil and type(workbench.Serialize) == "function") and workbench.Serialize(session) or nil,
 		tickets = tickets,
 	}
@@ -7472,12 +8955,30 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 		session.reputation = tonumber(data.reputation) :: number
 	end
 
-	-- saved device id -> live device id (starters keep their fixed ids)
+	-- Fase 2 cable inventory.
+	if type(data.cableSpools) == "table" then
+		for _, color in ipairs(constants.CABLES.colors) do
+			local count = tonumber(data.cableSpools[color])
+			if count ~= nil then
+				session.cableSpools[color] = math.max(0, math.floor(count))
+			end
+		end
+	end
+	if type(data.selectedCableColor) == "string" then
+		for _, color in ipairs(constants.CABLES.colors) do
+			if color == data.selectedCableColor then
+				session.selectedCableColor = color
+			end
+		end
+	end
+
+	-- saved device / rack id -> live id (starters keep their fixed ids)
 	local restoredIds: { [string]: string } = {
 		[ISP_ID] = ISP_ID,
 		["isp_router_1"] = "isp_router_1",
 		["sw_main_1"] = "sw_main_1",
 		["bm_starter_1"] = "bm_starter_1",
+		["rack_main_1"] = "rack_main_1",
 		[BENCH_ID] = BENCH_ID,
 	}
 	local starterSet: { [string]: boolean } = {
@@ -7488,7 +8989,30 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 
 	local savedDevices: { any } = if type(data.devices) == "table" then data.devices else {}
 
-	-- 1) Starter device config + freeform device re-placement.
+	-- 0) Freeform racks must exist before their mounted devices are restored.
+	if type(data.racks) == "table" and placement ~= nil then
+		for _, entry in ipairs(data.racks) do
+			if type(entry) ~= "table" or type(entry.rackId) ~= "string" or type(entry.itemId) ~= "string" then
+				continue
+			end
+			if entry.rackId == "rack_main_1" then
+				continue
+			end
+			local posX = tonumber(entry.posX) or 0
+			local posZ = tonumber(entry.posZ) or 0
+			local rotY = tonumber(entry.rotY) or 0
+			local ok, newRackId = pcall(function()
+				return placement.RestoreRack(session, entry.itemId :: string, posX, posZ, rotY, entry.pduPowered == true)
+			end)
+			if ok and type(newRackId) == "string" and newRackId ~= "" then
+				restoredIds[entry.rackId] = newRackId
+			else
+				warn("[DataPersistenceManager] could not restore rack '" .. entry.rackId .. "'")
+			end
+		end
+	end
+
+	-- 1) Starter device config + freeform / rack-mounted device re-placement.
 	for _, entry in ipairs(savedDevices) do
 		if type(entry) ~= "table" or type(entry.id) ~= "string" then
 			continue
@@ -7566,9 +9090,34 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 			else
 				warn("[DataPersistenceManager] could not restore device '" .. savedId .. "' (" .. tostring(entry.itemId) .. ")")
 			end
+		elseif type(entry.rackId) == "string" and entry.uSlot ~= nil and type(entry.itemId) == "string" and placement ~= nil then
+			-- Fase 2: rack-mounted devices (colocation servers, purchased units)
+			local rackId = restoredIds[entry.rackId] or entry.rackId
+			if session.racks[rackId] == nil then
+				warn("[DataPersistenceManager] missing rack '" .. tostring(entry.rackId) .. "' for device '" .. savedId .. "'")
+				continue
+			end
+			local ok, mounted, result = pcall(placement.MountDevice, session, entry.itemId, rackId, entry.uSlot, {
+				name = entry.name,
+				deviceType = entry.deviceType,
+				ip = entry.ip,
+				gateway = entry.gateway,
+				subnetMask = entry.subnetMask,
+				osInstalled = entry.osInstalled,
+				isPowered = if entry.isPowered ~= nil then entry.isPowered == true else nil,
+				contractId = entry.contractId,
+				noAutoCable = true,
+			})
+			if ok and mounted == true then
+				restoredIds[savedId] = result
+				local node = session.devices[result]
+				if node ~= nil then
+					restoreVMs(session, node, result, entry.vms)
+				end
+			else
+				warn("[DataPersistenceManager] could not restore rack device '" .. savedId .. "': " .. tostring(result))
+			end
 		else
-			-- Rack-mounted non-starter devices cannot be re-mounted in Fase 1
-			-- (carry & mount is Fase 2); recorded as a known limitation.
 			warn("[DataPersistenceManager] skipping non-restorable device '" .. savedId .. "'")
 		end
 	end
@@ -7608,6 +9157,29 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 					-- Mostly benign: pre-wired starter links (wan1<->isp_uplink)
 					-- already exist from BuildFacility and are rejected here.
 					_ = err
+				end
+			end
+		end
+	end
+
+	-- 3b) VLAN restore: applies to connected and unconnected ports alike.
+	for _, entry in ipairs(savedDevices) do
+		if type(entry) ~= "table" or type(entry.id) ~= "string" or type(entry.ports) ~= "table" then
+			continue
+		end
+		local devA = restoredIds[entry.id]
+		if devA == nil then
+			continue
+		end
+		for portA, conn in pairs(entry.ports :: { [string]: any }) do
+			if type(conn) == "table" and type(portA) == "string" then
+				if tonumber(conn.vlan) ~= nil then
+					local okVlan = graph.SetPortVlan(session, devA, portA, tonumber(conn.vlan) :: number)
+					_ = okVlan
+				end
+				if conn.trunk == true then
+					local okTrunk = graph.SetPortTrunk(session, devA, portA, true)
+					_ = okTrunk
 				end
 			end
 		end
@@ -7689,15 +9261,15 @@ return DataPersistenceManager
 </Item>
 </Item>
 </Item>
-<Item class="StarterPlayer" referent="RBX27">
+<Item class="StarterPlayer" referent="RBX28">
 <Properties>
 <string name="Name">StarterPlayer</string>
 </Properties>
-<Item class="StarterPlayerScripts" referent="RBX28">
+<Item class="StarterPlayerScripts" referent="RBX29">
 <Properties>
 <string name="Name">StarterPlayerScripts</string>
 </Properties>
-<Item class="LocalScript" referent="RBX29">
+<Item class="LocalScript" referent="RBX30">
 <Properties>
 <string name="Name">TerminalClient</string>
 <bool name="Disabled">false</bool>
@@ -7931,6 +9503,8 @@ local MAX_BUFFER_LINES = 500
 local COMMANDS = {
 	"help", "clear", "close", "ping", "traceroute", "ip a", "ip set", "ssh", "exit",
 	"top", "vm create", "vm list", "vm throttle", "vm delete", "install-os", "stress-test", "ship",
+	"vlan list", "vlan set", "switch port", "switch list",
+	"cable", "cable use", "cable buy", "cable cut", "mount list", "mount",
 }
 
 local function scrollToEnd()
@@ -8315,7 +9889,7 @@ appendLines({
 ]]></ProtectedString>
 </Properties>
 </Item>
-<Item class="LocalScript" referent="RBX30">
+<Item class="LocalScript" referent="RBX31">
 <Properties>
 <string name="Name">NOCMonitorClient</string>
 <bool name="Disabled">false</bool>
@@ -8387,6 +9961,10 @@ type SnapTicket = {
 	rewardPayout: number,
 	status: string,
 	requirementsText: string,
+	slaRemainingSec: number?,
+	payoutIntervalSec: number?,
+	validationText: string?,
+	vlanId: number?,
 }
 
 type FacilitySnapshot = {
@@ -8902,7 +10480,7 @@ local function updateTickets(snap: FacilitySnapshot)
 			local isActive = ticket.status == "Active"
 			local row = Instance.new("Frame")
 			row.Name = "Ticket_" .. tostring(ticket.id)
-			row.Size = UDim2.new(1, -6, 0, 30)
+			row.Size = UDim2.new(1, -6, 0, 40)
 			row.BackgroundColor3 = COLOR_ROW
 			row.BorderSizePixel = 0
 			row.LayoutOrder = order
@@ -8934,6 +10512,38 @@ local function updateTickets(snap: FacilitySnapshot)
 			subLabel.TextXAlignment = Enum.TextXAlignment.Left
 			subLabel.Text = NetworkUtils.FormatCurrency(ticket.rewardPayout or 0) .. "  -  " .. tostring(ticket.category)
 			subLabel.Parent = row
+
+			local statusBits: { string } = {}
+			local running = false
+			if isActive then
+				if ticket.category == "Colocation" and ticket.vlanId ~= nil then
+					table.insert(statusBits, "VLAN " .. tostring(ticket.vlanId))
+				end
+				local note = ticket.validationText or ""
+				running = string.find(note, "Layanan jalan") ~= nil
+				if ticket.slaRemainingSec ~= nil and ticket.slaRemainingSec > 0 and not running then
+					table.insert(statusBits, string.format("SLA %ds", ticket.slaRemainingSec))
+				end
+				if note ~= "" then
+					table.insert(statusBits, note)
+				end
+			else
+				table.insert(statusBits, ticket.requirementsText or "")
+			end
+			if #statusBits > 0 then
+				local statusLabel = Instance.new("TextLabel")
+				statusLabel.Name = "TicketStatus"
+				statusLabel.Size = UDim2.new(1, -66, 0, 10)
+				statusLabel.Position = UDim2.new(0, 6, 0, 28)
+				statusLabel.BackgroundTransparency = 1
+				statusLabel.Font = Enum.Font.Gotham
+				statusLabel.TextSize = 10
+				statusLabel.TextColor3 = if running then COLOR_GREEN else COLOR_GREY
+				statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+				statusLabel.TextTruncate = Enum.TextTruncate.AtEnd
+				statusLabel.Text = table.concat(statusBits, "  |  ")
+				statusLabel.Parent = row
+			end
 
 			if isActive then
 				local activeLabel = Instance.new("TextLabel")
@@ -9151,7 +10761,7 @@ end)
 ]]></ProtectedString>
 </Properties>
 </Item>
-<Item class="LocalScript" referent="RBX31">
+<Item class="LocalScript" referent="RBX32">
 <Properties>
 <string name="Name">CatalogAndBuilderClient</string>
 <bool name="Disabled">false</bool>
@@ -9161,12 +10771,13 @@ end)
 	Hardware Store (tombol keyboard B / tombol "STORE [B]" di HUD via BindableEvent
 	"NetSimToggleStore" yang dibuat script ini) + ghost placement mode.
 
-	Store 620x420 center: kolom kategori (Rack/Network/Server/Component dari
+	Store 740x470 center: kolom kategori (Rack/Network/Server/Component/Cable dari
 	HardwareCatalog.StoreCategories), daftar item (nama/harga/specs + tombol BELI),
 	dan panel kanan "PANDUAN BUILD".
 
 	Buy behavior (CONTRACT.md Section 3, PurchaseHardwareRemote):
 	- Component -> FireServer(itemId, "buy")
+	- Cable spool -> FireServer(itemId, "buy") (server menambah 5 kabel)
 	- Placeable (Rack/Network/Server) -> FireServer(itemId, "prepare") lalu ghost mode:
 	  RenderStepped mouse raycast (player:GetMouse(), TargetFilter=ghost), snap 2-grid
 	  relatif PLOT_POSITIONS[ownPlotIndex], validasi lokal = bounds + furniture zones
@@ -9269,6 +10880,8 @@ local function specsLine(def: any): string
 		return string.format("%d RJ45  -  %d WAN  -  %d SFP  -  %dW", s.ports or 0, s.wanPorts or 0, s.sfpPorts or 0, s.powerWatts or 0)
 	elseif def.category == "Server" then
 		return string.format("%d vCPU  -  %dGB RAM  -  %dGB Disk  -  %dW", s.cpu or 0, s.ram or 0, s.disk or 0, s.powerWatts or 0)
+	elseif def.category == "Cable" then
+		return string.format("1 spool = %d kabel  -  klik dua port untuk pasang", PlotConstants.CABLES.spoolYield)
 	end
 	-- Components
 	if string.sub(id, 1, 8) == "chassis_" then
@@ -9555,6 +11168,10 @@ onBuy = function(def: any)
 		-- Components go straight to the workbench (server validates order + proximity)
 		purchaseRemote:FireServer(def.id, "buy")
 		showStatus("Komponen dibeli: " .. tostring(def.name) .. " (pasang di bench)")
+	elseif def.category == "Cable" then
+		-- Fase 2: a spool fills the matching cable inventory server-side.
+		purchaseRemote:FireServer(def.id, "buy")
+		showStatus("Spool dibeli: " .. tostring(def.name) .. " (+" .. tostring(PlotConstants.CABLES.spoolYield) .. " kabel)")
 	else
 		if lastBalance ~= nil and lastBalance < (def.price or 0) then
 			showStatus("Saldo tidak cukup untuk " .. tostring(def.name))
@@ -9855,7 +11472,7 @@ selectCategory("Rack")
 ]]></ProtectedString>
 </Properties>
 </Item>
-<Item class="LocalScript" referent="RBX32">
+<Item class="LocalScript" referent="RBX33">
 <Properties>
 <string name="Name">HudClient</string>
 <bool name="Disabled">false</bool>
@@ -10094,9 +11711,11 @@ hintLabel.Parent = gui
 local TIPS = {
 	"Tekan [~] atau [F2] untuk buka / tutup Terminal (klik X [~] juga bisa)",
 	"Tekan [B] untuk buka / tutup Hardware Store",
-	"Pegang Laptop [1] lalu dekati device + tekan [E] = Kabel Console",
+	"Pegang TechnicianLaptop (hotbar) lalu dekati device + tekan [E] = Kabel Console",
 	"Klik 2 port berbeda untuk kabel LAN | Klik port terhubung = cabut",
 	"Mode placement: [R] Putar 90 deg | Klik Kiri = Pasang | Klik Kanan/[Esc] = Batal",
+	"Kabel berwarna: port WAN otomatis pakai spool kuning, port data pakai biru/merah",
+	"Colocation: terima kontrak, angkat crate di dock, mount ke rack, atur VLAN + PDU",
 }
 local tipIndex = 1
 local priorityActive = false
@@ -10211,7 +11830,7 @@ end)
 ]]></ProtectedString>
 </Properties>
 </Item>
-<Item class="LocalScript" referent="RBX33">
+<Item class="LocalScript" referent="RBX34">
 <Properties>
 <string name="Name">AudioAndEffectsClient</string>
 <bool name="Disabled">false</bool>
@@ -10356,17 +11975,17 @@ scanPlayerGui()
 </Item>
 </Item>
 </Item>
-<Item class="StarterPack" referent="RBX34">
+<Item class="StarterPack" referent="RBX35">
 <Properties>
 <string name="Name">StarterPack</string>
 </Properties>
 </Item>
-<Item class="StarterGui" referent="RBX35">
+<Item class="StarterGui" referent="RBX36">
 <Properties>
 <string name="Name">StarterGui</string>
 </Properties>
 </Item>
-<Item class="Players" referent="RBX36">
+<Item class="Players" referent="RBX37">
 <Properties>
 <string name="Name">Players</string>
 </Properties>

@@ -70,6 +70,7 @@ function SessionManager.CreateSession(player: Player, plotIndex: number): any
 		pendingCableDeviceId = nil,
 		pendingCablePortId = nil,
 		pendingCableHighlight = nil,
+		pendingCableColor = nil,
 		consoleLink = nil,
 		pendingPlacementItemId = nil,
 		workbench = {
@@ -108,6 +109,15 @@ function SessionManager.CreateSession(player: Player, plotIndex: number): any
 		loadedFromSave = false,
 		noSaveWarned = false,
 		tickets = {}, -- ContractTicket-like rows (filled by ContractAndIncidentManager)
+		cableSpools = {
+			LAN_Blue = Constants.CABLES.starter.LAN_Blue,
+			WAN_Yellow = Constants.CABLES.starter.WAN_Yellow,
+			Mgmt_Red = Constants.CABLES.starter.Mgmt_Red,
+		},
+		selectedCableColor = "LAN_Blue",
+		carry = nil,
+		colocation = { crates = {}, byTicket = {} },
+		rackSlots = {},
 	}
 	Sessions[player] = session
 	UsedPlots[plotIndex] = player
@@ -130,6 +140,10 @@ function SessionManager.DeleteSession(player: Player)
 		session.consoleLink.beam:Destroy()
 	end
 	session.consoleLink = nil
+	if session.carry ~= nil and session.carry.conn ~= nil then
+		session.carry.conn:Disconnect()
+	end
+	session.carry = nil
 	local facility = session.facility
 	if facility ~= nil and facility.root ~= nil then
 		facility.root:Destroy()

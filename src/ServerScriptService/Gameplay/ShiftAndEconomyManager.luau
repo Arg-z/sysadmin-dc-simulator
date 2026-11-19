@@ -306,6 +306,10 @@ function ShiftAndEconomyManager.BuildSnapshot(session: SessionLike): FacilitySna
 			rewardPayout = t.rewardPayout,
 			status = t.status,
 			requirementsText = t.requirementsText or "",
+			slaRemainingSec = t.slaRemainingSec,
+			payoutIntervalSec = t.payoutIntervalSec,
+			validationText = t.validationText or "",
+			vlanId = t.vlanId,
 		})
 	end
 

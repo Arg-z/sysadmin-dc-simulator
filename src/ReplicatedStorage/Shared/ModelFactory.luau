@@ -1160,6 +1160,79 @@ function ModelFactory.BuildLaptop(): Tool
 	return tool
 end
 
+--[[
+	BuildWireCutter: gunting kabel teknisi (grip hitam + rahang oranye).
+	Equipped: klik port yang tersambung untuk memotong kabel.
+]]
+function ModelFactory.BuildWireCutter(): Tool
+	local tool = Instance.new("Tool")
+	tool.Name = "WireCutter"
+	tool.ToolTip = "Klik port tersambung untuk memotong kabel"
+	tool.CanBeDropped = false
+
+	local handle = newPart({
+		name = "Handle",
+		size = Vector3.new(0.28, 1.35, 0.28),
+		cf = CFrame.new(0, 0, 0),
+		color = Color3.fromRGB(34, 40, 50),
+		material = Enum.Material.Rubber,
+		anchored = false,
+		canCollide = false,
+	})
+	handle.Parent = tool
+	tool.Grip = CFrame.new(0, -0.15, 0.2)
+	tool.GripPos = Vector3.new(0, -0.15, 0.2)
+
+	-- Pivot bolt + two jaw halves at the head of the tool.
+	local bolt = newPart({
+		name = "PivotBolt",
+		size = Vector3.new(0.34, 0.18, 0.34),
+		cf = CFrame.new(0, 0.78, 0),
+		color = ALU_LIGHT,
+		shape = "Cylinder",
+		anchored = false,
+		canCollide = false,
+	})
+	bolt.Parent = tool
+	local weldBolt = Instance.new("WeldConstraint")
+	weldBolt.Part0 = handle
+	weldBolt.Part1 = bolt
+	weldBolt.Parent = handle
+
+	for side = -1, 1, 2 do
+		local jaw = newPart({
+			name = "Jaw",
+			size = Vector3.new(0.16, 0.62, 0.22),
+			cf = CFrame.new(side * 0.18, 1.14, 0) * CFrame.Angles(0, 0, math.rad(side * -14)),
+			color = Color3.fromRGB(240, 120, 44),
+			material = Enum.Material.Metal,
+			anchored = false,
+			canCollide = false,
+		})
+		jaw.Parent = tool
+		local weldJaw = Instance.new("WeldConstraint")
+		weldJaw.Part0 = handle
+		weldJaw.Part1 = jaw
+		weldJaw.Parent = handle
+	end
+
+	local light = neon({
+		name = "CutterLED",
+		size = Vector3.new(0.1, 0.1, 0.1),
+		cf = CFrame.new(0, 0.55, 0.16),
+		color = CYAN_ACCENT,
+		anchored = false,
+		canCollide = false,
+	})
+	light.Parent = tool
+	local weldLight = Instance.new("WeldConstraint")
+	weldLight.Part0 = handle
+	weldLight.Part1 = light
+	weldLight.Parent = handle
+
+	return tool
+end
+
 function ModelFactory.BuildCrate(label: string): Model
 	local model = Instance.new("Model")
 	model.Name = "Crate"

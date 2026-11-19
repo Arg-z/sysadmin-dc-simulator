@@ -228,6 +228,8 @@ local MAX_BUFFER_LINES = 500
 local COMMANDS = {
 	"help", "clear", "close", "ping", "traceroute", "ip a", "ip set", "ssh", "exit",
 	"top", "vm create", "vm list", "vm throttle", "vm delete", "install-os", "stress-test", "ship",
+	"vlan list", "vlan set", "switch port", "switch list",
+	"cable", "cable use", "cable buy", "cable cut", "mount list", "mount",
 }
 
 local function scrollToEnd()

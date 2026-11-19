@@ -220,7 +220,7 @@ addItem({
 	category = "Cable",
 	price = 15,
 	uSize = 0,
-	description = "Kabel patch LAN biru (Fase 2: manual cabling).",
+	description = "Kabel patch LAN biru. Satu spool = 5 kabel RJ45/SFP.",
 	specs = {},
 	visualColor = Color3.fromRGB(70, 130, 255),
 })
@@ -230,7 +230,7 @@ addItem({
 	category = "Cable",
 	price = 15,
 	uSize = 0,
-	description = "Kabel WAN kuning (Fase 2: manual cabling).",
+	description = "Kabel WAN kuning untuk uplink router. Satu spool = 5 kabel.",
 	specs = {},
 	visualColor = Color3.fromRGB(240, 210, 70),
 })
@@ -240,7 +240,7 @@ addItem({
 	category = "Cable",
 	price = 15,
 	uSize = 0,
-	description = "Kabel management merah (Fase 2: manual cabling).",
+	description = "Kabel management merah untuk trunk/link khusus. Satu spool = 5 kabel.",
 	specs = {},
 	visualColor = Color3.fromRGB(230, 80, 80),
 })
@@ -259,7 +259,7 @@ function Catalog.IsPlaceable(itemId: string): boolean
 	return def.category == "Rack" or def.category == "Network" or def.category == "Server"
 end
 
-Catalog.StoreCategories = { "Rack", "Network", "Server", "Component" }
+Catalog.StoreCategories = { "Rack", "Network", "Server", "Component", "Cable" }
 
 function Catalog.ListByCategory(category: ItemCategory): { ItemDef }
 	local out: { ItemDef } = {}

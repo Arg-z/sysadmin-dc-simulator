@@ -20,6 +20,7 @@ export type PortData = {
 	cableColor: CableColorType?,
 	linkUp: boolean,
 	vlanId: number,
+	isTrunk: boolean?,
 	trafficLoadMbps: number,
 }
 
@@ -53,6 +54,8 @@ export type DeviceNode = {
 	gateway: string?,
 	subnetMask: string,
 	defaultVlan: number,
+	interVlanRouting: boolean?,
+	contractId: string?,
 	ports: { [string]: PortData },
 	specs: DeviceSpecs,
 	vms: { [string]: VMData },
@@ -92,6 +95,11 @@ export type ContractTicket = {
 	rewardPayout: number,
 	payoutIntervalSec: number?,
 	slaRemainingSec: number?,
+	runtimeRemainingSec: number?,
+	vlanId: number?,
+	targetIp: string?,
+	phase: string?,
+	validationText: string?,
 	targetDeviceId: string?,
 	targetRackId: string?,
 	targetUSlot: number?,
@@ -171,7 +179,7 @@ export type FacilitySnapshot = {
 	devices: { DeviceSnapshot },
 	vms: { { name: string, hostId: string, cpu: number, ram: number, disk: number, ip: string?, status: VMStatus, loadPercent: number } },
 	objectives: { [string]: boolean },
-	tickets: { { id: string, category: string, title: string, description: string, rewardPayout: number, status: string, requirementsText: string } },
+	tickets: { { id: string, category: string, title: string, description: string, rewardPayout: number, status: string, requirementsText: string, slaRemainingSec: number?, payoutIntervalSec: number?, validationText: string?, vlanId: number? } },
 }
 
 export type Session = {
@@ -202,6 +210,11 @@ export type Session = {
 	loadedFromSave: boolean,
 	noSaveWarned: boolean,
 	tickets: { any },
+	cableSpools: { [string]: number },
+	selectedCableColor: CableColorType,
+	carry: any?,
+	colocation: { [string]: any },
+	rackSlots: { [string]: any },
 }
 
 return nil

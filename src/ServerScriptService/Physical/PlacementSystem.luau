@@ -9,8 +9,9 @@
 	  DataPersistenceManager to restore saved devices (session.loadedFromSave
 	  suppresses auto-cabling; restored cables are linked explicitly)
 	- OnPurchase: PurchaseHardwareRemote dispatcher - "prepare"/"place"/
-	  "cancel" for placeables, "buy" for components (workbench), cable spools
-	  answered with a Fase 2 hint
+	  "cancel" for placeables, "buy" for components (workbench) and cable
+	  spools (Fase 2 inventory), plus MountDevice/UnmountDevice for the carry
+	  system and save restore.
 	All rejections reach the client as OpenTerminalEvent {action="hint"}.
 ]]
 
@@ -144,6 +145,155 @@ end
 -- Placement
 ---------------------------------------------------------------------
 
+--[[ Builds and registers one rack at the given world CFrame. Shared by the
+	 store placement flow and the save-restore path so both keep the same
+	 rack data, slot attachments and PDU hooks. Returns the new rack id. ]]
+local function createRack(session: any, itemId: string, snappedCF: CFrame, rotY: number): string
+	local def = Catalog.Get(itemId)
+	if def == nil then
+		return ""
+	end
+	local rackId = SessionManager.NextDeviceId(session, "rack")
+	local model, slots, pduPart = ModelFactory.BuildRack(itemId, rackId)
+	model:PivotTo(snappedCF * CFrame.Angles(0, rotY, 0))
+	model.Parent = session.facility.devices
+
+	session.racks[rackId] = {
+		rackId = rackId,
+		name = def.name,
+		itemId = itemId,
+		maxU = def.specs.maxU,
+		occupiedSlots = {},
+		totalPowerWatts = 0,
+		maxPowerWatts = def.specs.maxPowerWatts,
+		pduPowered = false,
+	}
+	session.rackModels[rackId] = model
+	session.rackSlots[rackId] = slots
+
+	session.facility.pduParts = session.facility.pduParts or {}
+	session.facility.pduParts[rackId] = pduPart
+	Cabling.HookFacility(session) -- wires the new PDU (guard attr skips old ones)
+	return rackId
+end
+
+--[[ Restores a rack saved by DataPersistenceManager (including PDU state). ]]
+function PlacementSystem.RestoreRack(session: any, itemId: string, posX: number, posZ: number, rotY: number, pduPowered: boolean): string
+	local rackId = createRack(session, itemId, CFrame.new(Vector3.new(posX, Constants.ROOM.floorTopY, posZ)), rotY)
+	local rack = session.racks[rackId]
+	if rack ~= nil then
+		rack.pduPowered = pduPowered
+	end
+	return rackId
+end
+
+--[[ First free contiguous U block of uSize (top slot number), or nil. ]]
+function PlacementSystem.FindFreeUSlot(session: any, rackId: string, uSize: number): number?
+	local rack = session.racks[rackId]
+	if rack == nil then
+		return nil
+	end
+	local size = math.max(1, math.floor(uSize))
+	for top = rack.maxU, size, -1 do
+		local free = true
+		for u = top - size + 1, top do
+			if rack.occupiedSlots[u] ~= nil then
+				free = false
+				break
+			end
+		end
+		if free then
+			return top
+		end
+	end
+	return nil
+end
+
+--[[ Mounts a catalog device into a rack U slot and registers its graph node.
+	 Used by the Fase 2 carry system, colocation delivery and save restore.
+	 config: { name?, deviceType?, ip?, gateway?, subnetMask?, osInstalled?,
+	           isPowered?, contractId?, noAutoCable?, idPrefix? }
+	 Returns (ok, deviceId or errorMessage). ]]
+function PlacementSystem.MountDevice(session: any, itemId: string, rackId: string, uSlot: number, config: any?): (boolean, string)
+	local def = Catalog.Get(itemId)
+	if def == nil then
+		return false, "Item tidak dikenal"
+	end
+	local rack = session.racks[rackId]
+	if rack == nil then
+		return false, "Rack tidak ditemukan"
+	end
+	local nodeSize = math.max(1, math.floor(def.uSize or 1))
+	if uSlot < nodeSize or uSlot > rack.maxU then
+		return false, "Slot U di luar batas rack"
+	end
+	for u = uSlot - nodeSize + 1, uSlot do
+		if rack.occupiedSlots[u] ~= nil then
+			return false, "Slot U" .. tostring(uSlot) .. " sudah terpakai"
+		end
+	end
+
+	local cfg = if type(config) == "table" then config else {}
+	local prefix = if type(cfg.idPrefix) == "string" then cfg.idPrefix else "srv"
+	local deviceId = SessionManager.NextDeviceId(session, prefix)
+	local model, _ports, _consoleAttach, _led, _smoke = ModelFactory.BuildDeviceModel(itemId, deviceId)
+	local slots = session.rackSlots[rackId]
+	local slot = if type(slots) == "table" then slots[uSlot] else nil
+	if slot ~= nil and slot:IsA("Attachment") then
+		model:PivotTo((slot :: Attachment).WorldCFrame * CFrame.new(0, 0, 0.95))
+	else
+		local rackModel = session.rackModels[rackId]
+		if rackModel ~= nil then
+			model:PivotTo(rackModel:GetPivot() * CFrame.new(0, 1.2, 0.2))
+		end
+	end
+	model.Parent = session.facility.devices
+
+	local node = Graph.DefaultNode(deviceId, if type(cfg.name) == "string" then cfg.name else def.name, itemId)
+	node.rackId = rackId
+	node.uSlot = uSlot
+	node.freeform = false
+	if type(cfg.deviceType) == "string" then
+		node.deviceType = cfg.deviceType
+	end
+	node.ip = cfg.ip
+	node.gateway = cfg.gateway
+	node.subnetMask = if type(cfg.subnetMask) == "string" then cfg.subnetMask else "255.255.255.0"
+	node.osInstalled = cfg.osInstalled
+	node.contractId = cfg.contractId
+	node.isPowered = if cfg.isPowered ~= nil then cfg.isPowered == true else rack.pduPowered
+
+	for u = uSlot - nodeSize + 1, uSlot do
+		rack.occupiedSlots[u] = deviceId
+	end
+	rack.totalPowerWatts += node.specs.powerWatts
+
+	Graph.RegisterDevice(session, node, model)
+	if cfg.noAutoCable ~= true and not session.loadedFromSave then
+		Graph.AutoCable(session, deviceId)
+	end
+	Cabling.HookDevice(session, deviceId)
+	return true, deviceId
+end
+
+--[[ Removes a rack-mounted device, frees its U block and adjusts rack power. ]]
+function PlacementSystem.UnmountDevice(session: any, deviceId: string)
+	local node = session.devices[deviceId]
+	if node == nil then
+		return
+	end
+	local rack = if node.rackId ~= nil then session.racks[node.rackId] else nil
+	if rack ~= nil and node.uSlot ~= nil then
+		for u = node.uSlot - node.uSize + 1, node.uSlot do
+			if rack.occupiedSlots[u] == deviceId then
+				rack.occupiedSlots[u] = nil
+			end
+		end
+		rack.totalPowerWatts = math.max(0, rack.totalPowerWatts - node.specs.powerWatts)
+	end
+	Graph.RemoveDevice(session, deviceId)
+end
+
 --[[
 	PlaceDevice(session, itemId, snappedCF, rotY, config?) -> id
 	Rack category: builds the rack model, session.racks entry (pduPowered =
@@ -161,27 +311,7 @@ function PlacementSystem.PlaceDevice(session: any, itemId: string, snappedCF: CF
 	end
 
 	if def.category == "Rack" then
-		local rackId = SessionManager.NextDeviceId(session, "rack")
-		local model, _slots, pduPart = ModelFactory.BuildRack(itemId, rackId)
-		model:PivotTo(snappedCF * CFrame.Angles(0, rotY, 0))
-		model.Parent = session.facility.devices
-
-		session.racks[rackId] = {
-			rackId = rackId,
-			name = def.name,
-			itemId = itemId,
-			maxU = def.specs.maxU,
-			occupiedSlots = {},
-			totalPowerWatts = 0,
-			maxPowerWatts = def.specs.maxPowerWatts,
-			pduPowered = false,
-		}
-		session.rackModels[rackId] = model
-
-		session.facility.pduParts = session.facility.pduParts or {}
-		session.facility.pduParts[rackId] = pduPart
-		Cabling.HookFacility(session) -- wires the new PDU (guard attr skips old ones)
-		return rackId
+		return createRack(session, itemId, snappedCF, rotY)
 	end
 
 	local deviceId = SessionManager.NextDeviceId(session, prefixFor(def))
@@ -248,7 +378,34 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 	end
 
 	if def.category == "Cable" then
-		hint(player, "Cable spools hadir di Fase 2. Fase 1 memakai auto-cable + klik dua port.")
+		if action ~= "buy" then
+			hint(player, "Kabel dibeli sebagai spool: tekan BELI pada kategori Cable.")
+			return
+		end
+		local color: string? = nil
+		for candidate, item in pairs(Constants.CABLES.itemByColor) do
+			if item == itemId then
+				color = candidate
+				break
+			end
+		end
+		if color == nil then
+			return
+		end
+		if session.balance < def.price then
+			hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
+			return
+		end
+		session.balance -= def.price
+		local current = tonumber(session.cableSpools[color]) or 0
+		session.cableSpools[color] = current + Constants.CABLES.spoolYield
+		playSFX(player, "cash")
+		hint(player, string.format(
+			"Spool %s dibeli: +%d kabel (stok %d).",
+			Constants.CABLES.labels[color] or color,
+			Constants.CABLES.spoolYield,
+			session.cableSpools[color]
+		))
 		return
 	end
 
