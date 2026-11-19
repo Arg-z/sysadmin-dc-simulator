@@ -34,6 +34,25 @@ local CYAN_ACCENT = Color3.fromRGB(44, 156, 208)
 local ESD_BLUE = Color3.fromRGB(52, 108, 160)
 local OAK_WOOD = Color3.fromRGB(176, 140, 100)
 
+-- Albedo skins dari pipeline ArtCraft VM (materialcraft). Tile pas sekali per
+-- face; normal map tidak berlaku di Part primitive (butuh MeshPart).
+local TEX_FACE_VENT = "rbxassetid://121620825410380"
+local TEX_BRUSHED = "rbxassetid://130607119354847"
+
+-- Pasang texture sekali-tile di sisi Back (+Z), tempat faceplate menghadap.
+local function applyFaceTexture(part: BasePart, asset: string)
+	if asset == "" then
+		return
+	end
+	local tex = Instance.new("Texture")
+	tex.Name = "Skin"
+	tex.Texture = asset
+	tex.Face = Enum.NormalId.Back
+	tex.StudsPerTileU = math.max(part.Size.X, 0.1)
+	tex.StudsPerTileV = math.max(part.Size.Y, 0.1)
+	tex.Parent = part
+end
+
 type PortRef = {
 	portId: string,
 	portType: string,
@@ -179,12 +198,14 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 	end
 
 	-- Dark front faceplate bezel with recessed side vent cheeks
-	newPart({
+	local faceplatePart = newPart({
 		name = "Faceplate",
 		size = Vector3.new(width - 0.14, height - 0.08, 0.06),
 		cf = CFrame.new(0, height / 2, depth / 2 + 0.02),
 		color = FACE_DARK,
-	}).Parent = model
+	})
+	applyFaceTexture(faceplatePart, TEX_FACE_VENT)
+	faceplatePart.Parent = model
 	for _, side in ipairs({ -1, 1 }) do
 		for vi = 1, 3 do
 			newPart({
@@ -505,23 +526,27 @@ function ModelFactory.BuildRack(itemId: string, rackId: string): (Model, { [numb
 	model.Name = defv.name
 
 	-- Bottom plinth base
-	newPart({
+	local plinthPart = newPart({
 		name = "BasePlinth",
 		size = Vector3.new(w, baseH * 0.85, d),
 		cf = CFrame.new(0, baseH * 0.425, 0),
 		color = SLATE_TRIM,
 		canCollide = true,
-	}).Parent = model
+	})
+	applyFaceTexture(plinthPart, TEX_BRUSHED)
+	plinthPart.Parent = model
 
 	-- Back panel (dark sheet steel) with rear exhaust vent slots
-	newPart({
+	local backPanelPart = newPart({
 		name = "BackPanel",
 		size = Vector3.new(w - 0.35, bodyH - baseH * 0.5, 0.16),
 		cf = CFrame.new(0, bodyH / 2 + 0.15, -d / 2 + 0.08),
 		color = defv.visualColor:Lerp(CHASSIS_DARK, 0.55),
 		material = Enum.Material.Metal,
 		canCollide = true,
-	}).Parent = model
+	})
+	applyFaceTexture(backPanelPart, TEX_BRUSHED)
+	backPanelPart.Parent = model
 	for vi = 1, 6 do
 		newPart({
 			name = "RearVent",
@@ -1057,12 +1082,14 @@ function ModelFactory.BuildISPUplink(deviceId: string): (Model, Attachment, Part
 	})
 	box.Parent = model
 
-	newPart({
+	local ispBezelPart = newPart({
 		name = "ISPBezel",
 		size = Vector3.new(2.25, 1.8, 0.12),
 		cf = CFrame.new(0, 3.8, 0.62),
 		color = SLATE_TRIM,
-	}).Parent = model
+	})
+	applyFaceTexture(ispBezelPart, TEX_FACE_VENT)
+	ispBezelPart.Parent = model
 	newPart({
 		name = "FiberStripe",
 		size = Vector3.new(2.25, 0.22, 0.14),
