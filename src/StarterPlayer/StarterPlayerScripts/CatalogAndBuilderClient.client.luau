@@ -141,9 +141,10 @@ local storeWindow = Instance.new("Frame")
 storeWindow.Name = "StoreWindow"
 storeWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 storeWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
-storeWindow.Size = UDim2.new(0, 620, 0, 420)
+storeWindow.Size = UDim2.new(0, 740, 0, 470)
 storeWindow.BackgroundColor3 = COLOR_BG
 storeWindow.BorderSizePixel = 0
+storeWindow.Active = true -- absorb mouse clicks on PC so tools/ClickDetectors behind do not trigger
 storeWindow.Visible = false
 storeWindow.Parent = storeGui
 local windowCorner = Instance.new("UICorner")
@@ -177,8 +178,8 @@ titleLabel.Text = "TOKO HARDWARE"
 titleLabel.Parent = titleBar
 
 local subLabel = Instance.new("TextLabel")
-subLabel.Size = UDim2.new(0, 200, 1, 0)
-subLabel.Position = UDim2.new(1, -224, 0, 0)
+subLabel.Size = UDim2.new(0, 220, 1, 0)
+subLabel.Position = UDim2.new(1, -294, 0, 0)
 subLabel.BackgroundTransparency = 1
 subLabel.Font = Enum.Font.Gotham
 subLabel.TextSize = 11
@@ -189,13 +190,15 @@ subLabel.Parent = titleBar
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.Name = "CloseButton"
-closeBtn.Size = UDim2.new(0, 28, 0, 26)
-closeBtn.Position = UDim2.new(1, -34, 0, 4)
-closeBtn.BackgroundColor3 = COLOR_BORDER
+closeBtn.Size = UDim2.new(0, 60, 0, 26)
+closeBtn.Position = UDim2.new(1, -66, 0, 4)
+closeBtn.BackgroundColor3 = Color3.fromRGB(145, 40, 48)
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 13
-closeBtn.TextColor3 = COLOR_RED
-closeBtn.Text = "X"
+closeBtn.TextSize = 12
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Text = "X [B]"
+closeBtn.Modal = true -- frees PC mouse cursor in First-Person / ShiftLock
+closeBtn.Active = true
 closeBtn.Parent = titleBar
 local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 6)
@@ -246,7 +249,7 @@ end
 
 -- Middle column: item list
 local itemsHeader = Instance.new("TextLabel")
-itemsHeader.Size = UDim2.new(0, 296, 0, 16)
+itemsHeader.Size = UDim2.new(0, 380, 0, 16)
 itemsHeader.Position = UDim2.new(0, 136, 0, 40)
 itemsHeader.BackgroundTransparency = 1
 itemsHeader.Font = Enum.Font.GothamBold
@@ -259,24 +262,24 @@ itemsHeader.Parent = storeWindow
 local itemsScroll = Instance.new("ScrollingFrame")
 itemsScroll.Name = "ItemsScroll"
 itemsScroll.Position = UDim2.new(0, 136, 0, 60)
-itemsScroll.Size = UDim2.new(0, 296, 1, -84)
+itemsScroll.Size = UDim2.new(0, 380, 1, -84)
 itemsScroll.BackgroundTransparency = 1
 itemsScroll.BorderSizePixel = 0
-itemsScroll.ScrollBarThickness = 5
+itemsScroll.ScrollBarThickness = 6
 itemsScroll.ScrollBarImageColor3 = COLOR_BORDER
 itemsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 itemsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 itemsScroll.Parent = storeWindow
 local itemsLayout = Instance.new("UIListLayout")
 itemsLayout.FillDirection = Enum.FillDirection.Vertical
-itemsLayout.Padding = UDim.new(0, 4)
+itemsLayout.Padding = UDim.new(0, 5)
 itemsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 itemsLayout.Parent = itemsScroll
 
 -- Status label (transient feedback, e.g. saldo tidak cukup)
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Name = "StatusLabel"
-statusLabel.Size = UDim2.new(0, 296, 0, 16)
+statusLabel.Size = UDim2.new(0, 380, 0, 16)
 statusLabel.Position = UDim2.new(0, 136, 1, -20)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Font = Enum.Font.Gotham
@@ -299,38 +302,63 @@ local function showStatus(message: string)
 	end)
 end
 
--- Right column: build guide (static)
+-- Right column: build guide (static, PC-oriented)
 local guideHeader = Instance.new("TextLabel")
-guideHeader.Size = UDim2.new(0, 172, 0, 16)
-guideHeader.Position = UDim2.new(0, 440, 0, 40)
+guideHeader.Size = UDim2.new(0, 208, 0, 16)
+guideHeader.Position = UDim2.new(0, 524, 0, 40)
 guideHeader.BackgroundTransparency = 1
 guideHeader.Font = Enum.Font.GothamBold
 guideHeader.TextSize = 11
 guideHeader.TextXAlignment = Enum.TextXAlignment.Left
 guideHeader.TextColor3 = COLOR_BLUE
-guideHeader.Text = "PANDUAN BUILD"
+guideHeader.Text = "PANDUAN BUILD (PC)"
 guideHeader.Parent = storeWindow
 
 local guideBody = Instance.new("TextLabel")
 guideBody.Name = "BuildGuide"
-guideBody.Size = UDim2.new(0, 172, 1, -66)
-guideBody.Position = UDim2.new(0, 440, 0, 60)
+guideBody.Size = UDim2.new(0, 208, 1, -68)
+guideBody.Position = UDim2.new(0, 524, 0, 60)
 guideBody.BackgroundColor3 = COLOR_CARD
 guideBody.BorderSizePixel = 0
 guideBody.Font = Enum.Font.Gotham
-guideBody.TextSize = 11
+guideBody.TextSize = 12
 guideBody.TextWrapped = true
 guideBody.TextXAlignment = Enum.TextXAlignment.Left
 guideBody.TextYAlignment = Enum.TextYAlignment.Top
 guideBody.TextColor3 = COLOR_TEXT
-guideBody.Text = "Chassis -> Mobo -> CPU -> RAM -> Storage -> PSU\n\n- Nyalakan bench (switch merah)\n- Console: install-os\n- stress-test\n- Ship otomatis saat stress-test lulus? (gunakan laptop console)"
+guideBody.Text = "Urutan Rakit Workbench:\nChassis -> Mobo -> CPU -> RAM -> Storage -> PSU\n\nLangkah PC:\n- Klik saklar merah di bench\n- Dekati bench + tekan [E] (pegang laptop)\n- Terminal: install-os ubuntu-22.04\n- Terminal: stress-test\n- Terminal: ship (kirim ke dock)\n\nKontrol Placement:\n[Klik Kiri] Pasang\n[R] Putar 90 deg\n[Klik Kanan / Esc] Batal"
 guideBody.Parent = storeWindow
+local guideCorner = Instance.new("UICorner")
+guideCorner.CornerRadius = UDim.new(0, 6)
+guideCorner.Parent = guideBody
 local guidePadding = Instance.new("UIPadding")
-guidePadding.PaddingLeft = UDim.new(0, 8)
-guidePadding.PaddingTop = UDim.new(0, 6)
-guidePadding.PaddingRight = UDim.new(0, 8)
-guidePadding.PaddingBottom = UDim.new(0, 6)
+guidePadding.PaddingLeft = UDim.new(0, 10)
+guidePadding.PaddingTop = UDim.new(0, 8)
+guidePadding.PaddingRight = UDim.new(0, 10)
+guidePadding.PaddingBottom = UDim.new(0, 8)
 guidePadding.Parent = guideBody
+
+-- PC ghost placement bottom control bar (visible only while placing)
+local ghostBanner = Instance.new("TextLabel")
+ghostBanner.Name = "GhostBanner"
+ghostBanner.AnchorPoint = Vector2.new(0.5, 1)
+ghostBanner.Position = UDim2.new(0.5, 0, 1, -46)
+ghostBanner.Size = UDim2.new(0, 540, 0, 30)
+ghostBanner.BackgroundColor3 = COLOR_BG
+ghostBanner.BackgroundTransparency = 0.12
+ghostBanner.Font = Enum.Font.GothamBold
+ghostBanner.TextSize = 13
+ghostBanner.TextColor3 = COLOR_YELLOW
+ghostBanner.Text = "[PLACEMENT PC]  Klik Kiri: Pasang  |  [R]: Putar 90 deg  |  Klik Kanan / [Esc]: Batal"
+ghostBanner.Visible = false
+ghostBanner.Parent = storeGui
+local ghostBannerCorner = Instance.new("UICorner")
+ghostBannerCorner.CornerRadius = UDim.new(0, 8)
+ghostBannerCorner.Parent = ghostBanner
+local ghostBannerStroke = Instance.new("UIStroke")
+ghostBannerStroke.Color = COLOR_BORDER
+ghostBannerStroke.Thickness = 1
+ghostBannerStroke.Parent = ghostBanner
 
 -- ===== Category selection + item rows =====
 type ItemRow = {
@@ -465,10 +493,13 @@ rebuildItems = function()
 	updateAffordability()
 end
 
-closeBtn.MouseButton1Click:Connect(function()
+local function closeStore()
 	storeWindow.Visible = false
 	storeVisible = false
-end)
+end
+
+closeBtn.MouseButton1Down:Connect(closeStore)
+closeBtn.MouseButton1Click:Connect(closeStore)
 
 local function setStoreVisible(visible: boolean)
 	if ghost ~= nil and visible then
@@ -489,6 +520,7 @@ exitGhost = function(cancel: boolean)
 		return
 	end
 	ghost = nil
+	ghostBanner.Visible = false
 	if g.connRender.Connected then
 		g.connRender:Disconnect()
 	end
@@ -510,7 +542,7 @@ updateGhost = function()
 	local mouse = player:GetMouse()
 	local hit = mouse.Target
 	if hit ~= nil then
-		local hitPos = hit.Position
+		local hitPos = mouse.Hit.Position
 		local origin = plotOrigin()
 		if origin ~= nil then
 			local snap = PlotConstants.SNAP_GRID
@@ -598,7 +630,7 @@ startGhost = function(itemId: string)
 			exitGhost(true)
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
 			if g.valid then
-				purchaseRemote:FireServer(g.itemId, "place", g.snappedCF, g.rotY)
+				purchaseRemote:FireServer(g.itemId, "place", g.snappedCF, math.rad(g.rotY))
 				exitGhost(false)
 			end
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -623,12 +655,13 @@ startGhost = function(itemId: string)
 	player:GetMouse().TargetFilter = model
 	model:PivotTo(startCF)
 
+	ghostBanner.Visible = true
 	setStoreVisible(false)
 end
 
--- ===== Input: key B toggles store =====
-UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-	if gameProcessed then
+-- ===== Input: key B toggles store (works anytime no TextBox is focused) =====
+UserInputService.InputBegan:Connect(function(input: InputObject, _gameProcessed: boolean)
+	if UserInputService:GetFocusedTextBox() ~= nil then
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.B then

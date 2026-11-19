@@ -198,7 +198,7 @@ function RackAndCablingSystem.AttachConsole(player: Player, session: any, device
 		return
 	end
 
-	local serial = laptop:FindFirstChild("SerialPortAttachment")
+	local serial = laptop:FindFirstChild("SerialPortAttachment", true)
 	local model = session.deviceModels[deviceId]
 	local consolePart = if model ~= nil then model:FindFirstChild("ConsolePort", true) else nil
 	local consoleAttach = if consolePart ~= nil and consolePart:IsA("BasePart") then consolePart:FindFirstChild("ConsoleAttach") else nil

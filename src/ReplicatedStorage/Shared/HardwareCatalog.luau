@@ -34,7 +34,7 @@ addItem({
 	uSize = 12,
 	description = "Rack 12U dengan PDU 3000W. Tempat mount device rackable.",
 	specs = { maxU = 12, maxPowerWatts = 3000, idleWatts = 40 },
-	visualColor = Color3.fromRGB(52, 56, 62),
+	visualColor = Color3.fromRGB(88, 102, 120),
 })
 addItem({
 	id = "rack_24u",
@@ -44,7 +44,7 @@ addItem({
 	uSize = 24,
 	description = "Rack 24U dengan PDU 6000W. Kapasitas dobel.",
 	specs = { maxU = 24, maxPowerWatts = 6000, idleWatts = 60 },
-	visualColor = Color3.fromRGB(52, 56, 62),
+	visualColor = Color3.fromRGB(68, 92, 124),
 })
 
 -- ===== Network =====
@@ -56,7 +56,7 @@ addItem({
 	uSize = 1,
 	description = "8x RJ45. Distribusi LAN dasar.",
 	specs = { ports = 8, sfpPorts = 0, wanPorts = 0, powerWatts = 30 },
-	visualColor = Color3.fromRGB(55, 58, 66),
+	visualColor = Color3.fromRGB(48, 136, 174),
 })
 addItem({
 	id = "switch_24p",
@@ -66,7 +66,7 @@ addItem({
 	uSize = 1,
 	description = "24x RJ45 + 2x SFP. Untuk kolokasi skala besar.",
 	specs = { ports = 24, sfpPorts = 2, wanPorts = 0, powerWatts = 60 },
-	visualColor = Color3.fromRGB(55, 58, 66),
+	visualColor = Color3.fromRGB(36, 114, 166),
 })
 addItem({
 	id = "router_edge",
@@ -76,7 +76,7 @@ addItem({
 	uSize = 1,
 	description = "2x WAN + 4x RJ45. Gateway antar subnet/VLAN.",
 	specs = { ports = 4, sfpPorts = 0, wanPorts = 2, powerWatts = 40 },
-	visualColor = Color3.fromRGB(60, 62, 70),
+	visualColor = Color3.fromRGB(72, 102, 224),
 })
 
 -- ===== Bare-Metal =====
@@ -88,7 +88,7 @@ addItem({
 	uSize = 2,
 	description = "8 vCPU / 16GB RAM / 500GB Disk / 450W.",
 	specs = { cpu = 8, ram = 16, disk = 500, powerWatts = 450, ports = 1, sfpPorts = 0, wanPorts = 0 },
-	visualColor = Color3.fromRGB(64, 68, 76),
+	visualColor = Color3.fromRGB(164, 176, 192),
 })
 addItem({
 	id = "bm_enterprise",
@@ -98,7 +98,7 @@ addItem({
 	uSize = 2,
 	description = "32 vCPU / 128GB RAM / 2TB Disk / 750W.",
 	specs = { cpu = 32, ram = 128, disk = 2000, powerWatts = 750, ports = 2, sfpPorts = 0, wanPorts = 0 },
-	visualColor = Color3.fromRGB(40, 42, 48),
+	visualColor = Color3.fromRGB(124, 140, 162),
 })
 
 -- ===== Components (Custom Build) =====
@@ -110,7 +110,7 @@ addItem({
 	uSize = 1,
 	description = "Casing rack 1U untuk custom build (1x RJ45 terpasang).",
 	specs = { uSize = 1, width = 4.2, ports = 1, sfpPorts = 0, wanPorts = 0 },
-	visualColor = Color3.fromRGB(70, 72, 78),
+	visualColor = Color3.fromRGB(182, 190, 202),
 })
 addItem({
 	id = "chassis_2u",
@@ -120,7 +120,7 @@ addItem({
 	uSize = 2,
 	description = "Casing rack 2U, lebih lega (1x RJ45 terpasang).",
 	specs = { uSize = 2, width = 4.6, ports = 1, sfpPorts = 0, wanPorts = 0 },
-	visualColor = Color3.fromRGB(70, 72, 78),
+	visualColor = Color3.fromRGB(154, 166, 184),
 })
 addItem({
 	id = "mobo_single",
@@ -130,7 +130,7 @@ addItem({
 	uSize = 0,
 	description = "1 socket CPU, 2 slot RAM, 2 bay storage.",
 	specs = { sockets = 1, ramSlots = 2, storageBays = 2 },
-	visualColor = Color3.fromRGB(40, 90, 55),
+	visualColor = Color3.fromRGB(48, 152, 92),
 })
 addItem({
 	id = "mobo_dual",
@@ -140,7 +140,7 @@ addItem({
 	uSize = 0,
 	description = "2 socket CPU, 4 slot RAM, 3 bay storage.",
 	specs = { sockets = 2, ramSlots = 4, storageBays = 3 },
-	visualColor = Color3.fromRGB(40, 90, 55),
+	visualColor = Color3.fromRGB(36, 142, 122),
 })
 addItem({
 	id = "cpu_xeon8",
@@ -150,7 +150,7 @@ addItem({
 	uSize = 0,
 	description = "8 vCPU untuk host bare-metal.",
 	specs = { cores = 8 },
-	visualColor = Color3.fromRGB(150, 150, 155),
+	visualColor = Color3.fromRGB(206, 214, 224),
 })
 addItem({
 	id = "cpu_epyc32",
@@ -160,7 +160,7 @@ addItem({
 	uSize = 0,
 	description = "32 vCPU untuk host bare-metal.",
 	specs = { cores = 32 },
-	visualColor = Color3.fromRGB(150, 150, 155),
+	visualColor = Color3.fromRGB(220, 172, 114),
 })
 addItem({
 	id = "ram_32g",
@@ -170,7 +170,7 @@ addItem({
 	uSize = 0,
 	description = "32GB memory per module.",
 	specs = { ramGb = 32 },
-	visualColor = Color3.fromRGB(50, 200, 130),
+	visualColor = Color3.fromRGB(64, 214, 148),
 })
 addItem({
 	id = "ram_128g",
@@ -180,7 +180,7 @@ addItem({
 	uSize = 0,
 	description = "128GB memory per module.",
 	specs = { ramGb = 128 },
-	visualColor = Color3.fromRGB(50, 200, 130),
+	visualColor = Color3.fromRGB(56, 189, 248),
 })
 addItem({
 	id = "nvme_1tb",
@@ -190,7 +190,7 @@ addItem({
 	uSize = 0,
 	description = "Storage 1000GB per drive.",
 	specs = { storageGb = 1000 },
-	visualColor = Color3.fromRGB(35, 35, 40),
+	visualColor = Color3.fromRGB(78, 98, 134),
 })
 addItem({
 	id = "psu_redundant",
@@ -200,7 +200,7 @@ addItem({
 	uSize = 0,
 	description = "Power supply 750W untuk menyalakan build.",
 	specs = { powerWatts = 750 },
-	visualColor = Color3.fromRGB(45, 45, 50),
+	visualColor = Color3.fromRGB(134, 144, 158),
 })
 addItem({
 	id = "replacement_hdd",
@@ -210,7 +210,7 @@ addItem({
 	uSize = 0,
 	description = "Drive pengganti untuk Remote Hands (Fase 2).",
 	specs = { storageGb = 500 },
-	visualColor = Color3.fromRGB(35, 35, 40),
+	visualColor = Color3.fromRGB(92, 110, 134),
 })
 
 -- ===== Cables (aktif penuh di Fase 2) =====

@@ -88,7 +88,7 @@ local function placeVisual(session: any, visual: Model, snapIndex: number)
 		return
 	end
 	local pivot = bench:GetPivot()
-	local offset = CFrame.new(0, 3.5, 1.2) -- fallback: in front of the bench top
+	local offset = CFrame.new(0, 2.72, 1.0) -- fallback: on the human-scale bench top
 	local snaps = facility.benchSnaps
 	local snap = if type(snaps) == "table" then snaps[snapIndex] else nil
 	if snap ~= nil and snap:IsA("Attachment") then
@@ -109,7 +109,7 @@ local function ensureBenchModel(session: any)
 	end
 	local chassisId = wb.chassis :: string
 	local model, _ports, _consoleAttach, _led, _smoke = ModelFactory.BuildDeviceModel(chassisId, BENCH_DEVICE_ID)
-	model:PivotTo(facility.workbenchModel:GetPivot() * CFrame.new(0, 3.5, 0))
+	model:PivotTo(facility.workbenchModel:GetPivot() * CFrame.new(0, 2.72, 0))
 	model.Parent = facility.devices
 
 	-- The bench console prompt should read as the custom build.

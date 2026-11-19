@@ -14,9 +14,12 @@
 	Semua teks GUI Bahasa Indonesia; komentar kode Bahasa Inggris.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared")
 local NetworkUtils = require(sharedFolder:WaitForChild("NetworkUtils"))
 
@@ -84,6 +87,7 @@ type FacilitySnapshot = {
 -- ===== State =====
 type MonitorRef = {
 	part: BasePart,
+	surfaceGui: SurfaceGui,
 	root: Frame,
 }
 
@@ -154,19 +158,45 @@ local function makeTitle(parent: Instance, text: string): TextLabel
 end
 
 -- ===== Monitor discovery =====
-local function findMonitorPart(plot: Instance, name: string): (BasePart?, Frame?)
+-- Moves each monitor's SurfaceGui into PlayerGui with Adornee = part so
+-- TextButtons inside the SurfaceGui receive mouse clicks in Roblox.
+local function findMonitorPart(plot: Instance, name: string): (BasePart?, SurfaceGui?, Frame?)
 	for _, desc in ipairs(plot:GetDescendants()) do
 		if desc.Name == name and desc:IsA("BasePart") then
-			local surfaceGui = desc:FindFirstChild("SurfaceGui")
-			if surfaceGui ~= nil then
-				local root = surfaceGui:FindFirstChild("Root")
+			local part = desc :: BasePart
+			-- Check if we already moved this part's SurfaceGui into PlayerGui
+			for _, child in ipairs(playerGui:GetChildren()) do
+				if child:IsA("SurfaceGui") and child.Adornee == part then
+					local root = child:FindFirstChild("Root")
+					if root ~= nil and root:IsA("Frame") then
+						return part, child :: SurfaceGui, root :: Frame
+					end
+				end
+			end
+			local surfaceGui = part:FindFirstChild("SurfaceGui")
+			if surfaceGui ~= nil and surfaceGui:IsA("SurfaceGui") then
+				local sg = surfaceGui :: SurfaceGui
+				local root = sg:FindFirstChild("Root")
 				if root ~= nil and root:IsA("Frame") then
-					return desc :: BasePart, root :: Frame
+					sg.Name = "NetSimNOC_" .. name
+					sg.Adornee = part
+					sg.ResetOnSpawn = false
+					sg.Parent = playerGui
+					return part, sg, root :: Frame
 				end
 			end
 		end
 	end
-	return nil, nil
+	return nil, nil, nil
+end
+
+local function clearAllMonitorRefs()
+	for name, ref in pairs(monitorRefs) do
+		if ref.surfaceGui.Parent == playerGui then
+			ref.surfaceGui:Destroy()
+		end
+		monitorRefs[name] = nil :: any
+	end
 end
 
 local function resetContentCaches()
@@ -196,14 +226,17 @@ local function refreshMonitorRefs(plot: Instance)
 	-- Drop refs whose plot was destroyed (facility rebuild / reset data)
 	for name, ref in pairs(monitorRefs) do
 		if ref.part.Parent == nil or ref.root.Parent == nil then
+			if ref.surfaceGui.Parent == playerGui then
+				ref.surfaceGui:Destroy()
+			end
 			monitorRefs[name] = nil :: any
 		end
 	end
 	for _, name in ipairs(MONITOR_NAMES) do
 		if monitorRefs[name] == nil then
-			local part, root = findMonitorPart(plot, name)
-			if part ~= nil and root ~= nil then
-				monitorRefs[name] = { part = part, root = root }
+			local part, sg, root = findMonitorPart(plot, name)
+			if part ~= nil and sg ~= nil and root ~= nil then
+				monitorRefs[name] = { part = part, surfaceGui = sg, root = root }
 			end
 		end
 	end
@@ -221,7 +254,7 @@ local function buildTopology(ref: MonitorRef)
 	canvas.BackgroundTransparency = 1
 	canvas.Parent = root
 
-	local surfaceGui = ref.part:FindFirstChild("SurfaceGui")
+	local surfaceGui = ref.surfaceGui
 	local pps = 60
 	if surfaceGui ~= nil and surfaceGui:IsA("SurfaceGui") then
 		pps = surfaceGui.PixelsPerStud
@@ -766,7 +799,7 @@ stateSyncRemote.OnClientEvent:Connect(function(payload: any)
 		return
 	end
 	if snap.plotIndex ~= lastPlotIndex then
-		monitorRefs = {}
+		clearAllMonitorRefs()
 		resetContentCaches()
 		lastPlotIndex = snap.plotIndex
 	end

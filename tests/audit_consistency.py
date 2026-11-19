@@ -18,7 +18,8 @@ import os
 import re
 import sys
 
-SRC = "/data/workspace/netsim/src"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
 
 passed = 0
 failed = 0

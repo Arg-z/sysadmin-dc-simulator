@@ -34,9 +34,9 @@ PlotConstants.PLOT_POSITIONS = {
 PlotConstants.ROOM = {
 	halfX = 32,
 	halfZ = 32,
-	height = 24,
+	height = 18,
 	doorWidth = 14,
-	doorHeight = 12,
+	doorHeight = 10,
 	floorTopY = 0.5,
 	wallThickness = 1,
 } :: RoomSpec
@@ -60,8 +60,8 @@ PlotConstants.WORKBENCH_POS = Vector3.new(18, 0, -12)
 PlotConstants.NOCDESK_POS = Vector3.new(18, 0, 16)
 PlotConstants.DOCK_POS = Vector3.new(0, 0, -24)
 PlotConstants.ISP_POS = Vector3.new(-20, 0, -28)
-PlotConstants.BEACON_OFFSET = Vector3.new(0, 21, -6)
-PlotConstants.AC_OFFSET = Vector3.new(29, 8, -10)
+PlotConstants.BEACON_OFFSET = Vector3.new(0, 15.6, -6)
+PlotConstants.AC_OFFSET = Vector3.new(29.8, 7, -10)
 
 PlotConstants.STARTER = {
 	isp = { id = "isp_uplink", name = "ISP_Uplink" },
@@ -92,15 +92,21 @@ PlotConstants.ECONOMY = {
 }
 
 PlotConstants.COLORS = {
-	floor = Color3.fromRGB(28, 30, 34),
-	wall = Color3.fromRGB(44, 48, 55),
-	trim = Color3.fromRGB(60, 66, 75),
-	lightPanel = Color3.fromRGB(235, 240, 245),
-	ledGreen = Color3.fromRGB(85, 255, 120),
-	ledYellow = Color3.fromRGB(255, 220, 80),
-	ledRed = Color3.fromRGB(255, 80, 80),
-	ledOff = Color3.fromRGB(70, 70, 70),
-	consoleBlue = Color3.fromRGB(80, 160, 255),
+	floor = Color3.fromRGB(214, 220, 228),
+	floorGrid = Color3.fromRGB(186, 195, 208),
+	wall = Color3.fromRGB(228, 233, 240),
+	wallLower = Color3.fromRGB(108, 122, 142),
+	trim = Color3.fromRGB(188, 198, 210),
+	frame = Color3.fromRGB(68, 78, 94),
+	glass = Color3.fromRGB(165, 215, 245),
+	accentCyan = Color3.fromRGB(56, 189, 248),
+	accentAmber = Color3.fromRGB(245, 196, 48),
+	lightPanel = Color3.fromRGB(248, 252, 255),
+	ledGreen = Color3.fromRGB(60, 245, 115),
+	ledYellow = Color3.fromRGB(255, 215, 70),
+	ledRed = Color3.fromRGB(255, 82, 82),
+	ledOff = Color3.fromRGB(95, 102, 112),
+	consoleBlue = Color3.fromRGB(64, 172, 255),
 }
 
 return PlotConstants

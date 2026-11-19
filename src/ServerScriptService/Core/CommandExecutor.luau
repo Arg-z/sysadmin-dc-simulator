@@ -196,6 +196,7 @@ local function cmdHelp(): { string }
 	table.insert(lines, "  " .. g("top") .. gr("                          monitor CPU/RAM/temp host aktif"))
 	table.insert(lines, "  " .. g("install-os <os>") .. gr("              ubuntu-22.04 | debian-12 | rocky-9"))
 	table.insert(lines, "  " .. g("stress-test") .. gr("                   burn-in 5 detik (validasi thermal)"))
+	table.insert(lines, "  " .. g("ship") .. gr("                          kirim custom server workbench ke dock"))
 	table.insert(lines, b("-- VM --"))
 	table.insert(lines, "  " .. g("vm create --name <n> --cpu <n> --ram <n> --disk <n>"))
 	table.insert(lines, "  " .. g("vm list") .. gr("                       daftar VM di host aktif"))
@@ -850,7 +851,7 @@ local function cmdStressTest(player: Player, session: any, _tokens: { string }):
 			table.insert(resultLines, gr("CPU / RAM / storage: semua OK - server tervalidasi"))
 			if deviceId == "bench_1" and liveSession.workbench ~= nil then
 				liveSession.workbench.tested = true
-				table.insert(resultLines, g("Custom build validated - siap di-ship dari workbench"))
+				table.insert(resultLines, g("Custom build validated - ketik 'ship' untuk kirim crate ke dock"))
 			end
 			playSfx(player, "cash")
 		else
@@ -859,6 +860,20 @@ local function cmdStressTest(player: Player, session: any, _tokens: { string }):
 		pushLines(player, resultLines)
 	end)
 	return lines
+end
+
+local function cmdShip(session: any): { string }
+	if Workbench == nil or type(Workbench.Ship) ~= "function" then
+		return { r("ship: sistem workbench tidak tersedia") }
+	end
+	local ok, errMsg = Workbench.Ship(session)
+	if not ok then
+		return { r("ship: " .. tostring(errMsg)) }
+	end
+	return {
+		g("[ ok ] Custom server dikirim ke Loading Dock!"),
+		gr("Payout sudah ditambahkan ke saldo lab."),
+	}
 end
 
 ---------------------------------------------------------------------
@@ -889,6 +904,8 @@ local function dispatch(player: Player, session: any, tokens: { string }): { str
 		return cmdInstallOs(player, session, tokens)
 	elseif cmd == "stress-test" then
 		return cmdStressTest(player, session, tokens)
+	elseif cmd == "ship" then
+		return cmdShip(session)
 	end
 	return { r("command not found: " .. cmd) .. gr("  (ketik 'help')") }
 end

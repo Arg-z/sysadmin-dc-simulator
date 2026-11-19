@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
-<roblox version="4">
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+<External>null</External>
+<External>nil</External>
 <Item class="Workspace" referent="RBX0">
 <Properties>
 <string name="Name">Workspace</string>
@@ -8,27 +9,28 @@
 <Properties>
 <string name="Name">Baseplate</string>
 <Vector3 name="size"><X>512</X><Y>20</Y><Z>512</Z></Vector3>
-<Coordinate3D name="CFrame"><X>0</X><Y>-10</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></Coordinate3D>
+<CoordinateFrame name="CFrame"><X>0</X><Y>-10</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
 <bool name="Anchored">true</bool>
 <bool name="Locked">true</bool>
 <token name="shape">1</token>
-<Color3uint8 name="Color3uint8">4283980123</Color3uint8>
+<Color3uint8 name="Color3uint8">4289509060</Color3uint8>
 </Properties>
 </Item>
 <Item class="SpawnLocation" referent="RBX2">
 <Properties>
 <string name="Name">SpawnLocation</string>
 <Vector3 name="size"><X>12</X><Y>1</Y><Z>12</Z></Vector3>
-<Coordinate3D name="CFrame"><X>0</X><Y>0.5</Y><Z>40</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></Coordinate3D>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.5</Y><Z>40</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
 <bool name="Anchored">true</bool>
 <token name="shape">1</token>
-<Color3uint8 name="Color3uint8">4282818660</Color3uint8>
+<Color3uint8 name="Color3uint8">4281908628</Color3uint8>
 </Properties>
 </Item>
 </Item>
 <Item class="Lighting" referent="RBX3">
 <Properties>
 <string name="Name">Lighting</string>
+<token name="Technology">4</token>
 </Properties>
 </Item>
 <Item class="ReplicatedStorage" referent="RBX4">
@@ -42,8 +44,7 @@
 <Item class="ModuleScript" referent="RBX6">
 <Properties>
 <string name="Name">NetworkTypes</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	NetworkTypes (ModuleScript, ReplicatedStorage/Shared)
 	Definisi type ketat untuk seluruh simulasi. Type-only module (return nil).
@@ -250,25 +251,24 @@ export type Session = {
 }
 
 return nil
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX7">
 <Properties>
 <string name="Name">NetworkUtils</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	NetworkUtils (ModuleScript, ReplicatedStorage/Shared)
-	Utilitas jaringan murni &amp; deterministik: validasi IPv4, subnet bitwise,
+	Utilitas jaringan murni & deterministik: validasi IPv4, subnet bitwise,
 	generator IP, formatter currency/watt/uptime, escape RichText.
-	Tidak menyentuh API Roblox -&gt; bisa di-unit-test dengan luau CLI.
+	Tidak menyentuh API Roblox -> bisa di-unit-test dengan luau CLI.
 ]]
 
 local NetworkUtils = {}
 
 function NetworkUtils.IsValidIPv4(ip: string): boolean
-	if type(ip) ~= "string" or #ip == 0 or #ip &gt; 15 then
+	if type(ip) ~= "string" or #ip == 0 or #ip > 15 then
 		return false
 	end
 	local parts = string.split(ip, ".")
@@ -276,12 +276,12 @@ function NetworkUtils.IsValidIPv4(ip: string): boolean
 		return false
 	end
 	for _, p in ipairs(parts) do
-		if #p == 0 or #p &gt; 3 then
+		if #p == 0 or #p > 3 then
 			return false
 		end
 		for i = 1, #p do
 			local ch = string.sub(p, i, i)
-			if ch &lt; "0" or ch &gt; "9" then
+			if ch < "0" or ch > "9" then
 				return false
 			end
 		end
@@ -289,10 +289,10 @@ function NetworkUtils.IsValidIPv4(ip: string): boolean
 		if n == nil then
 			return false
 		end
-		if n &lt; 0 or n &gt; 255 then
+		if n < 0 or n > 255 then
 			return false
 		end
-		if #p &gt; 1 and string.sub(p, 1, 1) == "0" then
+		if #p > 1 and string.sub(p, 1, 1) == "0" then
 			return false
 		end
 	end
@@ -347,7 +347,7 @@ function NetworkUtils.IsPrivateIP(ip: string): boolean
 	if a == 10 or a == 127 then
 		return true
 	end
-	if a == 172 and b &gt;= 16 and b &lt;= 31 then
+	if a == 172 and b >= 16 and b <= 31 then
 		return true
 	end
 	if a == 192 and b == 168 then
@@ -366,7 +366,7 @@ function NetworkUtils.GenerateInternalIP(index: number): string
 end
 
 function NetworkUtils.FormatCurrency(amount: number): string
-	local negative = amount &lt; 0
+	local negative = amount < 0
 	local n = math.floor(math.abs(amount) + 0.5)
 	local s = tostring(n)
 	local formatted = s
@@ -390,10 +390,10 @@ function NetworkUtils.FormatUptime(seconds: number): string
 	local days = math.floor(s / 86400)
 	local hours = math.floor((s % 86400) / 3600)
 	local minutes = math.floor((s % 3600) / 60)
-	if days &gt; 0 then
+	if days > 0 then
 		return string.format("%dd %dh %02dm", days, hours, minutes)
 	end
-	if hours &gt; 0 then
+	if hours > 0 then
 		return string.format("%dh %02dm", hours, minutes)
 	end
 	return string.format("%dm", minutes)
@@ -401,21 +401,20 @@ end
 
 function NetworkUtils.EscapeRich(text: string): string
 	local out = text
-	out = string.gsub(out, "&amp;", "&amp;amp;")
-	out = string.gsub(out, "&lt;", "&amp;lt;")
-	out = string.gsub(out, "&gt;", "&amp;gt;")
+	out = string.gsub(out, "&", "&amp;")
+	out = string.gsub(out, "<", "&lt;")
+	out = string.gsub(out, ">", "&gt;")
 	return out
 end
 
 return NetworkUtils
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX8">
 <Properties>
 <string name="Name">HardwareCatalog</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	HardwareCatalog (ModuleScript, ReplicatedStorage/Shared)
 	Katalog hardware: harga, ukuran U, specs, warna visual, deskripsi.
@@ -451,7 +450,7 @@ addItem({
 	uSize = 12,
 	description = "Rack 12U dengan PDU 3000W. Tempat mount device rackable.",
 	specs = { maxU = 12, maxPowerWatts = 3000, idleWatts = 40 },
-	visualColor = Color3.fromRGB(52, 56, 62),
+	visualColor = Color3.fromRGB(88, 102, 120),
 })
 addItem({
 	id = "rack_24u",
@@ -461,7 +460,7 @@ addItem({
 	uSize = 24,
 	description = "Rack 24U dengan PDU 6000W. Kapasitas dobel.",
 	specs = { maxU = 24, maxPowerWatts = 6000, idleWatts = 60 },
-	visualColor = Color3.fromRGB(52, 56, 62),
+	visualColor = Color3.fromRGB(68, 92, 124),
 })
 
 -- ===== Network =====
@@ -473,7 +472,7 @@ addItem({
 	uSize = 1,
 	description = "8x RJ45. Distribusi LAN dasar.",
 	specs = { ports = 8, sfpPorts = 0, wanPorts = 0, powerWatts = 30 },
-	visualColor = Color3.fromRGB(55, 58, 66),
+	visualColor = Color3.fromRGB(48, 136, 174),
 })
 addItem({
 	id = "switch_24p",
@@ -483,7 +482,7 @@ addItem({
 	uSize = 1,
 	description = "24x RJ45 + 2x SFP. Untuk kolokasi skala besar.",
 	specs = { ports = 24, sfpPorts = 2, wanPorts = 0, powerWatts = 60 },
-	visualColor = Color3.fromRGB(55, 58, 66),
+	visualColor = Color3.fromRGB(36, 114, 166),
 })
 addItem({
 	id = "router_edge",
@@ -493,7 +492,7 @@ addItem({
 	uSize = 1,
 	description = "2x WAN + 4x RJ45. Gateway antar subnet/VLAN.",
 	specs = { ports = 4, sfpPorts = 0, wanPorts = 2, powerWatts = 40 },
-	visualColor = Color3.fromRGB(60, 62, 70),
+	visualColor = Color3.fromRGB(72, 102, 224),
 })
 
 -- ===== Bare-Metal =====
@@ -505,7 +504,7 @@ addItem({
 	uSize = 2,
 	description = "8 vCPU / 16GB RAM / 500GB Disk / 450W.",
 	specs = { cpu = 8, ram = 16, disk = 500, powerWatts = 450, ports = 1, sfpPorts = 0, wanPorts = 0 },
-	visualColor = Color3.fromRGB(64, 68, 76),
+	visualColor = Color3.fromRGB(164, 176, 192),
 })
 addItem({
 	id = "bm_enterprise",
@@ -515,7 +514,7 @@ addItem({
 	uSize = 2,
 	description = "32 vCPU / 128GB RAM / 2TB Disk / 750W.",
 	specs = { cpu = 32, ram = 128, disk = 2000, powerWatts = 750, ports = 2, sfpPorts = 0, wanPorts = 0 },
-	visualColor = Color3.fromRGB(40, 42, 48),
+	visualColor = Color3.fromRGB(124, 140, 162),
 })
 
 -- ===== Components (Custom Build) =====
@@ -527,7 +526,7 @@ addItem({
 	uSize = 1,
 	description = "Casing rack 1U untuk custom build (1x RJ45 terpasang).",
 	specs = { uSize = 1, width = 4.2, ports = 1, sfpPorts = 0, wanPorts = 0 },
-	visualColor = Color3.fromRGB(70, 72, 78),
+	visualColor = Color3.fromRGB(182, 190, 202),
 })
 addItem({
 	id = "chassis_2u",
@@ -537,7 +536,7 @@ addItem({
 	uSize = 2,
 	description = "Casing rack 2U, lebih lega (1x RJ45 terpasang).",
 	specs = { uSize = 2, width = 4.6, ports = 1, sfpPorts = 0, wanPorts = 0 },
-	visualColor = Color3.fromRGB(70, 72, 78),
+	visualColor = Color3.fromRGB(154, 166, 184),
 })
 addItem({
 	id = "mobo_single",
@@ -547,7 +546,7 @@ addItem({
 	uSize = 0,
 	description = "1 socket CPU, 2 slot RAM, 2 bay storage.",
 	specs = { sockets = 1, ramSlots = 2, storageBays = 2 },
-	visualColor = Color3.fromRGB(40, 90, 55),
+	visualColor = Color3.fromRGB(48, 152, 92),
 })
 addItem({
 	id = "mobo_dual",
@@ -557,7 +556,7 @@ addItem({
 	uSize = 0,
 	description = "2 socket CPU, 4 slot RAM, 3 bay storage.",
 	specs = { sockets = 2, ramSlots = 4, storageBays = 3 },
-	visualColor = Color3.fromRGB(40, 90, 55),
+	visualColor = Color3.fromRGB(36, 142, 122),
 })
 addItem({
 	id = "cpu_xeon8",
@@ -567,7 +566,7 @@ addItem({
 	uSize = 0,
 	description = "8 vCPU untuk host bare-metal.",
 	specs = { cores = 8 },
-	visualColor = Color3.fromRGB(150, 150, 155),
+	visualColor = Color3.fromRGB(206, 214, 224),
 })
 addItem({
 	id = "cpu_epyc32",
@@ -577,7 +576,7 @@ addItem({
 	uSize = 0,
 	description = "32 vCPU untuk host bare-metal.",
 	specs = { cores = 32 },
-	visualColor = Color3.fromRGB(150, 150, 155),
+	visualColor = Color3.fromRGB(220, 172, 114),
 })
 addItem({
 	id = "ram_32g",
@@ -587,7 +586,7 @@ addItem({
 	uSize = 0,
 	description = "32GB memory per module.",
 	specs = { ramGb = 32 },
-	visualColor = Color3.fromRGB(50, 200, 130),
+	visualColor = Color3.fromRGB(64, 214, 148),
 })
 addItem({
 	id = "ram_128g",
@@ -597,7 +596,7 @@ addItem({
 	uSize = 0,
 	description = "128GB memory per module.",
 	specs = { ramGb = 128 },
-	visualColor = Color3.fromRGB(50, 200, 130),
+	visualColor = Color3.fromRGB(56, 189, 248),
 })
 addItem({
 	id = "nvme_1tb",
@@ -607,7 +606,7 @@ addItem({
 	uSize = 0,
 	description = "Storage 1000GB per drive.",
 	specs = { storageGb = 1000 },
-	visualColor = Color3.fromRGB(35, 35, 40),
+	visualColor = Color3.fromRGB(78, 98, 134),
 })
 addItem({
 	id = "psu_redundant",
@@ -617,7 +616,7 @@ addItem({
 	uSize = 0,
 	description = "Power supply 750W untuk menyalakan build.",
 	specs = { powerWatts = 750 },
-	visualColor = Color3.fromRGB(45, 45, 50),
+	visualColor = Color3.fromRGB(134, 144, 158),
 })
 addItem({
 	id = "replacement_hdd",
@@ -627,7 +626,7 @@ addItem({
 	uSize = 0,
 	description = "Drive pengganti untuk Remote Hands (Fase 2).",
 	specs = { storageGb = 500 },
-	visualColor = Color3.fromRGB(35, 35, 40),
+	visualColor = Color3.fromRGB(92, 110, 134),
 })
 
 -- ===== Cables (aktif penuh di Fase 2) =====
@@ -686,24 +685,23 @@ function Catalog.ListByCategory(category: ItemCategory): { ItemDef }
 		end
 	end
 	table.sort(out, function(a, b)
-		return a.price &lt; b.price
+		return a.price < b.price
 	end)
 	return out
 end
 
 return Catalog
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX9">
 <Properties>
 <string name="Name">PlotConstants</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	PlotConstants (ModuleScript, ReplicatedStorage/Shared)
 	Layout lab per pemain, bounds placement, snap grid, konstanta ekonomi, warna.
-	Dipakai server DAN client: geometry &amp; aturan validasi harus konsisten di dua-duanya.
+	Dipakai server DAN client: geometry & aturan validasi harus konsisten di dua-duanya.
 ]]
 
 export type RoomSpec = {
@@ -735,9 +733,9 @@ PlotConstants.PLOT_POSITIONS = {
 PlotConstants.ROOM = {
 	halfX = 32,
 	halfZ = 32,
-	height = 24,
+	height = 18,
 	doorWidth = 14,
-	doorHeight = 12,
+	doorHeight = 10,
 	floorTopY = 0.5,
 	wallThickness = 1,
 } :: RoomSpec
@@ -761,8 +759,8 @@ PlotConstants.WORKBENCH_POS = Vector3.new(18, 0, -12)
 PlotConstants.NOCDESK_POS = Vector3.new(18, 0, 16)
 PlotConstants.DOCK_POS = Vector3.new(0, 0, -24)
 PlotConstants.ISP_POS = Vector3.new(-20, 0, -28)
-PlotConstants.BEACON_OFFSET = Vector3.new(0, 21, -6)
-PlotConstants.AC_OFFSET = Vector3.new(29, 8, -10)
+PlotConstants.BEACON_OFFSET = Vector3.new(0, 15.6, -6)
+PlotConstants.AC_OFFSET = Vector3.new(29.8, 7, -10)
 
 PlotConstants.STARTER = {
 	isp = { id = "isp_uplink", name = "ISP_Uplink" },
@@ -793,40 +791,61 @@ PlotConstants.ECONOMY = {
 }
 
 PlotConstants.COLORS = {
-	floor = Color3.fromRGB(28, 30, 34),
-	wall = Color3.fromRGB(44, 48, 55),
-	trim = Color3.fromRGB(60, 66, 75),
-	lightPanel = Color3.fromRGB(235, 240, 245),
-	ledGreen = Color3.fromRGB(85, 255, 120),
-	ledYellow = Color3.fromRGB(255, 220, 80),
-	ledRed = Color3.fromRGB(255, 80, 80),
-	ledOff = Color3.fromRGB(70, 70, 70),
-	consoleBlue = Color3.fromRGB(80, 160, 255),
+	floor = Color3.fromRGB(214, 220, 228),
+	floorGrid = Color3.fromRGB(186, 195, 208),
+	wall = Color3.fromRGB(228, 233, 240),
+	wallLower = Color3.fromRGB(108, 122, 142),
+	trim = Color3.fromRGB(188, 198, 210),
+	frame = Color3.fromRGB(68, 78, 94),
+	glass = Color3.fromRGB(165, 215, 245),
+	accentCyan = Color3.fromRGB(56, 189, 248),
+	accentAmber = Color3.fromRGB(245, 196, 48),
+	lightPanel = Color3.fromRGB(248, 252, 255),
+	ledGreen = Color3.fromRGB(60, 245, 115),
+	ledYellow = Color3.fromRGB(255, 215, 70),
+	ledRed = Color3.fromRGB(255, 82, 82),
+	ledOff = Color3.fromRGB(95, 102, 112),
+	consoleBlue = Color3.fromRGB(64, 172, 255),
 }
 
 return PlotConstants
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX10">
 <Properties>
 <string name="Name">ModelFactory</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	ModelFactory (ModuleScript, ReplicatedStorage/Shared)
-	Pabrik model 3D prosedural: device rackable, rack, workbench, NOC desk,
-	dock, ISP uplink, beacon, AC unit, laptop tool, crate, visual komponen.
-	Dipakai server (model asli) dan client (ghost preview placement).
+	Pabrik model 3D prosedural berskala ergonomis karakter Roblox (~5.2 studs):
+	device rackable (1U=0.50 / 2U=1.04), rack (12U=7.6 / 24U=14.3 studs),
+	workbench (tinggi meja 2.68), NOC desk (tinggi meja 2.58, monitor setinggi
+	mata 2.9..5.2), dock, ISP uplink, beacon, AC unit, laptop, crate, komponen.
 	Konvensi: semua model dibangun dengan pivot di titik tengah-bawah (lantai).
 ]]
 
 local Catalog = require(script.Parent.HardwareCatalog)
 local PlotConstants = require(script.Parent.PlotConstants)
 
+type ItemDef = Catalog.ItemDef
+
 local ModelFactory = {}
 
 local C = PlotConstants.COLORS
+
+-- Shared bright industrial palette for multi-part hardware detailing
+local ALU_LIGHT = Color3.fromRGB(204, 212, 224)
+local ALU_MID = Color3.fromRGB(162, 174, 190)
+local SLATE_TRIM = Color3.fromRGB(72, 86, 106)
+local NAVY_PANEL = Color3.fromRGB(48, 64, 88)
+local FACE_LIGHT = Color3.fromRGB(230, 236, 244)
+local PORT_SOCKET = Color3.fromRGB(52, 62, 76)
+local GOLD_PIN = Color3.fromRGB(240, 196, 62)
+local SAFETY_YELLOW = Color3.fromRGB(245, 196, 48)
+local CYAN_ACCENT = Color3.fromRGB(56, 189, 248)
+local ESD_BLUE = Color3.fromRGB(64, 134, 198)
+local OAK_WOOD = Color3.fromRGB(204, 164, 118)
 
 type PortRef = {
 	portId: string,
@@ -841,11 +860,14 @@ local function newPart(props: { [string]: any }): Part
 	p.Name = props.name or "Part"
 	p.Size = props.size or Vector3.new(1, 1, 1)
 	p.CFrame = props.cf or CFrame.new(0, 0, 0)
-	p.Color = props.color or Color3.fromRGB(120, 120, 125)
+	p.Color = props.color or ALU_MID
 	p.Material = props.material or Enum.Material.SmoothPlastic
 	p.Transparency = props.transparency or 0
 	p.CanCollide = if props.canCollide ~= nil then props.canCollide else false
 	p.Anchored = if props.anchored ~= nil then props.anchored else true
+	if props.castShadow ~= nil then
+		p.CastShadow = props.castShadow
+	end
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	if props.shape == "Cylinder" then
@@ -859,72 +881,130 @@ local function neon(props: { [string]: any }): Part
 	return newPart(props)
 end
 
+-- Human-scale rack dimensions (1U = 0.50 studs, 2U = 1.04 studs; fits inside 5.6-wide rack)
 function ModelFactory.DeviceDimensions(itemId: string): (number, number, number, number)
 	-- return: width, height, depth, uSize
 	local def = Catalog.Get(itemId)
 	local uSize = if def then def.uSize else 1
-	local width = 4.6
-	local depth = 3.4
+	local width = 4.4
+	local depth = 2.6
 	if itemId == "switch_8p" then
-		width = 5
+		width = 4.4
 	elseif itemId == "switch_24p" then
-		width = 7
+		width = 4.8
 	elseif itemId == "router_edge" then
-		width = 6
-	elseif itemId == "bm_starter" or itemId == "bm_enterprise" then
 		width = 4.6
-		depth = 3.8
+	elseif itemId == "bm_starter" or itemId == "bm_enterprise" then
+		width = 4.4
+		depth = 2.8
 	end
-	local height = if uSize &lt;= 1 then 1.2 else 2.4
+	local height = if uSize <= 1 then 0.50 else 1.04
 	return width, height, depth, uSize
 end
 
 function ModelFactory.ComputeFootprint(itemId: string): (number, number)
 	local width, _, depth, _ = ModelFactory.DeviceDimensions(itemId)
-	if itemId == "rack_12u" then
-		return 3.6, 2.0
-	elseif itemId == "rack_24u" then
-		return 3.6, 2.0
+	if itemId == "rack_12u" or itemId == "rack_24u" then
+		return 2.9, 1.8
 	end
 	return width / 2 + 0.2, depth / 2 + 0.2
 end
 
 --[[
-	BuildDeviceModel: model device rackable/freeform lengkap dengan port.
-	Mengembalikan: model, ports (portId -&gt; ref), consoleAttachment, statusLED, smoke
+	BuildDeviceModel: model device rackable/freeform berskala 1U/2U realistis,
+	lengkap dengan faceplate, drive bays (server), rack ears, port berkode warna,
+	console port belakang, status LED, dan smoke emitter.
+	Mengembalikan: model, ports (portId -> ref), consoleAttachment, statusLED, smoke
 ]]
 function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model, { [string]: PortRef }, Attachment, Part, ParticleEmitter)
 	local def = Catalog.Get(itemId)
 	assert(def ~= nil, "Item tidak ada di katalog: " .. itemId)
 	local defv = def :: ItemDef
 	local width, height, depth, uSize = ModelFactory.DeviceDimensions(itemId)
+	local isServer = defv.category == "Server" or string.sub(itemId, 1, 8) == "chassis_"
 
 	local model = Instance.new("Model")
 	model.Name = defv.name
 
+	-- Main powder-coated chassis
 	local chassis = newPart({
 		name = "Chassis",
 		size = Vector3.new(width, height, depth),
 		cf = CFrame.new(0, height / 2, 0),
 		color = defv.visualColor,
-		material = Enum.Material.Metal,
+		material = Enum.Material.SmoothPlastic,
 	})
 	chassis.Parent = model
 
-	-- vent dekoratif depan
-	local vent = newPart({
-		name = "Vent",
-		size = Vector3.new(width - 1.2, 0.16, 0.1),
-		cf = CFrame.new(0, height / 2, depth / 2 + 0.05),
-		color = Color3.fromRGB(25, 25, 28),
-	})
-	vent.Parent = model
+	-- Silver top airflow panel
+	newPart({
+		name = "TopGrille",
+		size = Vector3.new(width - 0.5, 0.04, depth - 0.6),
+		cf = CFrame.new(0, height + 0.02, -0.08),
+		color = ALU_LIGHT,
+	}).Parent = model
 
-	-- Status LED
+	-- Rack-mount ears (brushed silver flanges on left & right)
+	for _, side in ipairs({ -1, 1 }) do
+		newPart({
+			name = "RackEar",
+			size = Vector3.new(0.22, height - 0.06, 0.12),
+			cf = CFrame.new(side * (width / 2 + 0.09), height / 2, depth / 2 - 0.05),
+			color = ALU_LIGHT,
+		}).Parent = model
+	end
+
+	-- Contrasting front faceplate bezel
+	local faceplateColor = if isServer then FACE_LIGHT else NAVY_PANEL
+	newPart({
+		name = "Faceplate",
+		size = Vector3.new(width - 0.14, height - 0.08, 0.06),
+		cf = CFrame.new(0, height / 2, depth / 2 + 0.02),
+		color = faceplateColor,
+	}).Parent = model
+
+	-- Category-specific front detailing
+	if isServer then
+		local bayCount = 4
+		local bayAreaW = width - 1.35
+		local bayW = (bayAreaW - 0.28) / bayCount
+		local bayH = math.min(0.46, height * 0.44)
+		for i = 1, bayCount do
+			local bx = -bayAreaW / 2 + (i - 0.5) * (bayAreaW / bayCount) - 0.22
+			newPart({
+				name = "DriveBay_" .. i,
+				size = Vector3.new(bayW, bayH, 0.08),
+				cf = CFrame.new(bx, bayH / 2 + 0.14, depth / 2 + 0.06),
+				color = SLATE_TRIM,
+			}).Parent = model
+			newPart({
+				name = "DriveLatch_" .. i,
+				size = Vector3.new(0.11, bayH - 0.08, 0.1),
+				cf = CFrame.new(bx + bayW / 2 - 0.09, bayH / 2 + 0.14, depth / 2 + 0.07),
+				color = CYAN_ACCENT,
+			}).Parent = model
+		end
+		newPart({
+			name = "AccentStrip",
+			size = Vector3.new(width - 0.35, 0.07, 0.08),
+			cf = CFrame.new(0, height - 0.1, depth / 2 + 0.06),
+			color = if itemId == "bm_enterprise" then GOLD_PIN else CYAN_ACCENT,
+		}).Parent = model
+	else
+		local stripeColor = if itemId == "router_edge" then SAFETY_YELLOW else CYAN_ACCENT
+		newPart({
+			name = "BrandStripe",
+			size = Vector3.new(width - 0.25, 0.06, 0.08),
+			cf = CFrame.new(0, 0.07, depth / 2 + 0.06),
+			color = stripeColor,
+		}).Parent = model
+	end
+
+	-- Status LED (bright neon indicator on front-right)
 	local led = neon({
 		name = "StatusLED",
-		size = Vector3.new(0.3, 0.14, 0.12),
-		cf = CFrame.new(width / 2 - 0.35, height - 0.2, depth / 2 + 0.06),
+		size = Vector3.new(0.22, 0.1, 0.09),
+		cf = CFrame.new(width / 2 - 0.28, height - 0.12, depth / 2 + 0.07),
 		color = C.ledRed,
 	})
 	led.Parent = model
@@ -942,8 +1022,8 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 	smoke.Rate = 8
 	smoke.Lifetime = NumberRange.new(1, 1.8)
 	smoke.Speed = NumberRange.new(1.2, 2.2)
-	smoke.Size = NumberSequence.new(0.45)
-	smoke.Color = ColorSequence.new(Color3.fromRGB(90, 90, 95))
+	smoke.Size = NumberSequence.new(0.4)
+	smoke.Color = ColorSequence.new(Color3.fromRGB(165, 170, 180))
 	smoke.Transparency = NumberSequence.new(0.3, 1)
 	smoke.SpreadAngle = Vector2.new(12, 12)
 	smoke.Enabled = false
@@ -967,21 +1047,44 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 
 	local ports: { [string]: PortRef } = {}
 	local total = #portsSpec
-	if total &gt; 0 then
-		local rows = if total &gt; 12 then 2 else 1
+	if total > 0 then
+		local rows = if total > 12 then 2 else 1
 		local perRow = math.ceil(total / rows)
-		local usable = width - 1.2
-		local step = if perRow &gt; 1 then usable / (perRow - 1) else 0
+		local usable = width - 0.95
+		local step = if perRow > 1 then usable / (perRow - 1) else 0
+		local portW = if rows == 2 then 0.22 else 0.34
+		local portH = if rows == 2 then 0.14 else 0.22
 		for idx, spec in ipairs(portsSpec) do
-			local rowIdx = if rows == 2 then (if idx &lt;= perRow then 0 else 1) else 0
+			local rowIdx = if rows == 2 then (if idx <= perRow then 0 else 1) else 0
 			local colIdx = if rows == 2 then ((idx - 1) % perRow) else (idx - 1)
-			local px = if perRow &gt; 1 then (-usable / 2) + colIdx * step else 0
-			local py = height - 0.45 - rowIdx * 0.5
+			local px: number
+			if isServer then
+				px = width / 2 - 0.52 - (if perRow > 1 then (colIdx * 0.45) else 0)
+			else
+				px = if perRow > 1 then (-usable / 2 - 0.08) + colIdx * step else 0
+			end
+			local py = if rows == 2
+				then (height * 0.68 - rowIdx * 0.22)
+				else (height * 0.54)
+
+			local collarColor = ALU_LIGHT
+			if spec.portType == "WAN" then
+				collarColor = SAFETY_YELLOW
+			elseif spec.portType == "SFP" then
+				collarColor = CYAN_ACCENT
+			end
+			newPart({
+				name = "PortFrame_" .. spec.id,
+				size = Vector3.new(portW + 0.07, portH + 0.07, 0.12),
+				cf = CFrame.new(px, py, depth / 2 + 0.06),
+				color = collarColor,
+			}).Parent = model
+
 			local portPart = newPart({
 				name = "Port_" .. spec.id,
-				size = Vector3.new(0.55, 0.4, 0.24),
-				cf = CFrame.new(px, py, depth / 2 + 0.12),
-				color = Color3.fromRGB(30, 30, 34),
+				size = Vector3.new(portW, portH, 0.18),
+				cf = CFrame.new(px, py, depth / 2 + 0.1),
+				color = PORT_SOCKET,
 			})
 			portPart:SetAttribute("PortId", spec.id)
 			portPart:SetAttribute("PortType", spec.portType)
@@ -990,8 +1093,8 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 
 			local portLed = neon({
 				name = "PortLED_" .. spec.id,
-				size = Vector3.new(0.18, 0.12, 0.06),
-				cf = CFrame.new(px, py - 0.28, depth / 2 + 0.14),
+				size = Vector3.new(math.min(0.14, portW * 0.5), 0.06, 0.07),
+				cf = CFrame.new(px, py - portH / 2 - 0.05, depth / 2 + 0.11),
 				color = C.ledOff,
 			})
 			portLed:SetAttribute("PortId", spec.id)
@@ -1000,7 +1103,7 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 
 			local attach = Instance.new("Attachment")
 			attach.Name = "PortAttach"
-			attach.CFrame = CFrame.new(0, 0, -0.14)
+			attach.CFrame = CFrame.new(0, 0, 0.11)
 			attach.Parent = portPart
 
 			local click = Instance.new("ClickDetector")
@@ -1012,18 +1115,24 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 		end
 	end
 
-	-- Console port (belakang, biru)
+	-- Console port (belakang, biru terang + collar silver)
+	newPart({
+		name = "ConsoleCollar",
+		size = Vector3.new(0.58, math.min(0.42, height - 0.06), 0.12),
+		cf = CFrame.new(0, height / 2, -depth / 2 - 0.04),
+		color = ALU_LIGHT,
+	}).Parent = model
 	local consolePart = neon({
 		name = "ConsolePort",
-		size = Vector3.new(0.6, 0.45, 0.22),
-		cf = CFrame.new(0, height / 2, -depth / 2 - 0.11),
+		size = Vector3.new(0.44, math.min(0.32, height - 0.12), 0.18),
+		cf = CFrame.new(0, height / 2, -depth / 2 - 0.09),
 		color = C.consoleBlue,
 	})
 	consolePart:SetAttribute("ConsoleDeviceId", deviceId)
 	consolePart.Parent = model
 	local consoleAttach = Instance.new("Attachment")
 	consoleAttach.Name = "ConsoleAttach"
-	consoleAttach.CFrame = CFrame.new(0, 0, 0.12)
+	consoleAttach.CFrame = CFrame.new(0, 0, -0.1)
 	consoleAttach.Parent = consolePart
 
 	local prompt = Instance.new("ProximityPrompt")
@@ -1044,67 +1153,117 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 end
 
 --[[
-	BuildRack: rak dengan slot attachment U1..UmaxU + PDU strip.
+	BuildRack: rak enterprise proporsional (12U = ~7.6 studs, 24U = ~14.3 studs)
+	dengan plinth bawah, rail U silver, header LED, dan vertical PDU strip.
+	SlotFrame diposisikan di z = -0.80 sehingga offset +0.95 dari BuildFacility
+	mendudukkan device rata rapi di dalam kabinet rak.
 ]]
 function ModelFactory.BuildRack(itemId: string, rackId: string): (Model, { [number]: Attachment }, Part)
 	local def = Catalog.Get(itemId)
 	assert(def ~= nil, "Item tidak ada di katalog: " .. itemId)
 	local defv = def :: ItemDef
 	local maxU = defv.specs.maxU
-	local slotH = 1.3
-	local baseH = 1
+	local slotH = 0.56
+	local baseH = 0.55
 	local bodyH = maxU * slotH + baseH
-	local w = 7
-	local d = 3.5
+	local w = 5.6
+	local d = 3.2
 
 	local model = Instance.new("Model")
 	model.Name = defv.name
 
-	local back = newPart({
-		name = "BackPanel",
-		size = Vector3.new(w, bodyH, 0.3),
-		cf = CFrame.new(0, bodyH / 2, -d / 2 + 0.15),
-		color = defv.visualColor,
-		material = Enum.Material.Metal,
-	})
-	back.Parent = model
-	model.PrimaryPart = back
+	-- Bottom plinth base
+	newPart({
+		name = "BasePlinth",
+		size = Vector3.new(w, baseH * 0.85, d),
+		cf = CFrame.new(0, baseH * 0.425, 0),
+		color = SLATE_TRIM,
+		canCollide = true,
+	}).Parent = model
 
+	-- Back panel (clean slate blue-grey)
+	newPart({
+		name = "BackPanel",
+		size = Vector3.new(w - 0.35, bodyH - baseH * 0.5, 0.16),
+		cf = CFrame.new(0, bodyH / 2 + 0.15, -d / 2 + 0.08),
+		color = defv.visualColor,
+		canCollide = true,
+	}).Parent = model
+
+	-- 4 vertical corner posts + brushed silver front U-rails + side braces
 	for sx = -1, 1, 2 do
 		for sz = -1, 1, 2 do
-			local post = newPart({
+			newPart({
 				name = "Post",
-				size = Vector3.new(0.45, bodyH, 0.45),
-				cf = CFrame.new(sx * (w / 2 - 0.25), bodyH / 2, sz * (d / 2 - 0.25)),
-				color = Color3.fromRGB(35, 37, 42),
-				material = Enum.Material.Metal,
-			})
-			post.Parent = model
+				size = Vector3.new(0.32, bodyH, 0.32),
+				cf = CFrame.new(sx * (w / 2 - 0.18), bodyH / 2, sz * (d / 2 - 0.18)),
+				color = SLATE_TRIM,
+				canCollide = true,
+			}).Parent = model
+		end
+		-- Brushed aluminum front U-mounting rail
+		newPart({
+			name = "FrontRail",
+			size = Vector3.new(0.16, bodyH - baseH, 0.14),
+			cf = CFrame.new(sx * (w / 2 - 0.44), baseH + (bodyH - baseH) / 2, d / 2 - 0.22),
+			color = ALU_LIGHT,
+		}).Parent = model
+		-- Side horizontal cross-braces
+		for _, frac in ipairs({ 0.36, 0.72 }) do
+			newPart({
+				name = "SideBrace",
+				size = Vector3.new(0.14, 0.2, d - 0.6),
+				cf = CFrame.new(sx * (w / 2 - 0.18), bodyH * frac, 0),
+				color = ALU_MID,
+			}).Parent = model
 		end
 	end
 
-	local topCap = newPart({
+	-- Top cap roof + illuminated front header LED bar
+	newPart({
 		name = "TopCap",
-		size = Vector3.new(w, 0.4, d),
-		cf = CFrame.new(0, bodyH + 0.2, 0),
-		color = Color3.fromRGB(35, 37, 42),
-		material = Enum.Material.Metal,
-	})
-	topCap.Parent = model
+		size = Vector3.new(w + 0.16, 0.36, d + 0.16),
+		cf = CFrame.new(0, bodyH + 0.18, 0),
+		color = SLATE_TRIM,
+		canCollide = true,
+	}).Parent = model
+	neon({
+		name = "RackHeaderLED",
+		size = Vector3.new(w - 0.6, 0.12, 0.1),
+		cf = CFrame.new(0, bodyH + 0.18, d / 2 + 0.09),
+		color = if itemId == "rack_24u" then GOLD_PIN else CYAN_ACCENT,
+	}).Parent = model
 
-	-- PDU strip (belakang kanan)
+	-- High-visibility vertical PDU power strip (right rear)
+	local pduH = math.max(3.6, bodyH - 1.0)
 	local pdu = newPart({
 		name = "PDU_Strip",
-		size = Vector3.new(0.5, bodyH - 1.4, 0.5),
-		cf = CFrame.new(w / 2 - 0.6, (bodyH - 1.4) / 2 + 0.7, -d / 2 + 0.8),
-		color = Color3.fromRGB(28, 28, 32),
-		material = Enum.Material.Metal,
+		size = Vector3.new(0.42, pduH, 0.42),
+		cf = CFrame.new(w / 2 - 0.44, pduH / 2 + 0.55, -d / 2 + 0.55),
+		color = NAVY_PANEL,
+		canCollide = true,
 	})
 	pdu.Parent = model
+	newPart({
+		name = "PDUStripe",
+		size = Vector3.new(0.1, pduH - 0.3, 0.44),
+		cf = CFrame.new(w / 2 - 0.64, pduH / 2 + 0.55, -d / 2 + 0.55),
+		color = Color3.fromRGB(235, 90, 70),
+	}).Parent = model
+	local outletCount = math.clamp(math.floor(pduH / 1.1), 4, 8)
+	for i = 1, outletCount do
+		local oy = 0.9 + (i - 0.5) * ((pduH - 0.9) / outletCount)
+		newPart({
+			name = "PDUOutlet_" .. i,
+			size = Vector3.new(0.24, 0.28, 0.1),
+			cf = CFrame.new(w / 2 - 0.44, oy, -d / 2 + 0.78),
+			color = FACE_LIGHT,
+		}).Parent = model
+	end
 	local pduLed = neon({
 		name = "PDULed",
-		size = Vector3.new(0.22, 0.22, 0.1),
-		cf = CFrame.new(w / 2 - 0.6, bodyH - 1.1, -d / 2 + 0.55),
+		size = Vector3.new(0.22, 0.22, 0.12),
+		cf = CFrame.new(w / 2 - 0.44, pduH + 0.2, -d / 2 + 0.78),
 		color = C.ledGreen,
 	})
 	pduLed.Parent = model
@@ -1113,12 +1272,13 @@ function ModelFactory.BuildRack(itemId: string, rackId: string): (Model, { [numb
 	pduClick.MaxActivationDistance = 45
 	pduClick.Parent = pdu
 
-	-- Slot attachments di muka rak (z positif)
+	-- Slot attachments: z = -0.80 so WorldCFrame * CFrame.new(0, 0, 0.95) puts
+	-- mounted devices at z = +0.15 (front faceplate flush with front rack rails).
 	local slots: { [number]: Attachment } = {}
 	local slotFrame = newPart({
 		name = "SlotFrame",
-		size = Vector3.new(w - 1, 0.1, 0.1),
-		cf = CFrame.new(0, baseH + 0.05, d / 2 - 0.35),
+		size = Vector3.new(w - 0.8, 0.08, 0.08),
+		cf = CFrame.new(0, baseH, -0.80),
 		transparency = 1,
 	})
 	slotFrame.Parent = model
@@ -1137,56 +1297,121 @@ function ModelFactory.BuildRack(itemId: string, rackId: string): (Model, { [numb
 	return model, slots, pdu
 end
 
+--[[
+	BuildWorkbench: meja rakit ergonomis (permukaan 2.68 studs, ESD mat 2.72)
+	dengan kayu oak cerah, pegboard alat, lampu kerja LED (5.1 studs), dan saklar merah.
+]]
 function ModelFactory.BuildWorkbench(): (Model, { [number]: Attachment }, Part, Part)
 	local model = Instance.new("Model")
 	model.Name = "AssemblyWorkbench"
 
+	-- Warm light oak butcher-block tabletop (surface at y = 2.68)
 	local top = newPart({
 		name = "BenchTop",
-		size = Vector3.new(10, 0.4, 5),
-		cf = CFrame.new(0, 3.3, 0),
-		color = Color3.fromRGB(66, 60, 52),
+		size = Vector3.new(8.6, 0.28, 4.0),
+		cf = CFrame.new(0, 2.54, 0),
+		color = OAK_WOOD,
 		material = Enum.Material.Wood,
+		canCollide = true,
 	})
 	top.Parent = model
-	model.PrimaryPart = top
 
+	-- Blue anti-static ESD mat on bench surface (top at y = 2.72)
+	newPart({
+		name = "ESDMat",
+		size = Vector3.new(6.8, 0.04, 3.1),
+		cf = CFrame.new(-0.4, 2.70, 0.1),
+		color = ESD_BLUE,
+	}).Parent = model
+
+	-- Silver tubular industrial frame legs + lower storage shelf
 	for sx = -1, 1, 2 do
 		for sz = -1, 1, 2 do
-			local leg = newPart({
+			newPart({
 				name = "Leg",
-				size = Vector3.new(0.5, 3.1, 0.5),
-				cf = CFrame.new(sx * 4.4, 1.55, sz * 2.0),
-				color = Color3.fromRGB(45, 42, 38),
-				material = Enum.Material.Metal,
-			})
-			leg.Parent = model
+				size = Vector3.new(0.34, 2.4, 0.34),
+				cf = CFrame.new(sx * 3.9, 1.2, sz * 1.65),
+				color = ALU_MID,
+				canCollide = true,
+			}).Parent = model
 		end
 	end
+	newPart({
+		name = "LowerShelf",
+		size = Vector3.new(7.6, 0.14, 3.1),
+		cf = CFrame.new(0, 0.65, 0),
+		color = ALU_LIGHT,
+		canCollide = true,
+	}).Parent = model
 
-	local backPanel = newPart({
+	-- Eye-level tool pegboard backpanel (y = 2.68..4.98) + overhead task light (y = 5.1)
+	newPart({
 		name = "BackPanel",
-		size = Vector3.new(10, 2.2, 0.25),
-		cf = CFrame.new(0, 4.6, -2.3),
-		color = Color3.fromRGB(52, 48, 44),
-		material = Enum.Material.Metal,
+		size = Vector3.new(8.6, 2.3, 0.22),
+		cf = CFrame.new(0, 3.83, -1.89),
+		color = Color3.fromRGB(136, 150, 168),
+		canCollide = true,
+	}).Parent = model
+	newPart({
+		name = "ToolTray",
+		size = Vector3.new(3.4, 0.2, 0.45),
+		cf = CFrame.new(-1.8, 3.35, -1.58),
+		color = SAFETY_YELLOW,
+	}).Parent = model
+	newPart({
+		name = "ScrewdriverA",
+		size = Vector3.new(0.14, 0.95, 0.14),
+		cf = CFrame.new(1.9, 3.95, -1.72),
+		color = Color3.fromRGB(235, 92, 68),
+	}).Parent = model
+	newPart({
+		name = "ScrewdriverB",
+		size = Vector3.new(0.14, 0.8, 0.14),
+		cf = CFrame.new(2.35, 3.88, -1.72),
+		color = CYAN_ACCENT,
+	}).Parent = model
+	newPart({
+		name = "TaskLightHood",
+		size = Vector3.new(8.6, 0.22, 1.35),
+		cf = CFrame.new(0, 5.08, -1.35),
+		color = SLATE_TRIM,
+	}).Parent = model
+	local taskBar = neon({
+		name = "TaskLightBar",
+		size = Vector3.new(7.4, 0.1, 0.42),
+		cf = CFrame.new(0, 4.94, -1.05),
+		color = Color3.fromRGB(250, 252, 255),
 	})
-	backPanel.Parent = model
+	taskBar.Parent = model
+	local taskLight = Instance.new("SurfaceLight")
+	taskLight.Face = Enum.NormalId.Bottom
+	taskLight.Range = 12
+	taskLight.Brightness = 1.5
+	taskLight.Angle = 120
+	taskLight.Parent = taskBar
 
+	-- Snap attachments flush on ESD mat (2.54 + 0.18 = 2.72)
 	local snaps: { [number]: Attachment } = {}
 	for i = 1, 6 do
 		local a = Instance.new("Attachment")
 		a.Name = "Snap_" .. i
-		a.CFrame = CFrame.new(-3.75 + (i - 1) * 1.5, 0.2, 0)
+		a.CFrame = CFrame.new(-3.25 + (i - 1) * 1.3, 0.18, 0)
 		a.Parent = top
 		snaps[i] = a
 	end
 
+	-- Power switch box + red clickable switch + bright LED on right edge of bench
+	newPart({
+		name = "SwitchHousing",
+		size = Vector3.new(0.88, 0.24, 0.88),
+		cf = CFrame.new(3.65, 2.80, 1.25),
+		color = ALU_LIGHT,
+	}).Parent = model
 	local switchPart = newPart({
 		name = "PowerSwitch",
-		size = Vector3.new(0.7, 0.5, 0.4),
-		cf = CFrame.new(4.5, 3.75, 1.6),
-		color = Color3.fromRGB(200, 60, 60),
+		size = Vector3.new(0.62, 0.36, 0.36),
+		cf = CFrame.new(3.65, 3.04, 1.25),
+		color = Color3.fromRGB(230, 68, 68),
 	})
 	switchPart.Parent = model
 	local switchClick = Instance.new("ClickDetector")
@@ -1196,8 +1421,8 @@ function ModelFactory.BuildWorkbench(): (Model, { [number]: Attachment }, Part, 
 
 	local benchLed = neon({
 		name = "BenchLed",
-		size = Vector3.new(0.3, 0.2, 0.1),
-		cf = CFrame.new(4.5, 4.15, 1.6),
+		size = Vector3.new(0.26, 0.18, 0.12),
+		cf = CFrame.new(3.65, 3.34, 1.25),
 		color = C.ledOff,
 	})
 	benchLed.Parent = model
@@ -1206,65 +1431,104 @@ function ModelFactory.BuildWorkbench(): (Model, { [number]: Attachment }, Part, 
 	return model, snaps, switchPart, benchLed
 end
 
+--[[
+	BuildNOCDesk: konsol operasi NOC ergonomis (tinggi meja 2.58 studs,
+	3 monitor widescreen melengkung tepat setinggi mata di y = 2.88..5.22,
+	PixelsPerStud = 78 agar layout SurfaceGui 180px pas & tajam).
+]]
 function ModelFactory.BuildNOCDesk(): (Model, { [string]: Part })
 	local model = Instance.new("Model")
 	model.Name = "NOCDesk"
 
+	-- Human-scale command-center desktop (surface at y = 2.58)
 	local top = newPart({
 		name = "DeskTop",
-		size = Vector3.new(14, 0.4, 5),
-		cf = CFrame.new(0, 3.3, 0),
-		color = Color3.fromRGB(52, 56, 64),
-		material = Enum.Material.Metal,
+		size = Vector3.new(11.6, 0.28, 4.0),
+		cf = CFrame.new(0, 2.44, 0),
+		color = Color3.fromRGB(216, 222, 232),
+		canCollide = true,
 	})
 	top.Parent = model
-	model.PrimaryPart = top
 
+	-- Cobalt-blue modesty panel + cyan LED front accent trim
+	newPart({
+		name = "FrontPanel",
+		size = Vector3.new(10.6, 1.7, 0.2),
+		cf = CFrame.new(0, 1.45, -1.75),
+		color = Color3.fromRGB(64, 118, 198),
+		canCollide = true,
+	}).Parent = model
+	neon({
+		name = "DeskAccentLED",
+		size = Vector3.new(11.4, 0.08, 0.1),
+		cf = CFrame.new(0, 2.32, 2.02),
+		color = CYAN_ACCENT,
+	}).Parent = model
+
+	-- Brushed silver legs
 	for sx = -1, 1, 2 do
 		for sz = -1, 1, 2 do
-			local leg = newPart({
+			newPart({
 				name = "Leg",
-				size = Vector3.new(0.5, 3.1, 0.5),
-				cf = CFrame.new(sx * 6.4, 1.55, sz * 2.0),
-				color = Color3.fromRGB(40, 42, 48),
-				material = Enum.Material.Metal,
-			})
-			leg.Parent = model
+				size = Vector3.new(0.34, 2.3, 0.34),
+				cf = CFrame.new(sx * 5.3, 1.15, sz * 1.65),
+				color = ALU_MID,
+				canCollide = true,
+			}).Parent = model
 		end
 	end
 
+	-- Articulated monitor arm rail behind monitors
+	newPart({
+		name = "MonitorBar",
+		size = Vector3.new(8.6, 0.18, 0.18),
+		cf = CFrame.new(0, 3.65, -1.35),
+		color = ALU_LIGHT,
+	}).Parent = model
+	newPart({
+		name = "MonitorCenterPost",
+		size = Vector3.new(0.28, 1.35, 0.28),
+		cf = CFrame.new(0, 3.2, -1.35),
+		color = ALU_MID,
+	}).Parent = model
+
+	-- 3 eye-level widescreen monitors (y = 2.88..5.23), gently angled toward operator
 	local monitors: { [string]: Part } = {}
-	local names = { "TopologyMonitor", "TicketMonitor", "TelemetryMonitor" }
-	for i, name in ipairs(names) do
-		local stand = newPart({
-			name = name .. "_Stand",
-			size = Vector3.new(0.4, 1.6, 0.4),
-			cf = CFrame.new(-4.7 + (i - 1) * 4.7, 4.3, -1.4),
-			color = Color3.fromRGB(30, 32, 36),
-		})
-		stand.Parent = model
+	local specs = {
+		{ name = "TopologyMonitor", x = -3.65, z = -0.82, yaw = 12 },
+		{ name = "TicketMonitor", x = 0, z = -1.12, yaw = 0 },
+		{ name = "TelemetryMonitor", x = 3.65, z = -0.82, yaw = -12 },
+	}
+	for _, m in ipairs(specs) do
+		local baseCF = CFrame.new(m.x, 4.05, m.z) * CFrame.Angles(0, math.rad(m.yaw), 0) * CFrame.Angles(math.rad(-4), 0, 0)
+		newPart({
+			name = m.name .. "_Stand",
+			size = Vector3.new(0.24, 1.25, 0.24),
+			cf = CFrame.new(m.x, 3.18, m.z - 0.16),
+			color = ALU_MID,
+		}).Parent = model
 
 		local screen = newPart({
-			name = name,
-			size = Vector3.new(4.4, 3.0, 0.25),
-			cf = CFrame.new(-4.7 + (i - 1) * 4.7, 6.6, -1.35) * CFrame.Angles(math.rad(-6), 0, 0),
-			color = Color3.fromRGB(12, 13, 16),
+			name = m.name,
+			size = Vector3.new(3.5, 2.35, 0.16),
+			cf = baseCF,
+			color = Color3.fromRGB(16, 22, 32),
 		})
 		screen.Parent = model
 
-		local bezelTop = newPart({
-			name = name .. "_Bezel",
-			size = Vector3.new(4.6, 3.2, 0.15),
-			cf = CFrame.new(-4.7 + (i - 1) * 4.7, 6.6, -1.5) * CFrame.Angles(math.rad(-6), 0, 0),
-			color = Color3.fromRGB(24, 26, 30),
-		})
-		bezelTop.Parent = model
+		-- Slim silver monitor back bezel
+		newPart({
+			name = m.name .. "_Bezel",
+			size = Vector3.new(3.68, 2.52, 0.12),
+			cf = baseCF * CFrame.new(0, 0, -0.11),
+			color = ALU_LIGHT,
+		}).Parent = model
 
 		local gui = Instance.new("SurfaceGui")
 		gui.Name = "SurfaceGui"
 		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		gui.PixelsPerStud = 60
-		gui.Face = Enum.NormalId.Front
+		gui.PixelsPerStud = 78 -- 3.5*78=273px x 2.35*78=183px (matches NOCMonitorClient layout)
+		gui.Face = Enum.NormalId.Back
 		gui.Brightness = 2
 		gui.Parent = screen
 
@@ -1274,74 +1538,213 @@ function ModelFactory.BuildNOCDesk(): (Model, { [string]: Part })
 		root.BackgroundTransparency = 1
 		root.Parent = gui
 
-		monitors[name] = screen
+		monitors[m.name] = screen
 	end
+
+	-- Desk accessories scaled to desktop height (y = 2.58)
+	newPart({
+		name = "DeskMat",
+		size = Vector3.new(4.6, 0.03, 1.65),
+		cf = CFrame.new(0, 2.60, 0.75),
+		color = NAVY_PANEL,
+	}).Parent = model
+	newPart({
+		name = "Keyboard",
+		size = Vector3.new(2.2, 0.1, 0.78),
+		cf = CFrame.new(-0.35, 2.65, 0.75),
+		color = ALU_LIGHT,
+	}).Parent = model
+	neon({
+		name = "KeyboardGlow",
+		size = Vector3.new(2.05, 0.03, 0.64),
+		cf = CFrame.new(-0.35, 2.71, 0.75),
+		color = CYAN_ACCENT,
+	}).Parent = model
+	newPart({
+		name = "Mouse",
+		size = Vector3.new(0.36, 0.1, 0.58),
+		cf = CFrame.new(1.35, 2.65, 0.78),
+		color = FACE_LIGHT,
+	}).Parent = model
+	newPart({
+		name = "CoffeeMug",
+		shape = "Cylinder",
+		size = Vector3.new(0.58, 0.44, 0.44),
+		cf = CFrame.new(4.1, 2.88, 0.85) * CFrame.Angles(0, 0, math.rad(90)),
+		color = Color3.fromRGB(56, 178, 172),
+	}).Parent = model
+
+	-- Ergonomic swivel office chair tucked slightly aside (non-colliding so walking is smooth)
+	local chairCF = CFrame.new(-2.8, 0, 3.1) * CFrame.Angles(0, math.rad(20), 0)
+	newPart({
+		name = "ChairBase",
+		shape = "Cylinder",
+		size = Vector3.new(0.18, 2.0, 2.0),
+		cf = chairCF * CFrame.new(0, 0.12, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		color = ALU_MID,
+	}).Parent = model
+	newPart({
+		name = "ChairStem",
+		shape = "Cylinder",
+		size = Vector3.new(1.25, 0.24, 0.24),
+		cf = chairCF * CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		color = SLATE_TRIM,
+	}).Parent = model
+	newPart({
+		name = "ChairSeat",
+		size = Vector3.new(1.85, 0.26, 1.75),
+		cf = chairCF * CFrame.new(0, 1.5, 0),
+		color = Color3.fromRGB(56, 98, 168),
+	}).Parent = model
+	newPart({
+		name = "ChairBack",
+		size = Vector3.new(1.75, 2.1, 0.22),
+		cf = chairCF * CFrame.new(0, 2.6, 0.82) * CFrame.Angles(math.rad(-8), 0, 0),
+		color = Color3.fromRGB(56, 98, 168),
+	}).Parent = model
 
 	model.WorldPivot = CFrame.new(0, 0, 0)
 	return model, monitors
 end
 
+--[[
+	BuildDockPad: platform loading dock industrial berskala rapi (10.4x10.4)
+	dengan tepi kuning safety, 4 bollard sudut, dan zona hologram hijau.
+]]
 function ModelFactory.BuildDockPad(): (Model, CFrame)
 	local model = Instance.new("Model")
 	model.Name = "LoadingDock"
+
+	newPart({
+		name = "DockDeck",
+		size = Vector3.new(10.4, 0.26, 10.4),
+		cf = CFrame.new(0, 0.13, 0),
+		color = Color3.fromRGB(190, 198, 210),
+		material = Enum.Material.DiamondPlate,
+		canCollide = true,
+	}).Parent = model
+
+	local frameDefs = {
+		{ size = Vector3.new(10.6, 0.3, 0.36), cf = CFrame.new(0, 0.15, 5.2) },
+		{ size = Vector3.new(10.6, 0.3, 0.36), cf = CFrame.new(0, 0.15, -5.2) },
+		{ size = Vector3.new(0.36, 0.3, 10.0), cf = CFrame.new(5.2, 0.15, 0) },
+		{ size = Vector3.new(0.36, 0.3, 10.0), cf = CFrame.new(-5.2, 0.15, 0) },
+	}
+	for i, fd in ipairs(frameDefs) do
+		newPart({
+			name = "SafetyTrim_" .. i,
+			size = fd.size,
+			cf = fd.cf,
+			color = SAFETY_YELLOW,
+		}).Parent = model
+	end
+
+	for sx = -1, 1, 2 do
+		for sz = -1, 1, 2 do
+			newPart({
+				name = "Bollard",
+				shape = "Cylinder",
+				size = Vector3.new(1.85, 0.44, 0.44),
+				cf = CFrame.new(sx * 4.9, 0.925, sz * 4.9) * CFrame.Angles(0, 0, math.rad(90)),
+				color = SAFETY_YELLOW,
+				canCollide = true,
+			}).Parent = model
+		end
+	end
+
 	local pad = newPart({
 		name = "DockPad",
-		size = Vector3.new(12, 0.2, 12),
-		cf = CFrame.new(0, 0.6, 0),
-		color = Color3.fromRGB(70, 200, 110),
+		size = Vector3.new(9.2, 0.1, 9.2),
+		cf = CFrame.new(0, 0.31, 0),
+		color = Color3.fromRGB(64, 218, 134),
 		material = Enum.Material.Neon,
 		transparency = 0.55,
 	})
 	pad.Parent = model
+
 	model.WorldPivot = CFrame.new(0, 0, 0)
-	return model, CFrame.new(0, 1.6, 0)
+	return model, CFrame.new(0, 0.36, 0)
 end
 
+--[[
+	BuildISPUplink: kotak demarkasi fiber ISP setinggi tangan/mata (2.7..4.9)
+	dengan pipa conduit fiber kuning menuju overhead cable tray (y = 15.2).
+]]
 function ModelFactory.BuildISPUplink(deviceId: string): (Model, Attachment, Part)
 	local model = Instance.new("Model")
 	model.Name = "ISP_Uplink"
 
 	local box = newPart({
 		name = "Chassis",
-		size = Vector3.new(3, 2.5, 1.6),
-		cf = CFrame.new(0, 4, 0),
-		color = Color3.fromRGB(130, 132, 138),
-		material = Enum.Material.Metal,
+		size = Vector3.new(2.6, 2.2, 1.2),
+		cf = CFrame.new(0, 3.8, 0),
+		color = FACE_LIGHT,
+		canCollide = true,
 	})
 	box.Parent = model
-	model.PrimaryPart = box
+
+	newPart({
+		name = "ISPBezel",
+		size = Vector3.new(2.25, 1.8, 0.12),
+		cf = CFrame.new(0, 3.8, 0.62),
+		color = SLATE_TRIM,
+	}).Parent = model
+	newPart({
+		name = "FiberStripe",
+		size = Vector3.new(2.25, 0.22, 0.14),
+		cf = CFrame.new(0, 4.55, 0.63),
+		color = SAFETY_YELLOW,
+	}).Parent = model
+
+	-- Vertical yellow fiber conduit pipe climbing to overhead cable tray
+	newPart({
+		name = "FiberConduit",
+		shape = "Cylinder",
+		size = Vector3.new(10.3, 0.34, 0.34),
+		cf = CFrame.new(0, 10.05, -0.15) * CFrame.Angles(0, 0, math.rad(90)),
+		color = SAFETY_YELLOW,
+	}).Parent = model
 
 	local led = neon({
 		name = "StatusLED",
-		size = Vector3.new(0.3, 0.2, 0.1),
-		cf = CFrame.new(1, 4.8, 0.85),
+		size = Vector3.new(0.26, 0.18, 0.1),
+		cf = CFrame.new(0.82, 4.22, 0.72),
 		color = C.ledGreen,
 	})
 	led.Parent = model
 
+	newPart({
+		name = "WANCollar",
+		size = Vector3.new(0.62, 0.46, 0.14),
+		cf = CFrame.new(0, 3.55, 0.7),
+		color = SAFETY_YELLOW,
+	}).Parent = model
 	local wanPart = newPart({
 		name = "Port_wan1",
-		size = Vector3.new(0.55, 0.4, 0.24),
-		cf = CFrame.new(0, 3.6, 0.92),
-		color = Color3.fromRGB(30, 30, 34),
+		size = Vector3.new(0.46, 0.34, 0.2),
+		cf = CFrame.new(0, 3.55, 0.77),
+		color = PORT_SOCKET,
 	})
 	wanPart:SetAttribute("PortId", "wan1")
 	wanPart:SetAttribute("PortType", "WAN")
 	wanPart:SetAttribute("DeviceId", deviceId)
 	wanPart.Parent = model
+
 	local wanLed = neon({
 		name = "PortLED_wan1",
-		size = Vector3.new(0.18, 0.12, 0.06),
-		cf = CFrame.new(0, 3.3, 0.94),
+		size = Vector3.new(0.2, 0.12, 0.08),
+		cf = CFrame.new(0, 3.22, 0.77),
 		color = C.ledGreen,
 	})
 	wanLed:SetAttribute("PortId", "wan1")
 	wanLed:SetAttribute("DeviceId", deviceId)
 	wanLed.Parent = model
+
 	local attach = Instance.new("Attachment")
 	attach.Name = "PortAttach"
-	attach.CFrame = CFrame.new(0, 0, 0.14)
+	attach.CFrame = CFrame.new(0, 0, 0.12)
 	attach.Parent = wanPart
+
 	local click = Instance.new("ClickDetector")
 	click.Name = "Click"
 	click.MaxActivationDistance = 45
@@ -1352,70 +1755,135 @@ function ModelFactory.BuildISPUplink(deviceId: string): (Model, Attachment, Part
 	return model, attach, wanLed
 end
 
+--[[
+	BuildBeacon: lampu alarm plafon dengan collar silver & lensa merah.
+]]
 function ModelFactory.BuildBeacon(): (Model, Part, PointLight)
 	local model = Instance.new("Model")
 	model.Name = "AlarmBeacon"
-	local base = newPart({
+
+	newPart({
 		name = "BeaconBase",
-		size = Vector3.new(1.2, 0.6, 1.2),
-		cf = CFrame.new(0, 0, 0),
-		color = Color3.fromRGB(35, 35, 40),
-		material = Enum.Material.Metal,
-	})
-	base.Parent = model
+		shape = "Cylinder",
+		size = Vector3.new(0.42, 1.25, 1.25),
+		cf = CFrame.new(0, 0, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		color = ALU_LIGHT,
+	}).Parent = model
+
 	local lens = neon({
 		name = "BeaconLens",
 		shape = "Cylinder",
-		size = Vector3.new(1.0, 1.0, 1.0),
-		cf = CFrame.new(0, 0.8, 0),
+		size = Vector3.new(0.82, 0.88, 0.88),
+		cf = CFrame.new(0, 0.58, 0) * CFrame.Angles(0, 0, math.rad(90)),
 		color = C.ledRed,
-		transparency = 0.25,
+		transparency = 0.2,
 	})
 	lens.Parent = model
+
 	local light = Instance.new("PointLight")
 	light.Name = "AlarmLight"
 	light.Color = Color3.fromRGB(255, 70, 70)
-	light.Range = 26
+	light.Range = 24
 	light.Brightness = 0
 	light.Parent = lens
+
 	model.WorldPivot = CFrame.new(0, 0, 0)
 	return model, lens, light
 end
 
+--[[
+	BuildACUnit: unit CRAC dinding putih bersih dengan kipas silinder rata
+	yang berputar mulus di Heartbeat.
+]]
 function ModelFactory.BuildACUnit(): (Model, Part)
 	local model = Instance.new("Model")
 	model.Name = "AC_Unit"
+
 	local body = newPart({
 		name = "ACBody",
-		size = Vector3.new(1.6, 4, 6),
+		size = Vector3.new(1.4, 3.4, 5.0),
 		cf = CFrame.new(0, 0, 0),
-		color = Color3.fromRGB(190, 194, 200),
-		material = Enum.Material.Metal,
+		color = Color3.fromRGB(236, 242, 248),
+		canCollide = true,
 	})
 	body.Parent = model
-	model.PrimaryPart = body
+
+	newPart({
+		name = "ACTrim",
+		size = Vector3.new(1.46, 0.28, 5.06),
+		cf = CFrame.new(0, 1.32, 0),
+		color = Color3.fromRGB(82, 162, 224),
+	}).Parent = model
+	neon({
+		name = "ACLed",
+		size = Vector3.new(0.12, 0.16, 0.42),
+		cf = CFrame.new(-0.74, 1.32, 1.85),
+		color = CYAN_ACCENT,
+	}).Parent = model
+
+	for i = 1, 4 do
+		newPart({
+			name = "ACLouver_" .. i,
+			size = Vector3.new(0.14, 0.18, 1.5),
+			cf = CFrame.new(-0.72, -0.95 + i * 0.44, 1.4),
+			color = ALU_MID,
+		}).Parent = model
+	end
+
 	local fan = newPart({
 		name = "ACFan",
 		shape = "Cylinder",
-		size = Vector3.new(0.3, 2.6, 2.6),
-		cf = CFrame.new(-0.95, 0, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		color = Color3.fromRGB(60, 62, 68),
+		size = Vector3.new(0.24, 2.1, 2.1),
+		cf = CFrame.new(-0.76, -0.12, -0.8),
+		color = SLATE_TRIM,
 	})
 	fan.Parent = model
+
+	local fanGui = Instance.new("SurfaceGui")
+	fanGui.Name = "FanBlades"
+	fanGui.Face = Enum.NormalId.Left
+	fanGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+	fanGui.CanvasSize = Vector2.new(128, 128)
+	fanGui.Parent = fan
+	for _, rot in ipairs({ 0, 60, 120 }) do
+		local blade = Instance.new("Frame")
+		blade.AnchorPoint = Vector2.new(0.5, 0.5)
+		blade.Position = UDim2.fromScale(0.5, 0.5)
+		blade.Size = UDim2.new(0.86, 0, 0.16, 0)
+		blade.Rotation = rot
+		blade.BackgroundColor3 = ALU_LIGHT
+		blade.BorderSizePixel = 0
+		blade.Parent = fanGui
+	end
+	local hub = Instance.new("Frame")
+	hub.AnchorPoint = Vector2.new(0.5, 0.5)
+	hub.Position = UDim2.fromScale(0.5, 0.5)
+	hub.Size = UDim2.fromScale(0.26, 0.26)
+	hub.BackgroundColor3 = CYAN_ACCENT
+	hub.BorderSizePixel = 0
+	hub.Parent = fanGui
+	local hubCorner = Instance.new("UICorner")
+	hubCorner.CornerRadius = UDim.new(1, 0)
+	hubCorner.Parent = hub
+
 	local cold = Instance.new("ParticleEmitter")
 	cold.Name = "ColdAir"
 	cold.Rate = 6
 	cold.Lifetime = NumberRange.new(0.8, 1.4)
 	cold.Speed = NumberRange.new(2, 4)
-	cold.Size = NumberSequence.new(0.5)
-	cold.Color = ColorSequence.new(Color3.fromRGB(150, 200, 255))
+	cold.Size = NumberSequence.new(0.45)
+	cold.Color = ColorSequence.new(Color3.fromRGB(165, 220, 255))
 	cold.Transparency = NumberSequence.new(0.55, 1)
 	cold.EmissionDirection = Enum.NormalId.Left
 	cold.Parent = body
+
 	model.WorldPivot = CFrame.new(0, 0, 0)
 	return model, fan
 end
 
+--[[
+	BuildLaptop: ultrabook teknisi ringkas (1.6x1.15) pas di genggaman avatar.
+]]
 function ModelFactory.BuildLaptop(): Tool
 	local tool = Instance.new("Tool")
 	tool.Name = "TechnicianLaptop"
@@ -1424,23 +1892,35 @@ function ModelFactory.BuildLaptop(): Tool
 
 	local handle = newPart({
 		name = "Handle",
-		size = Vector3.new(2.4, 0.3, 1.7),
+		size = Vector3.new(1.6, 0.14, 1.15),
 		cf = CFrame.new(0, 0, 0),
-		color = Color3.fromRGB(30, 32, 36),
-		material = Enum.Material.Metal,
+		color = ALU_LIGHT,
 		anchored = false,
 		canCollide = false,
 	})
 	handle.Parent = tool
-	tool.Grip = CFrame.new(0, -0.15, 0.35)
-	tool.GripPos = Vector3.new(0, -0.15, 0.35)
+	tool.Grip = CFrame.new(0, -0.1, 0.25)
+	tool.GripPos = Vector3.new(0, -0.1, 0.25)
+
+	local keydeck = newPart({
+		name = "KeyDeck",
+		size = Vector3.new(1.42, 0.03, 0.72),
+		cf = CFrame.new(0, 0.08, -0.05),
+		color = SLATE_TRIM,
+		anchored = false,
+		canCollide = false,
+	})
+	keydeck.Parent = tool
+	local weldKey = Instance.new("WeldConstraint")
+	weldKey.Part0 = handle
+	weldKey.Part1 = keydeck
+	weldKey.Parent = handle
 
 	local lid = newPart({
 		name = "Lid",
-		size = Vector3.new(2.4, 1.6, 0.14),
-		cf = CFrame.new(0, 0.75, -0.72) * CFrame.Angles(math.rad(-115), 0, 0),
-		color = Color3.fromRGB(24, 26, 30),
-		material = Enum.Material.Metal,
+		size = Vector3.new(1.6, 1.05, 0.08),
+		cf = CFrame.new(0, 0.54, -0.62) * CFrame.Angles(math.rad(-15), 0, 0),
+		color = ALU_LIGHT,
 		anchored = false,
 		canCollide = false,
 	})
@@ -1454,14 +1934,14 @@ function ModelFactory.BuildLaptop(): Tool
 	local gui = Instance.new("SurfaceGui")
 	gui.Name = "LaptopScreen"
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 50
-	gui.Face = Enum.NormalId.Front
+	gui.PixelsPerStud = 70
+	gui.Face = Enum.NormalId.Back
 	gui.Brightness = 2
 	gui.Parent = lid
 	local root = Instance.new("Frame")
 	root.Name = "Root"
 	root.Size = UDim2.new(1, 0, 1, 0)
-	root.BackgroundColor3 = Color3.fromRGB(13, 17, 23)
+	root.BackgroundColor3 = Color3.fromRGB(13, 20, 30)
 	root.BorderSizePixel = 0
 	root.Parent = gui
 	local label = Instance.new("TextLabel")
@@ -1471,20 +1951,20 @@ function ModelFactory.BuildLaptop(): Tool
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.RobotoMono
 	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(0, 255, 102)
+	label.TextColor3 = Color3.fromRGB(0, 255, 128)
 	label.Text = "[TECHNICIAN LAPTOP]\nKlik = Terminal\nDekati device = Console"
 	label.Parent = root
 
 	local serialAttach = Instance.new("Attachment")
 	serialAttach.Name = "SerialPortAttachment"
-	serialAttach.CFrame = CFrame.new(1.25, 0, 0)
+	serialAttach.CFrame = CFrame.new(0.84, 0, 0)
 	serialAttach.Parent = handle
 
 	local kbLight = neon({
 		name = "KBTrim",
-		size = Vector3.new(2.2, 0.06, 0.1),
-		cf = CFrame.new(0, 0.16, 0.6),
-		color = Color3.fromRGB(90, 160, 255),
+		size = Vector3.new(1.4, 0.04, 0.07),
+		cf = CFrame.new(0, 0.09, 0.4),
+		color = CYAN_ACCENT,
 		anchored = false,
 		canCollide = false,
 	})
@@ -1500,19 +1980,30 @@ end
 function ModelFactory.BuildCrate(label: string): Model
 	local model = Instance.new("Model")
 	model.Name = "Crate"
+
 	local box = newPart({
 		name = "CrateBox",
-		size = Vector3.new(3, 2.4, 3),
-		cf = CFrame.new(0, 1.2, 0),
-		color = Color3.fromRGB(133, 96, 60),
+		size = Vector3.new(2.4, 1.9, 2.4),
+		cf = CFrame.new(0, 0.95, 0),
+		color = Color3.fromRGB(212, 168, 114),
 		material = Enum.Material.Wood,
+		canCollide = true,
 	})
 	box.Parent = model
-	model.PrimaryPart = box
+
+	for _, y in ipairs({ 0.35, 1.55 }) do
+		newPart({
+			name = "CrateStrap",
+			size = Vector3.new(2.5, 0.14, 2.5),
+			cf = CFrame.new(0, y, 0),
+			color = SLATE_TRIM,
+		}).Parent = model
+	end
+
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "Label"
 	bb.Size = UDim2.new(0, 180, 0, 40)
-	bb.StudsOffset = Vector3.new(0, 2.2, 0)
+	bb.StudsOffset = Vector3.new(0, 1.9, 0)
 	bb.AlwaysOnTop = true
 	bb.MaxDistance = 60
 	bb.Parent = box
@@ -1521,16 +2012,17 @@ function ModelFactory.BuildCrate(label: string): Model
 	tl.BackgroundTransparency = 1
 	tl.Font = Enum.Font.GothamBold
 	tl.TextScaled = true
-	tl.TextColor3 = Color3.fromRGB(255, 235, 170)
-	tl.TextStrokeTransparency = 0.4
+	tl.TextColor3 = Color3.fromRGB(255, 240, 160)
+	tl.TextStrokeTransparency = 0.35
 	tl.Text = label
 	tl.Parent = bb
+
 	model.WorldPivot = CFrame.new(0, 0, 0)
 	return model
 end
 
 --[[
-	Visual komponen yang nempel di workbench saat di-install.
+	Visual komponen yang nempel di workbench saat di-install (proporsional dengan ESD mat).
 ]]
 function ModelFactory.BuildBenchComponentVisual(componentId: string): Model
 	local def = Catalog.Get(componentId)
@@ -1538,78 +2030,114 @@ function ModelFactory.BuildBenchComponentVisual(componentId: string): Model
 	local defv = def :: ItemDef
 	local model = Instance.new("Model")
 	model.Name = "Comp_" .. componentId
+
 	local main: Part
 	if componentId == "chassis_1u" or componentId == "chassis_2u" then
-		local h = if componentId == "chassis_1u" then 1.3 else 2.6
+		local h = if componentId == "chassis_1u" then 0.50 else 1.04
 		main = newPart({
 			name = "BenchChassis",
-			size = Vector3.new(3.4, h, 2.4),
+			size = Vector3.new(3.2, h, 2.2),
 			cf = CFrame.new(0, h / 2, 0),
 			color = defv.visualColor,
-			material = Enum.Material.Metal,
 		})
-		local led = neon({
+		neon({
 			name = "StatusLED",
-			size = Vector3.new(0.24, 0.12, 0.1),
-			cf = CFrame.new(1.3, h - 0.2, 1.22),
+			size = Vector3.new(0.2, 0.1, 0.08),
+			cf = CFrame.new(1.2, h - 0.12, 1.12),
 			color = C.ledRed,
-		})
-		led.Parent = model
+		}).Parent = model
 	elseif componentId == "mobo_single" or componentId == "mobo_dual" then
 		main = newPart({
 			name = "BenchMobo",
-			size = Vector3.new(2.4, 0.12, 2.0),
-			cf = CFrame.new(0, 0.4, 0),
+			size = Vector3.new(1.6, 0.08, 1.4),
+			cf = CFrame.new(0, 0.05, 0),
 			color = defv.visualColor,
 		})
+		newPart({
+			name = "SocketFrame",
+			size = Vector3.new(0.45, 0.06, 0.45),
+			cf = CFrame.new(-0.22, 0.11, -0.15),
+			color = ALU_LIGHT,
+		}).Parent = model
+		newPart({
+			name = "DimmSlot",
+			size = Vector3.new(0.12, 0.08, 0.85),
+			cf = CFrame.new(0.42, 0.12, 0),
+			color = CYAN_ACCENT,
+		}).Parent = model
 	elseif string.sub(componentId, 1, 4) == "cpu_" then
 		main = newPart({
 			name = "BenchCPU",
-			size = Vector3.new(0.5, 0.1, 0.5),
-			cf = CFrame.new(0, 0.55, 0),
+			size = Vector3.new(0.48, 0.1, 0.48),
+			cf = CFrame.new(0, 0.08, 0),
 			color = defv.visualColor,
-			material = Enum.Material.Metal,
 		})
+		newPart({
+			name = "CPUSubstrate",
+			size = Vector3.new(0.56, 0.04, 0.56),
+			cf = CFrame.new(0, 0.03, 0),
+			color = Color3.fromRGB(48, 148, 92),
+		}).Parent = model
 	elseif string.sub(componentId, 1, 4) == "ram_" then
 		main = newPart({
 			name = "BenchRAM",
-			size = Vector3.new(0.8, 0.35, 0.12),
-			cf = CFrame.new(-0.8, 0.62, 0.3),
+			size = Vector3.new(0.76, 0.28, 0.1),
+			cf = CFrame.new(0, 0.18, 0),
 			color = defv.visualColor,
-			material = Enum.Material.Neon,
 		})
+		newPart({
+			name = "RAMPins",
+			size = Vector3.new(0.72, 0.05, 0.09),
+			cf = CFrame.new(0, 0.03, 0),
+			color = GOLD_PIN,
+		}).Parent = model
+		neon({
+			name = "RAMBar",
+			size = Vector3.new(0.74, 0.05, 0.11),
+			cf = CFrame.new(0, 0.34, 0),
+			color = defv.visualColor,
+		}).Parent = model
 	elseif componentId == "nvme_1tb" then
 		main = newPart({
 			name = "BenchStorage",
-			size = Vector3.new(0.9, 0.12, 0.5),
-			cf = CFrame.new(0.6, 0.5, 0.3),
+			size = Vector3.new(0.72, 0.08, 0.36),
+			cf = CFrame.new(0, 0.06, 0),
 			color = defv.visualColor,
-			material = Enum.Material.Metal,
 		})
+		newPart({
+			name = "NVMeEdge",
+			size = Vector3.new(0.11, 0.06, 0.32),
+			cf = CFrame.new(-0.35, 0.06, 0),
+			color = GOLD_PIN,
+		}).Parent = model
 	elseif componentId == "psu_redundant" then
 		main = newPart({
 			name = "BenchPSU",
-			size = Vector3.new(1.2, 0.6, 1.0),
-			cf = CFrame.new(0, 0.3, -0.5),
+			size = Vector3.new(0.95, 0.48, 0.78),
+			cf = CFrame.new(0, 0.25, 0),
 			color = defv.visualColor,
-			material = Enum.Material.Metal,
 		})
+		newPart({
+			name = "PSULabel",
+			size = Vector3.new(0.56, 0.24, 0.04),
+			cf = CFrame.new(0, 0.28, 0.4),
+			color = SAFETY_YELLOW,
+		}).Parent = model
 	else
 		main = newPart({
 			name = "BenchMisc",
-			size = Vector3.new(0.6, 0.3, 0.6),
-			cf = CFrame.new(0, 0.15, 0),
+			size = Vector3.new(0.5, 0.24, 0.5),
+			cf = CFrame.new(0, 0.13, 0),
 			color = defv.visualColor,
 		})
 	end
 	main.Parent = model
-	model.PrimaryPart = main
 	model.WorldPivot = CFrame.new(0, 0, 0)
 	return model
 end
 
 return ModelFactory
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 </Item>
@@ -1622,7 +2150,7 @@ return ModelFactory
 <Properties>
 <string name="Name">MainServer</string>
 <bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	MainServer (Script, ServerScriptService)
 	Orkestrator: init order seluruh modul (dependency injection), lifecycle
@@ -1748,8 +2276,12 @@ local function buildSession(player: Player)
 	-- laptop langsung ke backpack (StarterPack mengurus respawn berikutnya)
 	local backpack = player:FindFirstChildOfClass("Backpack")
 	if backpack then
-		local laptop = ModelFactory.BuildLaptop()
-		laptop.Parent = backpack
+		local hasLaptop = backpack:FindFirstChild("TechnicianLaptop") ~= nil
+			or (player.Character ~= nil and player.Character:FindFirstChild("TechnicianLaptop") ~= nil)
+		if not hasLaptop then
+			local laptop = ModelFactory.BuildLaptop()
+			laptop.Parent = backpack
+		end
 	end
 
 	-- load save (Apply memulihkan device, kabel, workbench, tiket, uang)
@@ -1772,6 +2304,13 @@ local function buildSession(player: Player)
 	end
 
 	ShiftAndEconomyManager.ForceSync(session)
+	-- Follow-up sync once client LocalScripts finish initializing
+	task.delay(1.5, function()
+		local live = SessionManager.GetSession(player)
+		if live == session then
+			ShiftAndEconomyManager.ForceSync(live)
+		end
+	end)
 end
 
 local function rebuildSession(player: Player)
@@ -1808,7 +2347,7 @@ if resetRemote then
 		rebuildSession(player)
 	end)
 end
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="Folder" referent="RBX13">
@@ -1818,8 +2357,7 @@ end
 <Item class="ModuleScript" referent="RBX14">
 <Properties>
 <string name="Name">WorldAndAssetBuilder</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	WorldAndAssetBuilder (ModuleScript, ServerScriptService/Bootstrap)
 	Builds the world procedurally for every player lab plot:
@@ -1832,8 +2370,8 @@ end
 	  switch and bare-metal stay unwired - wiring them is the first objective),
 	  assembly workbench, NOC desk, loading dock, alarm beacon, AC unit
 	  (fan registered for Heartbeat-driven rotation)
-	- Door sign billboard ("SERVER LAB #n | &lt;DisplayName&gt;") and spawn CF refs
-	All geometry hangs under workspace.Plots.Plot&lt;n&gt; so SessionManager can
+	- Door sign billboard ("SERVER LAB #n | <DisplayName>") and spawn CF refs
+	All geometry hangs under workspace.Plots.Plot<n> so SessionManager can
 	tear a whole lab down with a single root:Destroy(). Every part is anchored.
 ]]
 
@@ -1894,36 +2432,54 @@ end
 -- Lighting
 ---------------------------------------------------------------------
 
--- Dark data-center atmosphere: Future lighting for crisp neon LEDs, subtle
--- bloom for glow, mild color correction for contrast.
+-- Bright modern data-center lighting: Future lighting (set in .rbxlx), high
+-- indoor ambient + environment diffuse so metallic/plastic surfaces stay crisp
+-- and vibrant rather than dark, plus subtle bloom and clean atmosphere.
 function WorldAndAssetBuilder.SetupLighting()
-	Lighting.Technology = Enum.Technology.Future
-	Lighting.Brightness = 1.5
-	Lighting.Ambient = Color3.fromRGB(25, 30, 40)
-	Lighting.OutdoorAmbient = Color3.fromRGB(20, 25, 35)
-	Lighting.ClockTime = 14
+	-- Lighting.Technology is non-scriptable at runtime (configured in .rbxlx XML).
+	pcall(function()
+		Lighting.Technology = Enum.Technology.Future
+	end)
+	Lighting.Brightness = 2.4
+	Lighting.Ambient = Color3.fromRGB(135, 148, 168)
+	Lighting.OutdoorAmbient = Color3.fromRGB(145, 160, 185)
+	Lighting.EnvironmentDiffuseScale = 0.85
+	Lighting.EnvironmentSpecularScale = 0.5
+	Lighting.ClockTime = 11.5
 	Lighting.GlobalShadows = true
+	Lighting.ShadowSoftness = 0.4
 
 	if Lighting:FindFirstChild("DCBloom") == nil then
 		local bloom = Instance.new("BloomEffect")
 		bloom.Name = "DCBloom"
-		bloom.Intensity = 0.4
-		bloom.Size = 16
-		bloom.Threshold = 1.1
+		bloom.Intensity = 0.22
+		bloom.Size = 18
+		bloom.Threshold = 1.4
 		bloom.Parent = Lighting
 	end
 	if Lighting:FindFirstChild("DCColor") == nil then
 		local cc = Instance.new("ColorCorrectionEffect")
 		cc.Name = "DCColor"
-		cc.Brightness = 0.02
-		cc.Contrast = 0.08
-		cc.Saturation = 0.05
+		cc.Brightness = 0.04
+		cc.Contrast = 0.06
+		cc.Saturation = 0.12
 		cc.Parent = Lighting
+	end
+	if Lighting:FindFirstChild("DCAtmosphere") == nil then
+		local atmo = Instance.new("Atmosphere")
+		atmo.Name = "DCAtmosphere"
+		atmo.Density = 0.22
+		atmo.Offset = 0.15
+		atmo.Color = Color3.fromRGB(205, 222, 242)
+		atmo.Decay = Color3.fromRGB(170, 195, 225)
+		atmo.Glare = 0.15
+		atmo.Haze = 0.6
+		atmo.Parent = Lighting
 	end
 end
 
 ---------------------------------------------------------------------
--- Plots folder &amp; AC fans
+-- Plots folder & AC fans
 ---------------------------------------------------------------------
 
 function WorldAndAssetBuilder.EnsurePlotsFolder(): Folder
@@ -1981,10 +2537,16 @@ local function newPart(props: { [string]: any }): Part
 	p.Name = props.name or "Part"
 	p.Size = props.size or Vector3.new(1, 1, 1)
 	p.CFrame = props.cf or CFrame.new(0, 0, 0)
-	p.Color = props.color or Color3.fromRGB(120, 120, 125)
+	p.Color = props.color or Color3.fromRGB(190, 198, 210)
 	p.Material = props.material or Enum.Material.SmoothPlastic
 	p.Transparency = props.transparency or 0
 	p.CanCollide = if props.canCollide ~= nil then props.canCollide else true
+	if props.canQuery ~= nil then
+		p.CanQuery = props.canQuery
+	end
+	if props.castShadow ~= nil then
+		p.CastShadow = props.castShadow
+	end
 	p.Anchored = true
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
@@ -2043,71 +2605,380 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 	cratesFolder.Name = "Crates"
 	cratesFolder.Parent = root
 
-	-- ===== Room geometry =====
-	-- Floor slab 66 x 0.5 x 66, top surface at y = floorTopY (0.5).
+	-- ===== Room geometry (bright Tier-4 enterprise data-center lab) =====
+	local fullW = halfX * 2 + 2 -- 66 studs
+	local fullD = halfZ * 2 + 2 -- 66 studs
+	local wallH = roomH -- 18 studs (proportional data-center hall)
+	local doorW = PlotConstants.ROOM.doorWidth -- 14
+	local doorH = PlotConstants.ROOM.doorHeight -- 10
+	local wainscotH = 3.5 -- lower architectural wall band height (waist/desk level)
+
+	-- Anti-static light raised floor slab (top at y = floorTopY = 0.5).
 	local floor = newPart({
 		name = "RoomFloor",
-		size = Vector3.new(halfX * 2 + 2, floorTopY, halfZ * 2 + 2),
+		size = Vector3.new(fullW, floorTopY, fullD),
 		cf = plotCF(0, floorTopY / 2, 0),
 		color = colors.floor,
-		material = Enum.Material.Metal,
+		material = Enum.Material.SmoothPlastic,
 	})
 	floor.Parent = facility
 
-	-- Walls, thickness 1, height 24 (y = 0 .. 24). The front (+Z) wall has a
-	-- door opening (width 14, height 12) -&gt; two segments + lintel.
-	local wallH = roomH
-	local wallY = wallH / 2
-	local doorW = PlotConstants.ROOM.doorWidth
-	local doorH = PlotConstants.ROOM.doorHeight
-	local segW = (halfX * 2 + 2 - doorW) / 2 -- 26 studs per side segment
-	local wallDefs: { { size: Vector3, x: number, y: number, z: number } } = {
-		{ size = Vector3.new(halfX * 2 + 2, wallH, 1), x = 0, y = wallY, z = -halfZ - 0.5 }, -- back
-		{ size = Vector3.new(1, wallH, halfZ * 2 + 2), x = -halfX - 0.5, y = wallY, z = 0 }, -- left
-		{ size = Vector3.new(1, wallH, halfZ * 2 + 2), x = halfX + 0.5, y = wallY, z = 0 }, -- right
-		{ size = Vector3.new(segW, wallH, 1), x = -(doorW / 2 + segW / 2), y = wallY, z = halfZ + 0.5 }, -- front left
-		{ size = Vector3.new(segW, wallH, 1), x = doorW / 2 + segW / 2, y = wallY, z = halfZ + 0.5 }, -- front right
-		{ size = Vector3.new(doorW, wallH - doorH, 1), x = 0, y = doorH + (wallH - doorH) / 2, z = halfZ + 0.5 }, -- lintel
-	}
-	for i, def in ipairs(wallDefs) do
-		local wall = newPart({
-			name = "Wall_" .. tostring(i),
-			size = def.size,
-			cf = plotCF(def.x, def.y, def.z),
-			color = colors.wall,
-			material = Enum.Material.Concrete,
-		})
-		wall.Parent = facility
+	-- Decorative raised-floor tile grid lines (non-collidable, non-queryable).
+	for gx = -24, 24, 8 do
+		newPart({
+			name = "FloorGridX",
+			size = Vector3.new(0.14, 0.02, halfZ * 2 - 1),
+			cf = plotCF(gx, floorTopY + 0.01, 0),
+			color = colors.floorGrid,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+	end
+	for gz = -24, 24, 8 do
+		newPart({
+			name = "FloorGridZ",
+			size = Vector3.new(halfX * 2 - 1, 0.02, 0.14),
+			cf = plotCF(0, floorTopY + 0.01, gz),
+			color = colors.floorGrid,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
 	end
 
-	-- Ceiling slab above the walls.
-	local ceiling = newPart({
-		name = "Ceiling",
-		size = Vector3.new(halfX * 2 + 2, 0.5, halfZ * 2 + 2),
-		cf = plotCF(0, roomH + 0.25, 0),
-		color = colors.trim,
-		material = Enum.Material.Concrete,
-	})
-	ceiling.Parent = facility
+	-- Central cold-aisle walkway + cyan LED guide rails from entrance to center.
+	newPart({
+		name = "WalkwayMat",
+		size = Vector3.new(8.5, 0.03, 46),
+		cf = plotCF(0, floorTopY + 0.015, 9),
+		color = Color3.fromRGB(168, 184, 204),
+		canCollide = false,
+		canQuery = false,
+		castShadow = false,
+	}).Parent = facility
+	for _, side in ipairs({ -4.35, 4.35 }) do
+		newPart({
+			name = "WalkwayLED",
+			size = Vector3.new(0.18, 0.04, 46),
+			cf = plotCF(side, floorTopY + 0.02, 9),
+			color = colors.accentCyan,
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+	end
 
-	-- 6 ceiling LED panels (8 x 0.15 x 2) with downward SurfaceLight.
-	for _, lx in ipairs({ -16, 0, 16 }) do
-		for _, lz in ipairs({ -10, 10 }) do
+	-- Floor zone pads (visual wayfinding per station; CanQuery=false so placement hits RoomFloor).
+	local zonePads: { { name: string, pos: Vector3, size: Vector3, color: Color3, border: Color3 } } = {
+		{
+			name = "ZonePad_Rack",
+			pos = Vector3.new(-21, floorTopY + 0.018, -22),
+			size = Vector3.new(15, 0.03, 15),
+			color = Color3.fromRGB(184, 208, 232),
+			border = Color3.fromRGB(56, 152, 236),
+		},
+		{
+			name = "ZonePad_Workbench",
+			pos = Vector3.new(18, floorTopY + 0.018, -12),
+			size = Vector3.new(14, 0.03, 11),
+			color = Color3.fromRGB(228, 214, 192),
+			border = Color3.fromRGB(235, 168, 52),
+		},
+		{
+			name = "ZonePad_NOC",
+			pos = Vector3.new(18, floorTopY + 0.018, 16),
+			size = Vector3.new(17, 0.03, 12),
+			color = Color3.fromRGB(178, 194, 216),
+			border = Color3.fromRGB(72, 130, 224),
+		},
+	}
+	for _, zp in ipairs(zonePads) do
+		newPart({
+			name = zp.name,
+			size = zp.size,
+			cf = plotCF(zp.pos.X, zp.pos.Y, zp.pos.Z),
+			color = zp.color,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+		-- crisp front accent bar on each zone pad
+		newPart({
+			name = zp.name .. "_Trim",
+			size = Vector3.new(zp.size.X, 0.04, 0.25),
+			cf = plotCF(zp.pos.X, floorTopY + 0.025, zp.pos.Z + zp.size.Z / 2),
+			color = zp.border,
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+	end
+
+	-- Helper: builds a two-tone solid wall section (wainscot + silver dado + upper white).
+	local function addSolidWall(namePrefix: string, sizeX: number, sizeZ: number, cx: number, cz: number, yLow: number, yHigh: number)
+		local lowerTop = math.min(wainscotH, yHigh)
+		if yLow < lowerTop then
+			local h = lowerTop - yLow
+			newPart({
+				name = namePrefix .. "_Low",
+				size = Vector3.new(sizeX, h, sizeZ),
+				cf = plotCF(cx, yLow + h / 2, cz),
+				color = colors.wallLower,
+			}).Parent = facility
+		end
+		if yHigh > lowerTop then
+			local h = yHigh - lowerTop
+			newPart({
+				name = namePrefix .. "_High",
+				size = Vector3.new(sizeX, h, sizeZ),
+				cf = plotCF(cx, lowerTop + h / 2, cz),
+				color = colors.wall,
+			}).Parent = facility
+		end
+	end
+
+	-- Back wall (-Z): solid two-tone with dado rail & cyan LED strip.
+	addSolidWall("Wall_Back", fullW, 1, 0, -halfZ - 0.5, 0, wallH)
+	newPart({
+		name = "Dado_Back",
+		size = Vector3.new(fullW - 2, 0.28, 0.16),
+		cf = plotCF(0, wainscotH, -halfZ + 0.08),
+		color = colors.trim,
+		canCollide = false,
+	}).Parent = facility
+	newPart({
+		name = "LEDStrip_Back",
+		size = Vector3.new(fullW - 4, 0.14, 0.1),
+		cf = plotCF(0, wainscotH + 0.22, -halfZ + 0.06),
+		color = colors.accentCyan,
+		material = Enum.Material.Neon,
+		canCollide = false,
+	}).Parent = facility
+
+	-- Right wall (+X): solid two-tone (houses AC unit) with dado rail & cyan LED strip.
+	addSolidWall("Wall_Right", 1, fullD, halfX + 0.5, 0, 0, wallH)
+	newPart({
+		name = "Dado_Right",
+		size = Vector3.new(0.16, 0.28, fullD - 2),
+		cf = plotCF(halfX - 0.08, wainscotH, 0),
+		color = colors.trim,
+		canCollide = false,
+	}).Parent = facility
+	newPart({
+		name = "LEDStrip_Right",
+		size = Vector3.new(0.1, 0.14, fullD - 4),
+		cf = plotCF(halfX - 0.06, wainscotH + 0.22, 0),
+		color = colors.accentCyan,
+		material = Enum.Material.Neon,
+		canCollide = false,
+	}).Parent = facility
+
+	-- Left wall (-X): panoramic observation glass window (z = -18..18, y = 3.5..12.5) for daylight.
+	local lx = -halfX - 0.5
+	addSolidWall("Wall_Left_North", 1, 15, lx, -25.5, 0, wallH) -- z = -33..-18
+	addSolidWall("Wall_Left_South", 1, 15, lx, 25.5, 0, wallH) -- z = 18..33
+	addSolidWall("Wall_Left_Sill", 1, 36, lx, 0, 0, 3.5)
+	addSolidWall("Wall_Left_Header", 1, 36, lx, 0, 12.5, wallH)
+	newPart({
+		name = "Window_Left_Glass",
+		size = Vector3.new(0.25, 9, 36),
+		cf = plotCF(lx, 8.0, 0),
+		color = colors.glass,
+		material = Enum.Material.Glass,
+		transparency = 0.65,
+		castShadow = false,
+	}).Parent = facility
+	-- Window frame mullions (horizontal sill/top + vertical dividers).
+	for _, my in ipairs({ 3.65, 12.35 }) do
+		newPart({
+			name = "Window_Left_Bar",
+			size = Vector3.new(1.15, 0.35, 36.2),
+			cf = plotCF(lx, my, 0),
+			color = colors.frame,
+		}).Parent = facility
+	end
+	for _, mz in ipairs({ -18, -6, 6, 18 }) do
+		newPart({
+			name = "Window_Left_Mullion",
+			size = Vector3.new(1.15, 9, 0.45),
+			cf = plotCF(lx, 8.0, mz),
+			color = colors.frame,
+		}).Parent = facility
+	end
+
+	-- Front wall (+Z): open glass-framed entrance (doorW=14, doorH=10) + side display windows.
+	local fz = halfZ + 0.5
+	-- Center lintel above doorway
+	addSolidWall("Wall_Front_Lintel", doorW, 1, 0, fz, doorH, wallH)
+	-- Left and right front wings with windows (x = +-11..+-25, y = 3.5..10.5)
+	for _, dir in ipairs({ -1, 1 }) do
+		local tag = if dir < 0 then "L" else "R"
+		addSolidWall("Wall_Front_Inner_" .. tag, 4, 1, dir * 9, fz, 0, wallH) -- 7..11
+		addSolidWall("Wall_Front_Outer_" .. tag, 8, 1, dir * 29, fz, 0, wallH) -- 25..33
+		addSolidWall("Wall_Front_Sill_" .. tag, 14, 1, dir * 18, fz, 0, 3.5) -- 11..25
+		addSolidWall("Wall_Front_Top_" .. tag, 14, 1, dir * 18, fz, 10.5, wallH)
+		newPart({
+			name = "Window_Front_Glass_" .. tag,
+			size = Vector3.new(14, 7, 0.25),
+			cf = plotCF(dir * 18, 7.0, fz),
+			color = colors.glass,
+			material = Enum.Material.Glass,
+			transparency = 0.65,
+			castShadow = false,
+		}).Parent = facility
+		for _, wy in ipairs({ 3.65, 10.35 }) do
+			newPart({
+				name = "Window_Front_Bar_" .. tag,
+				size = Vector3.new(14.3, 0.35, 1.15),
+				cf = plotCF(dir * 18, wy, fz),
+				color = colors.frame,
+			}).Parent = facility
+		end
+		newPart({
+			name = "Window_Front_Mullion_" .. tag,
+			size = Vector3.new(0.4, 7, 1.15),
+			cf = plotCF(dir * 18, 7.0, fz),
+			color = colors.frame,
+		}).Parent = facility
+	end
+
+	-- Entrance portal frame (sleek slate aluminum pillars + glowing cyan lintel bar).
+	for _, side in ipairs({ -1, 1 }) do
+		newPart({
+			name = "DoorPillar",
+			size = Vector3.new(0.9, doorH + 0.6, 1.5),
+			cf = plotCF(side * (doorW / 2 + 0.35), (doorH + 0.6) / 2, fz),
+			color = colors.frame,
+		}).Parent = facility
+	end
+	newPart({
+		name = "DoorHeader",
+		size = Vector3.new(doorW + 1.6, 1.2, 1.6),
+		cf = plotCF(0, doorH + 0.5, fz),
+		color = colors.frame,
+	}).Parent = facility
+	newPart({
+		name = "DoorHeaderLED",
+		size = Vector3.new(doorW + 0.6, 0.2, 1.68),
+		cf = plotCF(0, doorH + 0.05, fz),
+		color = colors.accentCyan,
+		material = Enum.Material.Neon,
+		canCollide = false,
+	}).Parent = facility
+
+	-- Exterior corner trim columns + roof fascia band for clean outside silhouette.
+	for _, cx in ipairs({ -halfX - 0.5, halfX + 0.5 }) do
+		for _, cz in ipairs({ -halfZ - 0.5, halfZ + 0.5 }) do
+			newPart({
+				name = "CornerColumn",
+				size = Vector3.new(1.5, wallH + 0.6, 1.5),
+				cf = plotCF(cx, (wallH + 0.6) / 2, cz),
+				color = colors.frame,
+			}).Parent = facility
+		end
+	end
+
+	-- Ceiling perimeter with a central 24x24 glass skylight atrium so daylight fills the lab.
+	local skyHalf = 12
+	local sideBand = (fullW - skyHalf * 2) / 2 -- 21 studs
+	local ceilingDefs: { { size: Vector3, x: number, z: number } } = {
+		{ size = Vector3.new(fullW, 0.6, sideBand), x = 0, z = -(skyHalf + sideBand / 2) },
+		{ size = Vector3.new(fullW, 0.6, sideBand), x = 0, z = skyHalf + sideBand / 2 },
+		{ size = Vector3.new(sideBand, 0.6, skyHalf * 2), x = -(skyHalf + sideBand / 2), z = 0 },
+		{ size = Vector3.new(sideBand, 0.6, skyHalf * 2), x = skyHalf + sideBand / 2, z = 0 },
+	}
+	for i, cdef in ipairs(ceilingDefs) do
+		newPart({
+			name = "Ceiling_" .. tostring(i),
+			size = cdef.size,
+			cf = plotCF(cdef.x, roomH + 0.3, cdef.z),
+			color = colors.wall,
+		}).Parent = facility
+	end
+	-- Skylight glass pane + architectural crossbeams.
+	newPart({
+		name = "SkylightGlass",
+		size = Vector3.new(skyHalf * 2, 0.25, skyHalf * 2),
+		cf = plotCF(0, roomH + 0.35, 0),
+		color = colors.glass,
+		material = Enum.Material.Glass,
+		transparency = 0.72,
+		castShadow = false,
+	}).Parent = facility
+	for _, bx in ipairs({ -skyHalf, 0, skyHalf }) do
+		newPart({
+			name = "SkylightBeamX",
+			size = Vector3.new(0.6, 0.75, skyHalf * 2 + 0.6),
+			cf = plotCF(bx, roomH + 0.25, 0),
+			color = colors.frame,
+		}).Parent = facility
+	end
+	for _, bz in ipairs({ -skyHalf, 0, skyHalf }) do
+		newPart({
+			name = "SkylightBeamZ",
+			size = Vector3.new(skyHalf * 2 + 0.6, 0.75, 0.6),
+			cf = plotCF(0, roomH + 0.25, bz),
+			color = colors.frame,
+		}).Parent = facility
+	end
+
+	-- Overhead industrial cable ladder trays + yellow fiber raceway (y = 15.2).
+	local trayY = 15.2
+	local trayDefs: { { size: Vector3, x: number, z: number, color: Color3 } } = {
+		{ size = Vector3.new(44, 0.25, 2.2), x = -2, z = -20, color = colors.trim }, -- back main trunk
+		{ size = Vector3.new(44, 0.2, 0.7), x = -2, z = -20, color = colors.accentAmber }, -- yellow fiber raceway
+		{ size = Vector3.new(2.2, 0.25, 36), x = 18, z = -2, color = colors.trim }, -- workbench to NOC trunk
+		{ size = Vector3.new(0.7, 0.2, 36), x = 18, z = -2, color = colors.accentAmber },
+	}
+	for i, tdef in ipairs(trayDefs) do
+		newPart({
+			name = "CableTray_" .. tostring(i),
+			size = tdef.size,
+			cf = plotCF(tdef.x, trayY, tdef.z),
+			color = tdef.color,
+			canCollide = false,
+			castShadow = false,
+		}).Parent = facility
+	end
+
+	-- 6 high-output ceiling LED fixtures with wide SurfaceLight + PointLight fill.
+	for _, lx in ipairs({ -20, 0, 20 }) do
+		for _, lz in ipairs({ -18, 18 }) do
+			local housing = newPart({
+				name = "LightHousing",
+				size = Vector3.new(9.2, 0.25, 2.6),
+				cf = plotCF(lx, roomH - 0.12, lz),
+				color = colors.frame,
+				canCollide = false,
+				castShadow = false,
+			})
+			housing.Parent = facility
 			local panel = newPart({
 				name = "LightPanel",
-				size = Vector3.new(8, 0.15, 2),
-				cf = plotCF(lx, roomH - 0.08, lz),
+				size = Vector3.new(8.6, 0.16, 2.1),
+				cf = plotCF(lx, roomH - 0.26, lz),
 				color = colors.lightPanel,
 				material = Enum.Material.Neon,
 				canCollide = false,
+				castShadow = false,
 			})
 			panel.Parent = facility
 			local light = Instance.new("SurfaceLight")
 			light.Face = Enum.NormalId.Bottom
-			light.Range = 30
-			light.Brightness = 1.1
-			light.Angle = 140
+			light.Range = 48
+			light.Brightness = 2.2
+			light.Angle = 150
+			light.Color = Color3.fromRGB(242, 248, 255)
 			light.Parent = panel
+			local fill = Instance.new("PointLight")
+			fill.Range = 44
+			fill.Brightness = 0.85
+			fill.Color = Color3.fromRGB(236, 244, 255)
+			fill.Shadows = false
+			fill.Parent = panel
 		end
 	end
 
@@ -2184,7 +3055,7 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 	mountStarter(PlotConstants.STARTER.switch)
 	mountStarter(PlotConstants.STARTER.baremetal)
 
-	-- Single initial cable: router WAN &lt;-&gt; ISP uplink. The starter switch and
+	-- Single initial cable: router WAN <-> ISP uplink. The starter switch and
 	-- bare-metal stay UNWIRED - wiring them is the player's first objective.
 	NetworkGraph.ConnectPorts(session, "isp_router_1", "wan1", "isp_uplink", "wan1", "WAN_Yellow")
 
@@ -2289,7 +3160,7 @@ function WorldAndAssetBuilder.GetCatalog()
 end
 
 return WorldAndAssetBuilder
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 </Item>
@@ -2300,8 +3171,7 @@ return WorldAndAssetBuilder
 <Item class="ModuleScript" referent="RBX16">
 <Properties>
 <string name="Name">SessionManager</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	SessionManager (ModuleScript, ServerScriptService/Core)
 	Per-player session store and lifecycle management:
@@ -2315,8 +3185,8 @@ return WorldAndAssetBuilder
 
 local SessionManager = {}
 
-local Sessions: { [Player]: any } = {} -- player -&gt; session table
-local UsedPlots: { [number]: Player } = {} -- plotIndex -&gt; owning player
+local Sessions: { [Player]: any } = {} -- player -> session table
+local UsedPlots: { [number]: Player } = {} -- plotIndex -> owning player
 local PlotCount = 4
 local Constants: any = nil -- PlotConstants module, injected via Init
 
@@ -2459,14 +3329,13 @@ function SessionManager.NextCableId(session: any): string
 end
 
 return SessionManager
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX17">
 <Properties>
 <string name="Name">NetworkGraph</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	NetworkGraph (ModuleScript, ServerScriptService/Core)
 	Authoritative network state store: devices, ports, cables and LEDs.
@@ -2568,10 +3437,10 @@ function NetworkGraph.DefaultNode(id: string, name: string, itemId: string): any
 	local uSize = 1
 	if def ~= nil then
 		if def.category == "Network" then
-			deviceType = if (def.specs.wanPorts or 0) &gt; 0 then "Router" else "Switch"
+			deviceType = if (def.specs.wanPorts or 0) > 0 then "Router" else "Switch"
 		elseif def.category == "Server" then
 			deviceType = "BareMetal"
-		elseif def.category == "Component" and (def.specs.ports or 0) &gt; 0 then
+		elseif def.category == "Component" and (def.specs.ports or 0) > 0 then
 			-- chassis items (chassis_1u/2u) are the base of custom builds:
 			-- the workbench registers them as BareMetal hosts
 			deviceType = "BareMetal"
@@ -2615,7 +3484,7 @@ function NetworkGraph.DefaultNode(id: string, name: string, itemId: string): any
 end
 
 ---------------------------------------------------------------------
--- Registration &amp; LEDs
+-- Registration & LEDs
 ---------------------------------------------------------------------
 
 -- Adds a device to the session graph (and stores its model when given).
@@ -2715,7 +3584,7 @@ function NetworkGraph.ConnectPorts(session: any, devAId: string, portAId: string
 	if pa.connectedToDeviceId ~= nil or pb.connectedToDeviceId ~= nil then
 		return false, "Port sudah terpakai"
 	end
-	-- type compatibility: WAN-WAN, RJ45-RJ45, SFP-SFP, RJ45 &lt;-&gt; SFP
+	-- type compatibility: WAN-WAN, RJ45-RJ45, SFP-SFP, RJ45 <-> SFP
 	local compatible = pa.portType == pb.portType
 		or (pa.portType == "RJ45" and pb.portType == "SFP")
 		or (pa.portType == "SFP" and pb.portType == "RJ45")
@@ -2857,7 +3726,7 @@ end
 -- BFS reachability
 ---------------------------------------------------------------------
 
--- Sort key for stable port ordering: wan -&gt; eth -&gt; sfp, then numeric suffix.
+-- Sort key for stable port ordering: wan -> eth -> sfp, then numeric suffix.
 local function portSortKey(portId: string): (number, number)
 	local prefix = string.match(portId, "^[a-zA-Z]+") or ""
 	local num = tonumber(string.match(portId, "%d+") or "") or 0
@@ -2882,15 +3751,15 @@ local function sortedPortIds(node: any): { string }
 		local oa, na = portSortKey(a)
 		local ob, nb = portSortKey(b)
 		if oa ~= ob then
-			return oa &lt; ob
+			return oa < ob
 		end
-		return na &lt; nb
+		return na < nb
 	end)
 	return ids
 end
 
 -- First free non-Console port id of a node whose type is compatible with
--- wantedType (RJ45 &lt;-&gt; SFP counts as compatible), or nil.
+-- wantedType (RJ45 <-> SFP counts as compatible), or nil.
 local function firstCompatibleFreePortId(node: any, wantedType: string): string?
 	for _, portId in ipairs(sortedPortIds(node)) do
 		local port = node.ports[portId]
@@ -2926,12 +3795,12 @@ end
 	- passing THROUGH a switch requires in-port vlanId == out-port vlanId
 	  (Fase 1: all ports default to vlan 1)
 	- reaching an already-visited node over a non-tree edge means a physical
-	  loop exists in the topology -&gt; broadcast storm flag
+	  loop exists in the topology -> broadcast storm flag
 ]]
 local function bfsPath(session: any, sourceDeviceId: string, targetId: string): ({ string }?, boolean)
 	local visited: { [string]: boolean } = {}
-	local parent: { [string]: string } = {} -- childId -&gt; parentId
-	local parentPort: { [string]: string } = {} -- childId -&gt; port on the child used to reach its parent
+	local parent: { [string]: string } = {} -- childId -> parentId
+	local parentPort: { [string]: string } = {} -- childId -> port on the child used to reach its parent
 	local queue: { { id: string, inPortId: string? } } = { { id = sourceDeviceId, inPortId = nil } }
 	local head = 1
 	local storm = false
@@ -2941,7 +3810,7 @@ local function bfsPath(session: any, sourceDeviceId: string, targetId: string): 
 		local current = queue[head]
 		head += 1
 		if current.id == targetId then
-			-- reconstruct the path source -&gt; ... -&gt; target
+			-- reconstruct the path source -> ... -> target
 			local path: { string } = {}
 			local walk: string? = current.id
 			while walk ~= nil do
@@ -2975,7 +3844,7 @@ local function bfsPath(session: any, sourceDeviceId: string, targetId: string): 
 				continue
 			end
 			if visited[nextId] then
-				-- non-tree edge =&gt; topology loop =&gt; broadcast storm
+				-- non-tree edge => topology loop => broadcast storm
 				local isTreeEdge = parent[current.id] == nextId and parentPort[current.id] == portId
 				if not isTreeEdge then
 					storm = true
@@ -2997,7 +3866,7 @@ local function bfsPath(session: any, sourceDeviceId: string, targetId: string): 
 end
 
 --[[
-	CanReachIP(session, sourceDeviceId, targetIP) -&gt; (reachable, latencyMs, err)
+	CanReachIP(session, sourceDeviceId, targetIP) -> (reachable, latencyMs, err)
 	sourceDeviceId == "__laptop__" = the laptop Wi-Fi management bridge
 	(PlotConstants.LAPTOP_BRIDGE_IP): any powered device with an ip is
 	reachable, public IPs go through the ISP (higher latency).
@@ -3083,7 +3952,7 @@ function NetworkGraph.CanReachIP(session: any, sourceDeviceId: string, targetIP:
 end
 
 --[[
-	GetRoutePath(session, sourceDeviceId, targetIP) -&gt; {deviceIds}?
+	GetRoutePath(session, sourceDeviceId, targetIP) -> {deviceIds}?
 	BFS path including both endpoints, or nil when unreachable.
 	Public targets route to the isp_uplink junction.
 ]]
@@ -3124,7 +3993,7 @@ end
 
 --[[
 	AutoCable(session, deviceId): connect the new device to the nearest
-	device (&lt;= 60 studs) that still has a free non-Console port; fall back
+	device (<= 60 studs) that still has a free non-Console port; fall back
 	to the starter switch sw_main_1. isp_uplink is never a candidate.
 	Caller skips this when session.loadedFromSave (links are restored
 	explicitly by the persistence layer).
@@ -3170,7 +4039,7 @@ function NetworkGraph.AutoCable(session: any, deviceId: string)
 		local model = session.deviceModels[id]
 		if model ~= nil then
 			local dist = (model:GetPivot().Position - selfPos).Magnitude
-			if dist &lt;= bestDist then
+			if dist <= bestDist then
 				bestDist = dist
 				bestId = id
 				bestSelfPortId = chosenSelf
@@ -3202,14 +4071,13 @@ function NetworkGraph.AutoCable(session: any, deviceId: string)
 end
 
 return NetworkGraph
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX18">
 <Properties>
 <string name="Name">CommandExecutor</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	CommandExecutor (ModuleScript, ServerScriptService/Core)
 	Server-side handler of the terminal. Binds ExecuteCommand.OnServerInvoke
@@ -3255,7 +4123,7 @@ local function rich(hex: string, text: string): string
 	if Utils ~= nil then
 		payload = Utils.EscapeRich(text)
 	end
-	return string.format('&lt;font color="%s"&gt;%s&lt;/font&gt;', hex, payload)
+	return string.format('<font color="%s">%s</font>', hex, payload)
 end
 
 local function g(text: string): string -- green
@@ -3276,7 +4144,7 @@ end
 
 -- Left-pad text to a fixed width (terminal font is monospace).
 local function pad(text: string, width: number): string
-	if #text &gt;= width then
+	if #text >= width then
 		return text
 	end
 	return text .. string.rep(" ", width - #text)
@@ -3287,7 +4155,7 @@ local function num(value: number): string
 	return string.format("%g", value)
 end
 
--- Sort key for stable port ordering: wan -&gt; eth -&gt; sfp, then numeric suffix.
+-- Sort key for stable port ordering: wan -> eth -> sfp, then numeric suffix.
 local function portSortKey(portId: string): (number, number)
 	local prefix = string.match(portId, "^[a-zA-Z]+") or ""
 	local numPart = tonumber(string.match(portId, "%d+") or "") or 0
@@ -3311,14 +4179,14 @@ local function sortedPortIds(node: any): { string }
 		local oa, na = portSortKey(a)
 		local ob, nb = portSortKey(b)
 		if oa ~= ob then
-			return oa &lt; ob
+			return oa < ob
 		end
-		return na &lt; nb
+		return na < nb
 	end)
 	return ids
 end
 
--- Value of "--flag &lt;value&gt;" in the token list, or nil.
+-- Value of "--flag <value>" in the token list, or nil.
 local function parseFlag(tokens: { string }, flag: string): string?
 	for i = 2, #tokens - 1 do
 		if tokens[i] == flag then
@@ -3353,7 +4221,7 @@ end
 -- Returns (node, errorLine?).
 local function requireDevice(session: any, commandName: string): (any, string?)
 	if session.terminal.mode == "Disconnected" then
-		return nil, commandName .. ": belum terhubung ke device (attach console / ssh &lt;ip&gt; dulu)"
+		return nil, commandName .. ": belum terhubung ke device (attach console / ssh <ip> dulu)"
 	end
 	local targetId = session.terminal.targetDeviceId
 	local node = if targetId ~= nil then session.devices[targetId] else nil
@@ -3395,23 +4263,24 @@ local function cmdHelp(): { string }
 	local lines: { string } = {}
 	table.insert(lines, b("=== NETSIM SHELL - DAFTAR PERINTAH ==="))
 	table.insert(lines, b("-- Jaringan --"))
-	table.insert(lines, "  " .. g("ping &lt;ip&gt;") .. gr("                  uji koneksi (4 packet ICMP)"))
-	table.insert(lines, "  " .. g("traceroute &lt;ip&gt;") .. gr("              telusuri rute hop-per-hop"))
+	table.insert(lines, "  " .. g("ping <ip>") .. gr("                  uji koneksi (4 packet ICMP)"))
+	table.insert(lines, "  " .. g("traceroute <ip>") .. gr("              telusuri rute hop-per-hop"))
 	table.insert(lines, b("-- Interface --"))
 	table.insert(lines, "  " .. g("ip a | ip addr") .. gr("                info hostname, IP, mask, gateway, port"))
-	table.insert(lines, "  " .. g("ip set &lt;ip&gt; &lt;gw&gt; [mask]") .. gr("      set IP statis device aktif"))
+	table.insert(lines, "  " .. g("ip set <ip> <gw> [mask]") .. gr("      set IP statis device aktif"))
 	table.insert(lines, b("-- Remote --"))
-	table.insert(lines, "  " .. g("ssh &lt;ip&gt;") .. gr("                      SSH ke device via management bridge / LAN"))
+	table.insert(lines, "  " .. g("ssh <ip>") .. gr("                      SSH ke device via management bridge / LAN"))
 	table.insert(lines, "  " .. g("exit") .. gr("                         keluar dari ssh / lepas console"))
 	table.insert(lines, b("-- Sistem --"))
 	table.insert(lines, "  " .. g("top") .. gr("                          monitor CPU/RAM/temp host aktif"))
-	table.insert(lines, "  " .. g("install-os &lt;os&gt;") .. gr("              ubuntu-22.04 | debian-12 | rocky-9"))
+	table.insert(lines, "  " .. g("install-os <os>") .. gr("              ubuntu-22.04 | debian-12 | rocky-9"))
 	table.insert(lines, "  " .. g("stress-test") .. gr("                   burn-in 5 detik (validasi thermal)"))
+	table.insert(lines, "  " .. g("ship") .. gr("                          kirim custom server workbench ke dock"))
 	table.insert(lines, b("-- VM --"))
-	table.insert(lines, "  " .. g("vm create --name &lt;n&gt; --cpu &lt;n&gt; --ram &lt;n&gt; --disk &lt;n&gt;"))
+	table.insert(lines, "  " .. g("vm create --name <n> --cpu <n> --ram <n> --disk <n>"))
 	table.insert(lines, "  " .. g("vm list") .. gr("                       daftar VM di host aktif"))
-	table.insert(lines, "  " .. g("vm throttle &lt;name&gt; --limit &lt;pct&gt;") .. gr("   batasi CPU VM (5-100)"))
-	table.insert(lines, "  " .. g("vm delete &lt;name&gt;") .. gr("              hapus VM, resource kembali ke host"))
+	table.insert(lines, "  " .. g("vm throttle <name> --limit <pct>") .. gr("   batasi CPU VM (5-100)"))
+	table.insert(lines, "  " .. g("vm delete <name>") .. gr("              hapus VM, resource kembali ke host"))
 	table.insert(lines, b("-- Terminal --"))
 	table.insert(lines, "  " .. g("clear") .. gr("                        bersihkan layar"))
 	table.insert(lines, "  " .. g("help") .. gr("                         daftar ini"))
@@ -3421,7 +4290,7 @@ end
 local function cmdPing(session: any, tokens: { string }): { string }
 	local targetIP = tokens[2]
 	if targetIP == nil then
-		return { r("ping: usage: ping &lt;ip&gt;") }
+		return { r("ping: usage: ping <ip>") }
 	end
 	local sourceId, err = resolveSource(session)
 	if err ~= nil then
@@ -3439,7 +4308,7 @@ local function cmdPing(session: any, tokens: { string }): { string }
 	table.insert(lines, gr("PING " .. targetIP .. " (" .. targetIP .. ") 56(84) bytes of data."))
 	for i = 1, 4 do
 		local t = latency + (math.random() - 0.5) * 0.4
-		if t &lt; 0.05 then
+		if t < 0.05 then
 			t = 0.05
 		end
 		table.insert(lines, g(string.format("64 bytes from %s: icmp_seq=%d ttl=64 time=%.2f ms", targetIP, i, t)))
@@ -3457,7 +4326,7 @@ end
 local function cmdTraceroute(session: any, tokens: { string }): { string }
 	local targetIP = tokens[2]
 	if targetIP == nil then
-		return { r("traceroute: usage: traceroute &lt;ip&gt;") }
+		return { r("traceroute: usage: traceroute <ip>") }
 	end
 	local sourceId, err = resolveSource(session)
 	if err ~= nil then
@@ -3480,7 +4349,7 @@ local function cmdTraceroute(session: any, tokens: { string }): { string }
 	else
 		path = Graph.GetRoutePath(session, sourceId, targetIP)
 	end
-	if path == nil or #path &lt; 2 then
+	if path == nil or #path < 2 then
 		return { r("traceroute: no route to host") }
 	end
 
@@ -3534,7 +4403,7 @@ local function cmdIpAddr(session: any): { string }
 		)
 		table.insert(lines, b("gateway:   ") .. g(node.gateway or "--"))
 	else
-		table.insert(lines, b("inet:      ") .. r("-- belum di-set") .. gr("  (ip set &lt;ip&gt; &lt;gw&gt;)"))
+		table.insert(lines, b("inet:      ") .. r("-- belum di-set") .. gr("  (ip set <ip> <gw>)"))
 		table.insert(lines, b("gateway:   ") .. gr("--"))
 	end
 	table.insert(lines, b("vlan:      ") .. g(num(node.defaultVlan)))
@@ -3571,7 +4440,7 @@ local function cmdIpSet(session: any, tokens: { string }): { string }
 	local gateway = tokens[4]
 	local mask = tokens[5] or "255.255.255.0"
 	if ip == nil or gateway == nil then
-		return { r("ip set: usage: ip set &lt;ip&gt; &lt;gateway&gt; [mask]") }
+		return { r("ip set: usage: ip set <ip> <gateway> [mask]") }
 	end
 	if not Utils.IsValidIPv4(ip) then
 		return { r("ip set: invalid IPv4 address: " .. ip) }
@@ -3609,13 +4478,13 @@ local function cmdIp(session: any, tokens: { string }): { string }
 	elseif sub == "set" then
 		return cmdIpSet(session, tokens)
 	end
-	return { r("ip: usage: ip a | ip addr | ip set &lt;ip&gt; &lt;gateway&gt; [mask]") }
+	return { r("ip: usage: ip a | ip addr | ip set <ip> <gateway> [mask]") }
 end
 
 local function cmdSsh(session: any, tokens: { string }): { string }
 	local targetIP = tokens[2]
 	if targetIP == nil then
-		return { r("ssh: usage: ssh &lt;ip&gt;") }
+		return { r("ssh: usage: ssh <ip>") }
 	end
 	local term = session.terminal
 	local targetNode: any = nil
@@ -3657,7 +4526,7 @@ local function cmdSsh(session: any, tokens: { string }): { string }
 	notifyMode(session, "RemoteSSH", targetNode)
 
 	local lines: { string } = {}
-	table.insert(lines, b("SSH session established -&gt; ") .. g(targetNode.name) .. gr(" (" .. (targetNode.ip or "?") .. ")"))
+	table.insert(lines, b("SSH session established -> ") .. g(targetNode.name) .. gr(" (" .. (targetNode.ip or "?") .. ")"))
 	table.insert(lines, gr("ketik 'exit' untuk kembali"))
 	return lines
 end
@@ -3713,7 +4582,7 @@ local function cmdTop(session: any): { string }
 		diskUsed += vm.disk
 	end
 	local cpuPct = 0
-	if specs.cpu &gt; 0 then
+	if specs.cpu > 0 then
 		cpuPct = cpuUsed / specs.cpu * 100
 	end
 	local lines: { string } = {}
@@ -3804,13 +4673,13 @@ local function cmdVmCreate(session: any, tokens: { string }): { string }
 	local ram = tonumber(parseFlag(tokens, "--ram") or "")
 	local disk = tonumber(parseFlag(tokens, "--disk") or "")
 	if name == nil or cpu == nil or ram == nil or disk == nil then
-		return { r("vm create: usage: vm create --name &lt;n&gt; --cpu &lt;n&gt; --ram &lt;n&gt; --disk &lt;n&gt;") }
+		return { r("vm create: usage: vm create --name <n> --cpu <n> --ram <n> --disk <n>") }
 	end
-	if cpu &lt;= 0 or ram &lt;= 0 or disk &lt;= 0 then
-		return { r("vm create: --cpu / --ram / --disk harus &gt; 0") }
+	if cpu <= 0 or ram <= 0 or disk <= 0 then
+		return { r("vm create: --cpu / --ram / --disk harus > 0") }
 	end
 	-- sanitize VM name: 1-16 chars of [A-Za-z0-9_-]
-	if #name &gt; 16 or string.match(name, "^[%w%-_]+$") == nil then
+	if #name > 16 or string.match(name, "^[%w%-_]+$") == nil then
 		return { r("vm create: nama VM invalid (1-16 huruf/angka/-/_): '" .. name .. "'") }
 	end
 	if node.vms[name] ~= nil then
@@ -3824,18 +4693,18 @@ local function cmdVmCreate(session: any, tokens: { string }): { string }
 		usedDisk += vm.disk
 	end
 	local specs = node.specs
-	if usedCpu + cpu &gt; specs.cpu then
+	if usedCpu + cpu > specs.cpu then
 		return { r(string.format("vm create: CPU penuh (%s/%s terpakai, diminta %s)", num(usedCpu), num(specs.cpu), num(cpu))) }
 	end
-	if usedRam + ram &gt; specs.ram then
+	if usedRam + ram > specs.ram then
 		return { r(string.format("vm create: RAM penuh (%s/%s GB terpakai, diminta %s GB)", num(usedRam), num(specs.ram), num(ram))) }
 	end
-	if usedDisk + disk &gt; specs.disk then
+	if usedDisk + disk > specs.disk then
 		return { r(string.format("vm create: disk penuh (%s/%s GB terpakai, diminta %s GB)", num(usedDisk), num(specs.disk), num(disk))) }
 	end
 	-- assign an internal IP from the per-host counter (10.0.0.x)
 	local nextIndex = (session.vmIpCounter[node.id] or 1) + 1
-	while nextIndex &lt; 254 and Graph.IsIPUsedByOther(session, Utils.GenerateInternalIP(nextIndex), node.id) do
+	while nextIndex < 254 and Graph.IsIPUsedByOther(session, Utils.GenerateInternalIP(nextIndex), node.id) do
 		nextIndex += 1
 	end
 	session.vmIpCounter[node.id] = nextIndex
@@ -3909,7 +4778,7 @@ local function cmdVmThrottle(session: any, tokens: { string }): { string }
 	local name = tokens[3]
 	local limitRaw = parseFlag(tokens, "--limit")
 	if name == nil or limitRaw == nil then
-		return { r("vm throttle: usage: vm throttle &lt;name&gt; --limit &lt;pct&gt;") }
+		return { r("vm throttle: usage: vm throttle <name> --limit <pct>") }
 	end
 	local limit = tonumber(limitRaw)
 	if limit == nil then
@@ -3921,8 +4790,8 @@ local function cmdVmThrottle(session: any, tokens: { string }): { string }
 		return { r("vm throttle: VM '" .. name .. "' tidak ditemukan") }
 	end
 	vm.cpuThrottlePercent = limit
-	vm.status = if limit &lt; 100 then "throttled" else "running"
-	return { g(string.format("VM '%s' throttle -&gt; %s%%", name, num(limit))) .. gr("  (status: " .. vm.status .. ")") }
+	vm.status = if limit < 100 then "throttled" else "running"
+	return { g(string.format("VM '%s' throttle -> %s%%", name, num(limit))) .. gr("  (status: " .. vm.status .. ")") }
 end
 
 local function cmdVmDelete(session: any, tokens: { string }): { string }
@@ -3932,7 +4801,7 @@ local function cmdVmDelete(session: any, tokens: { string }): { string }
 	end
 	local name = tokens[3]
 	if name == nil then
-		return { r("vm delete: usage: vm delete &lt;name&gt;") }
+		return { r("vm delete: usage: vm delete <name>") }
 	end
 	if node.vms[name] == nil then
 		return { r("vm delete: VM '" .. name .. "' tidak ditemukan") }
@@ -3952,7 +4821,7 @@ local function cmdVm(session: any, tokens: { string }): { string }
 	elseif sub == "delete" then
 		return cmdVmDelete(session, tokens)
 	end
-	return { r("vm: usage: vm create | vm list | vm throttle &lt;name&gt; --limit &lt;pct&gt; | vm delete &lt;name&gt;") }
+	return { r("vm: usage: vm create | vm list | vm throttle <name> --limit <pct> | vm delete <name>") }
 end
 
 ---------------------------------------------------------------------
@@ -4015,7 +4884,7 @@ local function cmdInstallOs(player: Player, session: any, tokens: { string }): {
 		liveNode.osInstalled = osName
 		pushLines(player, {
 			g("[ ok ] OS terinstall: " .. osName .. " on " .. liveNode.name),
-			gr("Lanjut: vm create --name &lt;n&gt; --cpu &lt;n&gt; --ram &lt;n&gt; --disk &lt;n&gt;"),
+			gr("Lanjut: vm create --name <n> --cpu <n> --ram <n> --disk <n>"),
 		})
 		playSfx(player, "cash")
 	end)
@@ -4052,28 +4921,42 @@ local function cmdStressTest(player: Player, session: any, _tokens: { string }):
 			return
 		end
 		liveSession.flags["stress_" .. deviceId] = nil
-		-- burn-in drives load to 95%: temp = 30 + 95 * 0.45 = 72.75 (&lt; 80 limit)
+		-- burn-in drives load to 95%: temp = 30 + 95 * 0.45 = 72.75 (< 80 limit)
 		local peakTemp = 30 + 95 * 0.45
 		liveNode.temperatureC = peakTemp
 		local resultLines: { string } = {}
-		if peakTemp &lt; 80 then
+		if peakTemp < 80 then
 			table.insert(resultLines, g(string.format("[PASS] stress-test 5s: temp peak %.1fC (limit 80C)", peakTemp)))
 			table.insert(resultLines, gr("CPU / RAM / storage: semua OK - server tervalidasi"))
 			if deviceId == "bench_1" and liveSession.workbench ~= nil then
 				liveSession.workbench.tested = true
-				table.insert(resultLines, g("Custom build validated - siap di-ship dari workbench"))
+				table.insert(resultLines, g("Custom build validated - ketik 'ship' untuk kirim crate ke dock"))
 			end
 			playSfx(player, "cash")
 		else
-			table.insert(resultLines, r(string.format("[FAIL] stress-test: temp peak %.1fC (&gt;= 80C)", peakTemp)))
+			table.insert(resultLines, r(string.format("[FAIL] stress-test: temp peak %.1fC (>= 80C)", peakTemp)))
 		end
 		pushLines(player, resultLines)
 	end)
 	return lines
 end
 
+local function cmdShip(session: any): { string }
+	if Workbench == nil or type(Workbench.Ship) ~= "function" then
+		return { r("ship: sistem workbench tidak tersedia") }
+	end
+	local ok, errMsg = Workbench.Ship(session)
+	if not ok then
+		return { r("ship: " .. tostring(errMsg)) }
+	end
+	return {
+		g("[ ok ] Custom server dikirim ke Loading Dock!"),
+		gr("Payout sudah ditambahkan ke saldo lab."),
+	}
+end
+
 ---------------------------------------------------------------------
--- Dispatcher &amp; remote binding
+-- Dispatcher & remote binding
 ---------------------------------------------------------------------
 
 local function dispatch(player: Player, session: any, tokens: { string }): { string }
@@ -4100,11 +4983,13 @@ local function dispatch(player: Player, session: any, tokens: { string }): { str
 		return cmdInstallOs(player, session, tokens)
 	elseif cmd == "stress-test" then
 		return cmdStressTest(player, session, tokens)
+	elseif cmd == "ship" then
+		return cmdShip(session)
 	end
 	return { r("command not found: " .. cmd) .. gr("  (ketik 'help')") }
 end
 
--- ExecuteCommand.OnServerInvoke(player, rawText) -&gt; {lines = {string}}
+-- ExecuteCommand.OnServerInvoke(player, rawText) -> {lines = {string}}
 local function onInvoke(player: Player, rawText: any): { lines: { string } }
 	local session = if Sessions ~= nil then Sessions.GetSession(player) else nil
 	if session == nil then
@@ -4113,7 +4998,7 @@ local function onInvoke(player: Player, rawText: any): { lines: { string } }
 	if type(rawText) ~= "string" or #rawText == 0 then
 		return { lines = {} }
 	end
-	if #rawText &gt; 240 then
+	if #rawText > 240 then
 		return { lines = { r("command terlalu panjang (max 240 karakter)") } }
 	end
 	local tokens: { string } = {}
@@ -4153,7 +5038,7 @@ function CommandExecutor.Init(deps: { [string]: any })
 end
 
 return CommandExecutor
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 </Item>
@@ -4164,8 +5049,7 @@ return CommandExecutor
 <Item class="ModuleScript" referent="RBX20">
 <Properties>
 <string name="Name">RackAndCablingSystem</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	RackAndCablingSystem (ModuleScript, ServerScriptService/Physical)
 	Physical interaction layer for cabling, console links and power:
@@ -4180,7 +5064,7 @@ return CommandExecutor
 	  toggle prompt for freeform devices (once per device per session)
 	- HookFacility: rack PDU click toggles power for every rack-mounted device
 	- Remote responders: CableActionRemote "disconnect_all" (topology UI) and
-	  OpenTerminalEvent "request_shell" (laptop click -&gt; open terminal)
+	  OpenTerminalEvent "request_shell" (laptop click -> open terminal)
 	Player isolation: every handler verifies the caller owns the session.
 ]]
 
@@ -4199,7 +5083,7 @@ local HIGHLIGHT_YELLOW = Color3.fromRGB(255, 220, 80)
 local CONSOLE_BLUE = Color3.fromRGB(80, 160, 255)
 
 ---------------------------------------------------------------------
--- Init &amp; remote bindings
+-- Init & remote bindings
 ---------------------------------------------------------------------
 
 function RackAndCablingSystem.Init(deps: { [string]: any })
@@ -4260,8 +5144,8 @@ end
 
 --[[
 	HandlePortClick(player, session, deviceId, portId):
-	- connected port  -&gt; DisconnectPort + "plug" SFX
-	- empty port      -&gt; first click starts a pending selection (yellow
+	- connected port  -> DisconnectPort + "plug" SFX
+	- empty port      -> first click starts a pending selection (yellow
 	                     SelectionBox, 15 s timeout); second click on another
 	                     port connects both ("LAN_Blue") with "plug"/"error";
 	                     same port cancels the pending selection
@@ -4331,7 +5215,7 @@ function RackAndCablingSystem.HandlePortClick(player: Player, session: any, devi
 end
 
 ---------------------------------------------------------------------
--- Console cable (laptop &lt;-&gt; device)
+-- Console cable (laptop <-> device)
 ---------------------------------------------------------------------
 
 --[[
@@ -4349,7 +5233,7 @@ function RackAndCablingSystem.AttachConsole(player: Player, session: any, device
 		return
 	end
 
-	-- Toggle: same device already linked -&gt; detach.
+	-- Toggle: same device already linked -> detach.
 	local link = session.consoleLink
 	if link ~= nil and link.deviceId == deviceId then
 		RackAndCablingSystem.DetachConsole(session, player, true)
@@ -4365,7 +5249,7 @@ function RackAndCablingSystem.AttachConsole(player: Player, session: any, device
 		return
 	end
 
-	local serial = laptop:FindFirstChild("SerialPortAttachment")
+	local serial = laptop:FindFirstChild("SerialPortAttachment", true)
 	local model = session.deviceModels[deviceId]
 	local consolePart = if model ~= nil then model:FindFirstChild("ConsolePort", true) else nil
 	local consoleAttach = if consolePart ~= nil and consolePart:IsA("BasePart") then consolePart:FindFirstChild("ConsoleAttach") else nil
@@ -4438,8 +5322,8 @@ end
 --[[
 	HookDevice(session, deviceId): connects all interaction callbacks of one
 	device model, exactly once per session (session.hookedDevices guard):
-	- every port ClickDetector -&gt; HandlePortClick
-	- console ProximityPrompt  -&gt; AttachConsole
+	- every port ClickDetector -> HandlePortClick
+	- console ProximityPrompt  -> AttachConsole
 	- freeform devices get a "PowerPrompt" on their Chassis (HoldDuration 0.4)
 	  toggling node.isPowered (rack-mounted devices are driven by the PDU)
 ]]
@@ -4473,7 +5357,7 @@ function RackAndCablingSystem.HookDevice(session: any, deviceId: string)
 		end
 	end
 
-	-- Console port prompt -&gt; laptop console link.
+	-- Console port prompt -> laptop console link.
 	local consolePart = model:FindFirstChild("ConsolePort", true)
 	if consolePart ~= nil and consolePart:IsA("BasePart") then
 		local prompt = consolePart:FindFirstChildOfClass("ProximityPrompt")
@@ -4591,7 +5475,7 @@ function RackAndCablingSystem.Update(session: any)
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if hrp ~= nil and hrp:IsA("BasePart") then
 		local dist = (hrp.Position - model:GetPivot().Position).Magnitude
-		if dist &gt; CONSOLE_MAX_DISTANCE then
+		if dist > CONSOLE_MAX_DISTANCE then
 			RackAndCablingSystem.DetachConsole(session, session.player, true)
 		end
 	end
@@ -4654,14 +5538,13 @@ function RackAndCablingSystem.onTerminalRequest(player: Player, payload: any)
 end
 
 return RackAndCablingSystem
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX21">
 <Properties>
 <string name="Name">PlacementSystem</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	PlacementSystem (ModuleScript, ServerScriptService/Physical)
 	Server-authoritative hardware purchase + freeform placement:
@@ -4737,7 +5620,7 @@ local function prefixFor(def: any): string
 	if def.category == "Server" then
 		return "bm"
 	end
-	if def.category == "Network" and (def.specs.wanPorts or 0) &gt; 0 then
+	if def.category == "Network" and (def.specs.wanPorts or 0) > 0 then
 		return "rt"
 	end
 	return "sw"
@@ -4748,7 +5631,7 @@ end
 ---------------------------------------------------------------------
 
 --[[
-	ValidatePlacement(session, itemId, cf) -&gt; (ok, reason, snappedCF)
+	ValidatePlacement(session, itemId, cf) -> (ok, reason, snappedCF)
 	- snaps the requested position to the 2-stud grid (plot-relative)
 	- inside PLACEMENT_BOUNDS (plot-relative)
 	- clear of every FURNITURE_ZONES bubble (radius + device half-extent)
@@ -4774,7 +5657,7 @@ function PlacementSystem.ValidatePlacement(session: any, itemId: string, cf: CFr
 	local sz = math.floor(rel.Z / grid + 0.5) * grid
 
 	local bounds = Constants.PLACEMENT_BOUNDS
-	if sx &lt; bounds.minX or sx &gt; bounds.maxX or sz &lt; bounds.minZ or sz &gt; bounds.maxZ then
+	if sx < bounds.minX or sx > bounds.maxX or sz < bounds.minZ or sz > bounds.maxZ then
 		return false, "Di luar area lab", cf
 	end
 
@@ -4783,7 +5666,7 @@ function PlacementSystem.ValidatePlacement(session: any, itemId: string, cf: CFr
 	for _, zone in ipairs(Constants.FURNITURE_ZONES) do
 		local zoneRel = Vector3.new(zone.position.X, 0, zone.position.Z)
 		local dist = (zoneRel - relSnap).Magnitude
-		if dist &lt; zone.radius + margin then
+		if dist < zone.radius + margin then
 			return false, "Menabrak area " .. zone.name, cf
 		end
 	end
@@ -4793,7 +5676,7 @@ function PlacementSystem.ValidatePlacement(session: any, itemId: string, cf: CFr
 			local otherHalfX, otherHalfZ = ModelFactory.ComputeFootprint(node.itemId)
 			local otherRel = Vector3.new(node.posX - origin.X, 0, node.posZ - origin.Z)
 			local dist = (otherRel - relSnap).Magnitude
-			if dist &lt; (halfX + otherHalfX) + (halfZ + otherHalfZ) + 0.5 then
+			if dist < (halfX + otherHalfX) + (halfZ + otherHalfZ) + 0.5 then
 				return false, "Menabrak " .. node.name, cf
 			end
 		end
@@ -4808,7 +5691,7 @@ end
 ---------------------------------------------------------------------
 
 --[[
-	PlaceDevice(session, itemId, snappedCF, rotY, config?) -&gt; id
+	PlaceDevice(session, itemId, snappedCF, rotY, config?) -> id
 	Rack category: builds the rack model, session.racks entry (pduPowered =
 	false - the player must switch the PDU on), registers the PDU part in
 	facility.pduParts and hooks it.
@@ -4867,7 +5750,7 @@ function PlacementSystem.PlaceDevice(session: any, itemId: string, snappedCF: CF
 		node.isPowered = if config.isPowered ~= nil then config.isPowered == true else false
 		if type(config.vms) == "table" then
 			for _, vm in ipairs(config.vms) do
-				if type(vm) == "table" and type(vm.name) == "string" and #vm.name &gt; 0 then
+				if type(vm) == "table" and type(vm.name) == "string" and #vm.name > 0 then
 					node.vms[vm.name] = vm
 				end
 			end
@@ -4889,9 +5772,9 @@ end
 --[[
 	OnPurchase(player, itemId, action, cf, rotY): PurchaseHardwareRemote
 	handler. Categories:
-	- Cable     -&gt; Fase 2 hint (manual cabling is out of Fase 1 scope)
-	- Component -&gt; workbench.TryInstall (assembly order enforced there)
-	- Rack/Network/Server -&gt; "prepare" (balance check, remembers pending item),
+	- Cable     -> Fase 2 hint (manual cabling is out of Fase 1 scope)
+	- Component -> workbench.TryInstall (assembly order enforced there)
+	- Rack/Network/Server -> "prepare" (balance check, remembers pending item),
 	  "place" (validate + deduct + PlaceDevice + "cash"), "cancel"
 ]]
 function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf: any, rotY: any)
@@ -4922,7 +5805,7 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 
 	-- Placeable categories: Rack / Network / Server
 	if action == "prepare" then
-		if session.balance &lt; def.price then
+		if session.balance < def.price then
 			hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
 			return
 		end
@@ -4949,7 +5832,7 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 			playSFX(player, "error")
 			return
 		end
-		if session.balance &lt; def.price then
+		if session.balance < def.price then
 			hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
 			session.pendingPlacementItemId = nil
 			return
@@ -4964,18 +5847,17 @@ function PlacementSystem.OnPurchase(player: Player, itemId: any, action: any, cf
 end
 
 return PlacementSystem
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX22">
 <Properties>
 <string name="Name">WorkbenchBuilderSystem</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	WorkbenchBuilderSystem (ModuleScript, ServerScriptService/Physical)
 	Custom server assembly on the AssemblyWorkbench, single clean path:
-	- Install order: Chassis -&gt; Mobo -&gt; CPU* -&gt; RAM* -&gt; Storage* -&gt; PSU
+	- Install order: Chassis -> Mobo -> CPU* -> RAM* -> Storage* -> PSU
 	  (hints + "error" SFX on every violation)
 	- Chassis install builds the bench device model ("bench_1") on the bench
 	  top; the device id is reserved but the node is NOT registered until the
@@ -5053,7 +5935,7 @@ local function hint(player: Player, message: string)
 end
 
 -- Places a component visual relative to the workbench pivot, snapped to the
--- Snap_&lt;index&gt; attachment position when available (bench top row).
+-- Snap_<index> attachment position when available (bench top row).
 local function placeVisual(session: any, visual: Model, snapIndex: number)
 	local facility = session.facility
 	local bench = facility.workbenchModel
@@ -5061,7 +5943,7 @@ local function placeVisual(session: any, visual: Model, snapIndex: number)
 		return
 	end
 	local pivot = bench:GetPivot()
-	local offset = CFrame.new(0, 3.5, 1.2) -- fallback: in front of the bench top
+	local offset = CFrame.new(0, 2.72, 1.0) -- fallback: on the human-scale bench top
 	local snaps = facility.benchSnaps
 	local snap = if type(snaps) == "table" then snaps[snapIndex] else nil
 	if snap ~= nil and snap:IsA("Attachment") then
@@ -5082,7 +5964,7 @@ local function ensureBenchModel(session: any)
 	end
 	local chassisId = wb.chassis :: string
 	local model, _ports, _consoleAttach, _led, _smoke = ModelFactory.BuildDeviceModel(chassisId, BENCH_DEVICE_ID)
-	model:PivotTo(facility.workbenchModel:GetPivot() * CFrame.new(0, 3.5, 0))
+	model:PivotTo(facility.workbenchModel:GetPivot() * CFrame.new(0, 2.72, 0))
 	model.Parent = facility.devices
 
 	-- The bench console prompt should read as the custom build.
@@ -5178,7 +6060,7 @@ function WorkbenchBuilderSystem.TryInstall(player: Player, session: any, itemId:
 		hint(player, "Dekati AssemblyWorkbench untuk memasang komponen.")
 		return
 	end
-	if (hrp.Position - facility.workbenchModel:GetPivot().Position).Magnitude &gt; INSTALL_RANGE then
+	if (hrp.Position - facility.workbenchModel:GetPivot().Position).Magnitude > INSTALL_RANGE then
 		hint(player, "Dekati AssemblyWorkbench untuk memasang komponen.")
 		return
 	end
@@ -5206,19 +6088,19 @@ function WorkbenchBuilderSystem.TryInstall(player: Player, session: any, itemId:
 	elseif isCpu then
 		if wb.mobo == nil then
 			orderErr = "Pasang motherboard dulu."
-		elseif wb.cpuCount &gt;= wb.cpuSockets then
+		elseif wb.cpuCount >= wb.cpuSockets then
 			orderErr = "Socket CPU penuh."
 		end
 	elseif isRam then
 		if wb.mobo == nil then
 			orderErr = "Pasang motherboard dulu."
-		elseif wb.ramSlotsUsed &gt;= wb.ramSlots then
+		elseif wb.ramSlotsUsed >= wb.ramSlots then
 			orderErr = "Slot RAM penuh."
 		end
 	elseif isStorage then
 		if wb.mobo == nil then
 			orderErr = "Pasang motherboard dulu."
-		elseif wb.storageBaysUsed &gt;= wb.storageBays then
+		elseif wb.storageBaysUsed >= wb.storageBays then
 			orderErr = "Bay storage penuh."
 		end
 	elseif isPsu then
@@ -5237,7 +6119,7 @@ function WorkbenchBuilderSystem.TryInstall(player: Player, session: any, itemId:
 	end
 
 	-- Balance.
-	if session.balance &lt; def.price then
+	if session.balance < def.price then
 		hint(player, "Uang belum cukup untuk " .. def.name .. " ($" .. tostring(def.price) .. ")")
 		playSFX(player, "error")
 		return
@@ -5368,7 +6250,7 @@ end
 ---------------------------------------------------------------------
 
 --[[
-	Ship(session) -&gt; (ok, msg): packs the finished build into a crate that
+	Ship(session) -> (ok, msg): packs the finished build into a crate that
 	spawns on the loading dock (despawns after 20 s) and pays out
 	floor(totalSpent * 0.3) + 100. Requires chassis + psu + OS + stress-test
 	pass and not already shipped.
@@ -5421,7 +6303,7 @@ end
 ---------------------------------------------------------------------
 
 --[[
-	Serialize(session) -&gt; table: every persistent workbench field + the
+	Serialize(session) -> table: every persistent workbench field + the
 	visuals list (component ids in install order). No Instance values - this
 	payload goes straight into a DataStore.
 ]]
@@ -5479,9 +6361,9 @@ end
 --[[
 	ApplyState(session, data): restores the workbench from a save.
 	- sets every wb field (incl. cpuCores / lastCpuId / lastRamId)
-	- chassis present -&gt; rebuilds the bench device model (same path as install)
-	- data.visuals -&gt; rebuilds the component visuals on the bench snaps
-	- complete + powered -&gt; registers the bench node (auto-cable suppressed by
+	- chassis present -> rebuilds the bench device model (same path as install)
+	- data.visuals -> rebuilds the component visuals on the bench snaps
+	- complete + powered -> registers the bench node (auto-cable suppressed by
 	  loadedFromSave; cables are restored by the persistence link pass)
 	- recolors the bench LED
 ]]
@@ -5533,7 +6415,7 @@ function WorkbenchBuilderSystem.ApplyState(session: any, data: any)
 			wb.snapIndex = snapIdx
 		end
 
-		-- Complete + powered -&gt; the bench node comes alive right away.
+		-- Complete + powered -> the bench node comes alive right away.
 		if wb.powered and wb.mobo ~= nil and wb.psu ~= nil then
 			WorkbenchBuilderSystem.RegisterBenchNode(session)
 		end
@@ -5546,7 +6428,7 @@ function WorkbenchBuilderSystem.ApplyState(session: any, data: any)
 end
 
 return WorkbenchBuilderSystem
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 </Item>
@@ -5557,8 +6439,7 @@ return WorkbenchBuilderSystem
 <Item class="ModuleScript" referent="RBX24">
 <Properties>
 <string name="Name">ShiftAndEconomyManager</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	ShiftAndEconomyManager (ModuleScript, ServerScriptService/Gameplay)
 	AGENT C - Fase 1.
@@ -5566,16 +6447,16 @@ return WorkbenchBuilderSystem
 	Economy tick (every ECONOMY.tickSeconds = 5s) per session:
 	  - VM load jitter: running VMs get a smoothed currentLoadPercent toward a
 	    random 35..95 target, capped by cpuThrottlePercent (status "throttled"
-	    while a throttle limit &gt; 0 is set); stopped VMs sit at 0.
+	    while a throttle limit > 0 is set); stopped VMs sit at 0.
 	  - Device loadPercent = sum(vm.cpu * vmLoad / 100) / specs.cpu * 100.
-	  - Thermal sim: temperatureC = 30 + loadPercent * 0.45; at &gt;= 80 C the
+	  - Thermal sim: temperatureC = 30 + loadPercent * 0.45; at >= 80 C the
 	    model's "OverheatSmoke" ParticleEmitter is enabled, otherwise disabled.
 	  - Power cost per tick: sum of powered device powerWatts + 40 W per rack
-	    with pduPowered; balance -= watts * electricityPerWattPerTick (clamp &gt;= 0).
+	    with pduPowered; balance -= watts * electricityPerWattPerTick (clamp >= 0).
 	  - Payout every ECONOMY.payoutInterval (15s = 3 ticks): per VM hosted on a
 	    powered device that has an IP: cpu*vpsCpuRate + ram*vpsRamRate + disk*vpsDiskRate.
 	  - cabling.Update(session): console cable distance check.
-	  - BuildSnapshot -&gt; StateSyncRemote:FireClient.
+	  - BuildSnapshot -> StateSyncRemote:FireClient.
 
 	Fase 1 runs 24/7 (no shift clock / daily settlement - that is Fase 3 scope,
 	see CONTRACT.md Section 9). clockText in the snapshot reflects that.
@@ -5632,7 +6513,7 @@ local tickCounter = 0
 local LOAD_SMOOTHING = 0.4
 -- Room/base temperature used when a device carries no meaningful load.
 local BASE_TEMP_C = 30
--- Smoke kicks in at this temperature (per spec: &gt;= 80 C enables OverheatSmoke).
+-- Smoke kicks in at this temperature (per spec: >= 80 C enables OverheatSmoke).
 local SMOKE_TEMP_C = 80
 -- Fixed idle draw of a powered rack PDU (watts), per contract Section 6.
 local RACK_IDLE_WATTS = 40
@@ -5702,7 +6583,7 @@ local function applyLoadAndThermal(session: SessionLike)
 			else
 				local throttle = vm.cpuThrottlePercent or 0
 				local target = rng:NextInteger(35, 95)
-				if throttle &gt; 0 then
+				if throttle > 0 then
 					-- Throttle limit caps the load; status stays throttled while set.
 					target = math.min(target, throttle)
 					vm.status = "throttled"
@@ -5715,7 +6596,7 @@ local function applyLoadAndThermal(session: SessionLike)
 		end
 
 		local loadPercent = 0
-		if hostCpu &gt; 0 then
+		if hostCpu > 0 then
 			loadPercent = math.clamp(totalLoad / hostCpu * 100, 0, 100)
 		end
 		-- loadPercent lives as a dynamic node field (DeviceSnapshot needs it).
@@ -5723,7 +6604,7 @@ local function applyLoadAndThermal(session: SessionLike)
 		node.temperatureC = BASE_TEMP_C + loadPercent * 0.45
 
 		if model ~= nil then
-			local smoking = node.temperatureC &gt;= SMOKE_TEMP_C
+			local smoking = node.temperatureC >= SMOKE_TEMP_C
 			for _, desc in ipairs(model:GetDescendants()) do
 				if desc:IsA("ParticleEmitter") and desc.Name == "OverheatSmoke" then
 					desc.Enabled = smoking
@@ -5753,7 +6634,7 @@ local function payVpsIncome(session: SessionLike)
 			end
 		end
 	end
-	if income &gt; 0 then
+	if income > 0 then
 		session.balance += income
 	end
 end
@@ -5854,7 +6735,7 @@ function ShiftAndEconomyManager.BuildSnapshot(session: SessionLike): FacilitySna
 		table.insert(deviceSnapshots, snapshot)
 	end
 
-	local avgTempC = if poweredCount &gt; 0 then tempSum / poweredCount else 0
+	local avgTempC = if poweredCount > 0 then tempSum / poweredCount else 0
 
 	local ticketRows = {}
 	for _, t in ipairs(session.tickets or {}) do
@@ -5905,7 +6786,7 @@ local function tickSession(session: SessionLike, isPayoutTick: boolean)
 		payVpsIncome(session)
 	end
 	if cabling ~= nil and type(cabling.Update) == "function" then
-		cabling.Update(session) -- console cable distance check (&gt; 18 studs detaches)
+		cabling.Update(session) -- console cable distance check (> 18 studs detaches)
 	end
 	ShiftAndEconomyManager.ForceSync(session)
 end
@@ -5947,14 +6828,13 @@ function ShiftAndEconomyManager.Start()
 end
 
 return ShiftAndEconomyManager
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX25">
 <Properties>
 <string name="Name">ContractAndIncidentManager</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	ContractAndIncidentManager (ModuleScript, ServerScriptService/Gameplay)
 	AGENT C - Fase 1.
@@ -5972,11 +6852,11 @@ return ShiftAndEconomyManager
 	  - CloudVPS specs: cpu 2..8, ram 4..32, disk 50..500; reward scaled
 	    (cpu*60 + ram*2 + disk*0.1, minimum 120).
 	  - CustomBuild: reward 250..600, fixed requirementsText.
-	  - ContractActionRemote {action="accept", ticketId}: Available -&gt; Active,
+	  - ContractActionRemote {action="accept", ticketId}: Available -> Active,
 	    max 2 Active tickets per session.
 	  - Active validation each pass:
 	      CloudVPS  = any powered BareMetal with an OS installed hosts a VM with
-	                  cpu &gt;= req.cpu and ram &gt;= req.ram and disk &gt;= req.disk.
+	                  cpu >= req.cpu and ram >= req.ram and disk >= req.disk.
 	      CustomBuild = session.workbench.shipped.
 	  - On completion: balance += rewardPayout, reputation += 1, status
 	    "Completed", PlaySFXRemote "cash", hint via OpenTerminalEvent, and the
@@ -5993,7 +6873,7 @@ type TicketCategory = NetworkTypes.TicketCategory
 type TicketStatus = NetworkTypes.TicketStatus
 
 --[[ ContractTicket plus the UI-only requirementsText row. ]]
-export type TicketRow = NetworkTypes.ContractTicket &amp; {
+export type TicketRow = NetworkTypes.ContractTicket & {
 	requirementsText: string,
 }
 
@@ -6091,7 +6971,7 @@ local function makeCloudVPSTicket(): TicketRow
 		targetUSlot = nil,
 		status = "Available" :: TicketStatus,
 		requirementsText = string.format(
-			"VM &gt;= %d vCPU / %dGB RAM / %dGB disk di bare-metal powered + OS ter-install",
+			"VM >= %d vCPU / %dGB RAM / %dGB disk di bare-metal powered + OS ter-install",
 			cpu,
 			ram,
 			disk
@@ -6137,8 +7017,8 @@ local function generateTickets(session: SessionLike)
 	end
 
 	local totalAvailable = available.CloudVPS + available.CustomBuild
-	while totalAvailable &lt; MAX_AVAILABLE_TICKETS do
-		local category: TicketCategory = if available.CloudVPS &lt;= available.CustomBuild
+	while totalAvailable < MAX_AVAILABLE_TICKETS do
+		local category: TicketCategory = if available.CloudVPS <= available.CustomBuild
 			then "CloudVPS"
 			else "CustomBuild"
 		local ticket = if category == "CloudVPS" then makeCloudVPSTicket() else makeCustomBuildTicket()
@@ -6156,7 +7036,7 @@ local function cloudVPSComplete(session: SessionLike, requirements: any): boolea
 	for _, node in pairs(session.devices) do
 		if node.deviceType == "BareMetal" and node.osInstalled ~= nil and node.isPowered then
 			for _, vm in pairs(node.vms) do
-				if vm.cpu &gt;= reqCpu and vm.ram &gt;= reqRam and vm.disk &gt;= reqDisk then
+				if vm.cpu >= reqCpu and vm.ram >= reqRam and vm.disk >= reqDisk then
 					return true
 				end
 			end
@@ -6206,7 +7086,7 @@ local function validateActiveTickets(session: SessionLike)
 	end
 end
 
---[[ ContractActionRemote handler: {action="accept", ticketId} -&gt; Available -&gt; Active. ]]
+--[[ ContractActionRemote handler: {action="accept", ticketId} -> Available -> Active. ]]
 local function onAccept(player: Player, payload: any)
 	if type(payload) ~= "table" or payload.action ~= "accept" then
 		return
@@ -6226,7 +7106,7 @@ local function onAccept(player: Player, payload: any)
 			activeCount += 1
 		end
 	end
-	if activeCount &gt;= MAX_ACTIVE_TICKETS then
+	if activeCount >= MAX_ACTIVE_TICKETS then
 		sendHint(session, string.format("Maksimal %d kontrak aktif. Selesaikan dulu salah satunya.", MAX_ACTIVE_TICKETS))
 		return
 	end
@@ -6287,14 +7167,13 @@ function ContractAndIncidentManager.Start()
 end
 
 return ContractAndIncidentManager
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="ModuleScript" referent="RBX26">
 <Properties>
 <string name="Name">DataPersistenceManager</string>
-<bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	DataPersistenceManager (ModuleScript, ServerScriptService/Gameplay)
 	AGENT C - Fase 1.
@@ -6325,15 +7204,15 @@ return ContractAndIncidentManager
 	              requirementsText, clientName }
 
 	Apply(session, data):
-	  loadedFromSave = true FIRST (suppresses AutoCable during restore) -&gt;
-	  balance/reputation -&gt; starter device config (bm_starter_1, sw_main_1,
-	  isp_router_1: ip/gateway/mask/os/power/vms + vmIpCounter rebuild) -&gt;
-	  freeform devices re-placed via PlacementSystem.PlaceDevice(config) -&gt;
-	  workbench.ApplyState (so bench_1 exists before cables) -&gt; link pass
+	  loadedFromSave = true FIRST (suppresses AutoCable during restore) ->
+	  balance/reputation -> starter device config (bm_starter_1, sw_main_1,
+	  isp_router_1: ip/gateway/mask/os/power/vms + vmIpCounter rebuild) ->
+	  freeform devices re-placed via PlacementSystem.PlaceDevice(config) ->
+	  workbench.ApplyState (so bench_1 exists before cables) -> link pass
 	  (graph.ConnectPorts per saved peer, deduped by sorted "dev|port" pair,
-	  covers starter + bench + placed links) -&gt; tickets restore (Available stays
-	  Available, Active stays Active) -&gt; loadedFromSave = false -&gt;
-	  graph.UpdateDeviceLED for all devices -&gt; ForceSync snapshot.
+	  covers starter + bench + placed links) -> tickets restore (Available stays
+	  Available, Active stays Active) -> loadedFromSave = false ->
+	  graph.UpdateDeviceLED for all devices -> ForceSync snapshot.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6545,7 +7424,7 @@ local function restoreVMs(session: SessionLike, node: any, hostNewId: string, vm
 	local maxOctet = 1
 	if type(vmArray) == "table" then
 		for _, v in ipairs(vmArray) do
-			if type(v) == "table" and type(v.name) == "string" and #v.name &gt; 0 then
+			if type(v) == "table" and type(v.name) == "string" and #v.name > 0 then
 				local vm = {
 					name = v.name,
 					cpu = tonumber(v.cpu) or 1,
@@ -6559,7 +7438,7 @@ local function restoreVMs(session: SessionLike, node: any, hostNewId: string, vm
 				node.vms[vm.name] = vm
 				if vm.assignedIp ~= nil then
 					local octet = tonumber(string.match(vm.assignedIp, "^10%.0%.0%.(%d+)$"))
-					if octet ~= nil and octet &gt; maxOctet then
+					if octet ~= nil and octet > maxOctet then
 						maxOctet = octet
 					end
 				end
@@ -6570,11 +7449,11 @@ local function restoreVMs(session: SessionLike, node: any, hostNewId: string, vm
 	return maxOctet
 end
 
---[[ Sorted-pair dedupe key for a cable connection ("devA|portA&gt;devB|portB"). ]]
+--[[ Sorted-pair dedupe key for a cable connection ("devA|portA>devB|portB"). ]]
 local function pairKey(devA: string, portA: string, devB: string, portB: string): string
 	local left = devA .. "|" .. portA
 	local right = devB .. "|" .. portB
-	return if left &lt;= right then left .. "&gt;" .. right else right .. "&gt;" .. left
+	return if left <= right then left .. ">" .. right else right .. ">" .. left
 end
 
 --[[ Restore a saved payload onto a freshly built session. ]]
@@ -6593,7 +7472,7 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 		session.reputation = tonumber(data.reputation) :: number
 	end
 
-	-- saved device id -&gt; live device id (starters keep their fixed ids)
+	-- saved device id -> live device id (starters keep their fixed ids)
 	local restoredIds: { [string]: string } = {
 		[ISP_ID] = ISP_ID,
 		["isp_router_1"] = "isp_router_1",
@@ -6649,7 +7528,7 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 			local maxOctet = 1
 			if type(entry.vms) == "table" then
 				for _, v in ipairs(entry.vms) do
-					if type(v) == "table" and type(v.name) == "string" and #v.name &gt; 0 then
+					if type(v) == "table" and type(v.name) == "string" and #v.name > 0 then
 						table.insert(vms, {
 							name = v.name,
 							cpu = tonumber(v.cpu) or 1,
@@ -6662,7 +7541,7 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 						})
 						if type(v.assignedIp) == "string" then
 							local octet = tonumber(string.match(v.assignedIp, "^10%.0%.0%.(%d+)$"))
-							if octet ~= nil and octet &gt; maxOctet then
+							if octet ~= nil and octet > maxOctet then
 								maxOctet = octet
 							end
 						end
@@ -6689,7 +7568,7 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 			end
 		else
 			-- Rack-mounted non-starter devices cannot be re-mounted in Fase 1
-			-- (carry &amp; mount is Fase 2); recorded as a known limitation.
+			-- (carry & mount is Fase 2); recorded as a known limitation.
 			warn("[DataPersistenceManager] skipping non-restorable device '" .. savedId .. "'")
 		end
 	end
@@ -6726,7 +7605,7 @@ function DataPersistenceManager.Apply(session: SessionLike, data: any)
 				local color = if type(conn.color) == "string" then conn.color else "LAN_Blue"
 				local ok, err = graph.ConnectPorts(session, devA, portA, devB, conn.peerPort, color)
 				if not ok then
-					-- Mostly benign: pre-wired starter links (wan1&lt;-&gt;isp_uplink)
+					-- Mostly benign: pre-wired starter links (wan1<->isp_uplink)
 					-- already exist from BuildFacility and are rejected here.
 					_ = err
 				end
@@ -6794,7 +7673,7 @@ function DataPersistenceManager.SaveAll()
 	end
 end
 
---[[ Autosave loop (PlayerRemoving save is handled by MainServer -&gt; Save). ]]
+--[[ Autosave loop (PlayerRemoving save is handled by MainServer -> Save). ]]
 function DataPersistenceManager.Start()
 	task.spawn(function()
 		while true do
@@ -6805,7 +7684,7 @@ function DataPersistenceManager.Start()
 end
 
 return DataPersistenceManager
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 </Item>
@@ -6814,7 +7693,7 @@ return DataPersistenceManager
 <Properties>
 <string name="Name">StarterPlayer</string>
 </Properties>
-<Item class="Folder" referent="RBX28">
+<Item class="StarterPlayerScripts" referent="RBX28">
 <Properties>
 <string name="Name">StarterPlayerScripts</string>
 </Properties>
@@ -6822,31 +7701,35 @@ return DataPersistenceManager
 <Properties>
 <string name="Name">TerminalClient</string>
 <bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	TerminalClient (LocalScript, StarterPlayer/StarterPlayerScripts)
-	GUI Terminal: local shell / console device / SSH session.
+	GUI Terminal yang dioptimalkan untuk PC (keyboard + mouse):
+	- Ukuran desktop lega (680x430), bisa di-drag lewat TopBar.
+	- Tutup cepat: klik tombol "X [~]" (MouseButton1Down, tidak bentrok dengan
+	  TextBox focus maupun Tool.Activated), tekan [~] / [F2] / [Ctrl+W],
+	  klik tombol "TERMINAL [~]" di HUD, atau ketik "close" / "quit".
+	- Modal = true pada closeBtn agar kursor mouse otomatis bebas meski pemain
+	  sedang mode First-Person / ShiftLock di PC.
+	- History Up/Down, Tab autocomplete, Ctrl+L clear layar, scroll wheel mulus.
+	- Tool "TechnicianLaptop" Activated tidak akan membuka ulang terminal saat
+	  pemain mengklik tombol UI atau baru saja menutup terminal.
 
 	Protocol (CONTRACT.md Section 3):
-	- OpenTerminalEvent (RE): server-&gt;client {action="open", mode, deviceName, deviceId} |
-	  {action="detach"} | {action="hint", message}; client-&gt;server {action="request_shell"}.
-	- ExecuteCommand (RF): InvokeServer(rawText) -&gt; {lines = {string}}, RichText allowed,
+	- OpenTerminalEvent (RE): server->client {action="open", mode, deviceName, deviceId} |
+	  {action="detach"} | {action="hint", message}; client->server {action="request_shell"}.
+	- ExecuteCommand (RF): InvokeServer(rawText) -> {lines = {string}}, RichText allowed,
 	  single line "__CLEAR__" = clear buffer.
-	- TerminalPushOutput (RE): server-&gt;client {lines = {string}} (async completion).
-
-	Laptop tool "TechnicianLaptop" Activated -&gt; FireServer({action="request_shell"}).
-	Hooked via player.Character ChildAdded + CharacterAdded re-hook.
-	History Up/Down + Tab autocomplete work even while the TextBox is focused
-	(UserInputService.InputBegan WITHOUT gameProcessed filter, gated on window visible).
-	All GUI strings in Indonesian (game language), code comments in English.
+	- TerminalPushOutput (RE): server->client {lines = {string}} (async completion).
 ]]
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared")
 local NetworkUtils = require(sharedFolder:WaitForChild("NetworkUtils"))
 
@@ -6868,11 +7751,12 @@ local COLOR_BORDER = Color3.fromRGB(48, 54, 61)
 local COLOR_GREEN = Color3.fromRGB(0, 255, 102)
 local COLOR_BLUE = Color3.fromRGB(88, 166, 255)
 local COLOR_RED = Color3.fromRGB(255, 85, 85)
+local COLOR_RED_BG = Color3.fromRGB(145, 40, 48)
 local COLOR_YELLOW = Color3.fromRGB(255, 216, 102)
 local COLOR_GREY = Color3.fromRGB(139, 148, 158)
 local COLOR_TEXT = Color3.fromRGB(201, 209, 217)
 
--- ===== GUI build =====
+-- ===== GUI build (PC-optimized desktop window) =====
 local gui = Instance.new("ScreenGui")
 gui.Name = "NetSimTerminal"
 gui.ResetOnSpawn = false
@@ -6882,28 +7766,33 @@ gui.Parent = playerGui
 
 local window = Instance.new("Frame")
 window.Name = "Window"
-window.AnchorPoint = Vector2.new(0, 0.5)
-window.Position = UDim2.new(1, -572, 0.5, 0) -- right-center, safe on 1280x720
-window.Size = UDim2.new(0, 560, 0, 340)
+window.AnchorPoint = Vector2.new(0.5, 0.5)
+window.Position = UDim2.new(0.62, 0, 0.52, 0) -- comfortable right-of-center PC placement
+window.Size = UDim2.new(0, 680, 0, 430)
 window.BackgroundColor3 = COLOR_BG
 window.BorderSizePixel = 0
+window.Active = true -- absorb mouse clicks inside window so Tool.Activated does not trigger
 window.Visible = false
 window.Parent = gui
 local windowCorner = Instance.new("UICorner")
 windowCorner.CornerRadius = UDim.new(0, 10)
 windowCorner.Parent = window
-
 local windowStroke = Instance.new("UIStroke")
 windowStroke.Color = COLOR_BORDER
-windowStroke.Thickness = 1
+windowStroke.Thickness = 1.5
 windowStroke.Parent = window
+local sizeConstraint = Instance.new("UISizeConstraint")
+sizeConstraint.MinSize = Vector2.new(460, 280)
+sizeConstraint.MaxSize = Vector2.new(960, 680)
+sizeConstraint.Parent = window
 
--- Top bar: mode label + hint overlay + close button
+-- Top bar (draggable on PC): mode label + shortcut hint + close button
 local topBar = Instance.new("Frame")
 topBar.Name = "TopBar"
-topBar.Size = UDim2.new(1, 0, 0, 34)
+topBar.Size = UDim2.new(1, 0, 0, 36)
 topBar.BackgroundColor3 = COLOR_BAR
 topBar.BorderSizePixel = 0
+topBar.Active = true
 topBar.Parent = window
 local topBarCorner = Instance.new("UICorner")
 topBarCorner.CornerRadius = UDim.new(0, 10)
@@ -6911,7 +7800,7 @@ topBarCorner.Parent = topBar
 
 local modeLabel = Instance.new("TextLabel")
 modeLabel.Name = "ModeLabel"
-modeLabel.Size = UDim2.new(1, -60, 1, 0)
+modeLabel.Size = UDim2.new(1, -240, 1, 0)
 modeLabel.Position = UDim2.new(0, 12, 0, 0)
 modeLabel.BackgroundTransparency = 1
 modeLabel.Font = Enum.Font.RobotoMono
@@ -6921,10 +7810,22 @@ modeLabel.TextColor3 = COLOR_GREEN
 modeLabel.Text = "[LOCAL SHELL]"
 modeLabel.Parent = topBar
 
+local hotkeyHint = Instance.new("TextLabel")
+hotkeyHint.Name = "HotkeyHint"
+hotkeyHint.Size = UDim2.new(0, 160, 1, 0)
+hotkeyHint.Position = UDim2.new(1, -234, 0, 0)
+hotkeyHint.BackgroundTransparency = 1
+hotkeyHint.Font = Enum.Font.Gotham
+hotkeyHint.TextSize = 11
+hotkeyHint.TextXAlignment = Enum.TextXAlignment.Right
+hotkeyHint.TextColor3 = COLOR_GREY
+hotkeyHint.Text = "drag bar | [~]/[F2] tutup"
+hotkeyHint.Parent = topBar
+
 -- Hint overlay shown inside the bar area for 3 seconds
 local hintLabel = Instance.new("TextLabel")
 hintLabel.Name = "HintLabel"
-hintLabel.Size = UDim2.new(1, -60, 1, 0)
+hintLabel.Size = UDim2.new(1, -86, 1, 0)
 hintLabel.Position = UDim2.new(0, 12, 0, 0)
 hintLabel.BackgroundTransparency = 1
 hintLabel.Font = Enum.Font.RobotoMono
@@ -6936,16 +7837,20 @@ hintLabel.Text = ""
 hintLabel.Visible = false
 hintLabel.Parent = topBar
 
+-- Close button: Modal=true frees mouse cursor in First-Person / ShiftLock on PC
 local closeBtn = Instance.new("TextButton")
 closeBtn.Name = "CloseButton"
-closeBtn.Size = UDim2.new(0, 28, 0, 26)
-closeBtn.Position = UDim2.new(1, -34, 0, 4)
-closeBtn.BackgroundColor3 = COLOR_BORDER
+closeBtn.Size = UDim2.new(0, 62, 0, 26)
+closeBtn.Position = UDim2.new(1, -68, 0, 5)
+closeBtn.BackgroundColor3 = COLOR_RED_BG
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 13
-closeBtn.TextColor3 = COLOR_RED
-closeBtn.Text = "X"
+closeBtn.TextSize = 12
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Text = "X [~]"
 closeBtn.AutoButtonColor = true
+closeBtn.Modal = true
+closeBtn.Active = true
+closeBtn.ZIndex = 10
 closeBtn.Parent = topBar
 local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 6)
@@ -6954,29 +7859,33 @@ closeCorner.Parent = closeBtn
 -- Output: ScrollingFrame + one RichText TextLabel (AutomaticSize Y)
 local outputScroll = Instance.new("ScrollingFrame")
 outputScroll.Name = "OutputScroll"
-outputScroll.Position = UDim2.new(0, 8, 0, 40)
-outputScroll.Size = UDim2.new(1, -16, 1, -40 - 38)
+outputScroll.Position = UDim2.new(0, 10, 0, 42)
+outputScroll.Size = UDim2.new(1, -20, 1, -86)
 outputScroll.BackgroundColor3 = COLOR_OUTPUT
 outputScroll.BorderSizePixel = 0
-outputScroll.ScrollBarThickness = 6
+outputScroll.ScrollBarThickness = 7
 outputScroll.ScrollBarImageColor3 = COLOR_BORDER
 outputScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 outputScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+outputScroll.Active = true
 outputScroll.Parent = window
 local outputPadding = Instance.new("UIPadding")
-outputPadding.PaddingBottom = UDim.new(0, 6)
+outputPadding.PaddingLeft = UDim.new(0, 6)
+outputPadding.PaddingRight = UDim.new(0, 6)
+outputPadding.PaddingTop = UDim.new(0, 4)
+outputPadding.PaddingBottom = UDim.new(0, 8)
 outputPadding.Parent = outputScroll
 
 local outputLabel = Instance.new("TextLabel")
 outputLabel.Name = "OutputLabel"
 outputLabel.Size = UDim2.new(1, -8, 0, 0)
-outputLabel.Position = UDim2.new(0, 4, 0, 4)
+outputLabel.Position = UDim2.new(0, 0, 0, 0)
 outputLabel.BackgroundTransparency = 1
 outputLabel.RichText = true
 outputLabel.AutomaticSize = Enum.AutomaticSize.Y
 outputLabel.TextWrapped = true
 outputLabel.Font = Enum.Font.RobotoMono
-outputLabel.TextSize = 13
+outputLabel.TextSize = 14
 outputLabel.TextXAlignment = Enum.TextXAlignment.Left
 outputLabel.TextYAlignment = Enum.TextYAlignment.Top
 outputLabel.TextColor3 = COLOR_TEXT
@@ -6986,18 +7895,22 @@ outputLabel.Parent = outputScroll
 -- Input TextBox (bottom). Name "InputBox" is referenced by AudioAndEffectsClient.
 local inputBox = Instance.new("TextBox")
 inputBox.Name = "InputBox"
-inputBox.Position = UDim2.new(0, 8, 1, -34)
-inputBox.Size = UDim2.new(1, -16, 0, 28)
+inputBox.Position = UDim2.new(0, 10, 1, -38)
+inputBox.Size = UDim2.new(1, -20, 0, 30)
 inputBox.BackgroundColor3 = COLOR_BAR
 inputBox.Font = Enum.Font.RobotoMono
 inputBox.TextSize = 14
 inputBox.TextColor3 = COLOR_BLUE
-inputBox.PlaceholderText = "type help; enter = kirim"
+inputBox.PlaceholderText = "ketik help | Enter=kirim | Tab=lengkapi | Up/Down=riwayat | [~]/[F2]=tutup"
 inputBox.PlaceholderColor3 = COLOR_GREY
 inputBox.ClearTextOnFocus = false
 inputBox.Text = ""
 inputBox.TextXAlignment = Enum.TextXAlignment.Left
 inputBox.Parent = window
+local inputPad = Instance.new("UIPadding")
+inputPad.PaddingLeft = UDim.new(0, 8)
+inputPad.PaddingRight = UDim.new(0, 8)
+inputPad.Parent = inputBox
 local inputCorner = Instance.new("UICorner")
 inputCorner.CornerRadius = UDim.new(0, 6)
 inputCorner.Parent = inputBox
@@ -7011,16 +7924,17 @@ local buffer: { string } = {}
 local history: { string } = {}
 local historyIndex = 1
 local hintToken = 0
+local openToken = 0
+local lastCloseTime = 0
 local MAX_BUFFER_LINES = 500
 
 local COMMANDS = {
-	"help", "clear", "ping", "traceroute", "ip a", "ip set", "ssh", "exit",
-	"top", "vm create", "vm list", "vm throttle", "vm delete", "install-os", "stress-test",
+	"help", "clear", "close", "ping", "traceroute", "ip a", "ip set", "ssh", "exit",
+	"top", "vm create", "vm list", "vm throttle", "vm delete", "install-os", "stress-test", "ship",
 }
 
 local function scrollToEnd()
 	task.defer(function()
-		-- Overshoot; the ScrollingFrame clamps to the canvas bounds on the next layout pass.
 		outputScroll.CanvasPosition = Vector2.new(0, 1e9)
 	end)
 end
@@ -7029,7 +7943,7 @@ local function appendLines(lines: { string })
 	for _, line in ipairs(lines) do
 		table.insert(buffer, tostring(line))
 	end
-	while #buffer &gt; MAX_BUFFER_LINES do
+	while #buffer > MAX_BUFFER_LINES do
 		table.remove(buffer, 1)
 	end
 	outputLabel.Text = table.concat(buffer, "\n")
@@ -7046,11 +7960,30 @@ local function refocusInput()
 	if not window.Visible then
 		return
 	end
+	openToken += 1
+	local myToken = openToken
 	task.defer(function()
-		if window.Visible then
+		if window.Visible and openToken == myToken then
 			inputBox:CaptureFocus()
 		end
 	end)
+end
+
+local function closeTerminal()
+	openToken += 1 -- invalidate any pending refocusInput
+	lastCloseTime = os.clock()
+	window.Visible = false
+	if inputBox:IsFocused() then
+		inputBox:ReleaseFocus()
+	end
+end
+
+local function toggleTerminal()
+	if window.Visible then
+		closeTerminal()
+	else
+		openTerminalRemote:FireServer({ action = "request_shell" })
+	end
 end
 
 local function titleFor(mode: string?, deviceName: string?): string
@@ -7069,13 +8002,46 @@ local function showHint(message: string)
 	hintLabel.Text = message
 	hintLabel.Visible = true
 	modeLabel.Visible = false
+	hotkeyHint.Visible = false
 	task.delay(3, function()
 		if hintToken == myToken then
 			hintLabel.Visible = false
 			modeLabel.Visible = true
+			hotkeyHint.Visible = true
 		end
 	end)
 end
+
+-- ===== PC TopBar Dragging =====
+local dragging = false
+local dragStartMouse = Vector2.new(0, 0)
+local dragStartPos = window.Position
+
+topBar.InputBegan:Connect(function(input: InputObject)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStartMouse = Vector2.new(input.Position.X, input.Position.Y)
+		dragStartPos = window.Position
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input: InputObject)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStartMouse
+		window.Position = UDim2.new(
+			dragStartPos.X.Scale,
+			dragStartPos.X.Offset + delta.X,
+			dragStartPos.Y.Scale,
+			dragStartPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input: InputObject)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
 
 -- ===== Command history + Tab autocomplete =====
 local function historyUp()
@@ -7091,7 +8057,7 @@ local function historyDown()
 		return
 	end
 	historyIndex = math.min(#history + 1, historyIndex + 1)
-	if historyIndex &lt;= #history then
+	if historyIndex <= #history then
 		inputBox.Text = history[historyIndex] or ""
 	else
 		inputBox.Text = ""
@@ -7099,7 +8065,7 @@ local function historyDown()
 end
 
 local function tabComplete()
-	local current = inputBox.Text
+	local current = string.gsub(inputBox.Text, "\t", "")
 	if #current == 0 then
 		return
 	end
@@ -7111,6 +8077,7 @@ local function tabComplete()
 		end
 	end
 	if #matches == 0 then
+		inputBox.Text = current
 		return
 	end
 	if #matches == 1 then
@@ -7135,36 +8102,73 @@ local function tabComplete()
 			break
 		end
 	end
-	if #prefix &gt; #lower then
+	if #prefix > #lower then
 		inputBox.Text = prefix
+	else
+		inputBox.Text = current
 	end
 end
 
--- UIS.InputBegan without gameProcessed filter: Up/Down/Tab must work while
--- the TextBox has focus (gameProcessed == true in that case).
-UserInputService.InputBegan:Connect(function(input: InputObject, _gameProcessed: boolean)
+-- ===== PC Keyboard Shortcuts =====
+-- [~] (Backquote) and [F2] toggle terminal anytime (works even while typing in inputBox).
+-- While open: Up/Down = history, Tab = autocomplete, Ctrl+L = clear, Ctrl+W = close.
+UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
+	local key = input.KeyCode
+	if key == Enum.KeyCode.Backquote or key == Enum.KeyCode.F2 then
+		if window.Visible then
+			-- Strip stray backtick if typed into TextBox right before close
+			task.defer(function()
+				inputBox.Text = string.gsub(inputBox.Text, "`", "")
+			end)
+			closeTerminal()
+		elseif not gameProcessed then
+			toggleTerminal()
+		end
+		return
+	end
+
 	if not window.Visible then
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.Up then
+
+	local ctrlHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+	if ctrlHeld and key == Enum.KeyCode.W then
+		closeTerminal()
+		return
+	elseif ctrlHeld and key == Enum.KeyCode.L then
+		clearBuffer()
+		return
+	end
+
+	if key == Enum.KeyCode.Up then
 		historyUp()
-	elseif input.KeyCode == Enum.KeyCode.Down then
+	elseif key == Enum.KeyCode.Down then
 		historyDown()
-	elseif input.KeyCode == Enum.KeyCode.Tab then
-		tabComplete()
+	elseif key == Enum.KeyCode.Tab then
+		task.defer(function()
+			tabComplete()
+			refocusInput()
+		end)
 	end
 end)
 
 -- ===== Enter = send command =====
 inputBox.FocusLost:Connect(function(enterPressed: boolean)
-	if not enterPressed then
+	if not enterPressed or not window.Visible then
 		return
 	end
-	local raw = inputBox.Text
+	local raw = string.gsub(inputBox.Text, "`", "")
 	inputBox.Text = ""
 	historyIndex = #history + 1
 	if raw == nil or #raw == 0 then
 		refocusInput()
+		return
+	end
+
+	local trimmedLower = string.lower((string.gsub(raw, "^%s*(.-)%s*$", "%1")))
+	if trimmedLower == "close" or trimmedLower == "quit" then
+		closeTerminal()
 		return
 	end
 
@@ -7173,14 +8177,14 @@ inputBox.FocusLost:Connect(function(enterPressed: boolean)
 
 	-- Local echo of the typed command (escaped before embedding in RichText)
 	appendLines({
-		string.format('&lt;font color="#58A6FF"&gt;&amp;gt; %s&lt;/font&gt;', NetworkUtils.EscapeRich(raw)),
+		string.format('<font color="#58A6FF">&gt; %s</font>', NetworkUtils.EscapeRich(raw)),
 	})
 
 	local ok, result = pcall(function(): any
 		return (executeRemote :: any):InvokeServer(raw)
 	end)
 	if not ok then
-		appendLines({ '&lt;font color="#FF5555"&gt;[terminal] gagal mengirim perintah ke server&lt;/font&gt;' })
+		appendLines({ '<font color="#FF5555">[terminal] gagal mengirim perintah ke server</font>' })
 	else
 		local lines = (result :: any).lines
 		if type(lines) == "table" then
@@ -7198,21 +8202,26 @@ inputBox.FocusLost:Connect(function(enterPressed: boolean)
 	refocusInput()
 end)
 
--- ===== Server -&gt; client =====
+-- ===== Server -> client =====
 openTerminalRemote.OnClientEvent:Connect(function(payload: any)
 	if type(payload) ~= "table" then
 		return
 	end
 	local action = payload.action
 	if action == "open" then
+		-- Ignore stale open packets right after an explicit close
+		if os.clock() - lastCloseTime < 0.2 then
+			return
+		end
 		window.Visible = true
 		modeLabel.Visible = true
+		hotkeyHint.Visible = true
 		hintLabel.Visible = false
 		modeLabel.Text = titleFor(payload.mode, payload.deviceName)
 		refocusInput()
 	elseif action == "detach" then
-		-- Keep the window open, just fall back to the local shell title
 		modeLabel.Visible = true
+		hotkeyHint.Visible = true
 		hintLabel.Visible = false
 		modeLabel.Text = "[LOCAL SHELL]"
 	elseif action == "hint" then
@@ -7220,31 +8229,60 @@ openTerminalRemote.OnClientEvent:Connect(function(payload: any)
 	end
 end)
 
-pushOutputRemote.OnClientEvent:Connect(function(lines: any)
-	if type(lines) ~= "table" then
+pushOutputRemote.OnClientEvent:Connect(function(payload: any)
+	if type(payload) ~= "table" then
 		return
 	end
+	local rawLines = if type(payload.lines) == "table" then payload.lines else payload
 	local strs: { string } = {}
-	for _, line in ipairs(lines :: { any }) do
+	for _, line in ipairs(rawLines :: { any }) do
 		table.insert(strs, tostring(line))
 	end
-	if #strs &gt; 0 then
+	if #strs > 0 then
 		appendLines(strs)
 	end
 end)
 
-closeBtn.MouseButton1Click:Connect(function()
-	inputBox:ReleaseFocus()
-	window.Visible = false
-end)
+-- Fire close on MouseButton1Down so a single click closes immediately even while
+-- inputBox is focused (and before Tool.Activated could ever react to the click).
+closeBtn.MouseButton1Down:Connect(closeTerminal)
+closeBtn.MouseButton1Click:Connect(closeTerminal)
 
--- ===== Laptop tool hook (Activated -&gt; request_shell) =====
+-- ===== Cross-script toggle: HudClient's "TERMINAL [~]" button fires this =====
+local toggleBindable = Instance.new("BindableEvent")
+toggleBindable.Name = "NetSimToggleTerminal"
+toggleBindable.Parent = playerGui
+toggleBindable.Event:Connect(toggleTerminal)
+
+-- ===== Laptop tool hook (Activated -> request_shell, guarded against UI clicks) =====
+local function isPointerOverInteractiveGui(): boolean
+	local pos = UserInputService:GetMouseLocation()
+	local topLeftInset = GuiService:GetGuiInset()
+	local objs = playerGui:GetGuiObjectsAtPosition(pos.X, pos.Y - topLeftInset.Y)
+	for _, obj in ipairs(objs) do
+		if obj.Visible and (obj:IsA("GuiButton") or obj:IsA("TextBox") or obj.Active) then
+			return true
+		end
+	end
+	return false
+end
+
 local function bindTool(tool: Tool)
 	if tool:GetAttribute("NetSimTermHooked") == true then
 		return
 	end
 	tool:SetAttribute("NetSimTermHooked", true)
 	tool.Activated:Connect(function()
+		-- Do not re-open if terminal is already visible, just closed, or clicking a UI element
+		if window.Visible then
+			return
+		end
+		if os.clock() - lastCloseTime < 0.45 then
+			return
+		end
+		if isPointerOverInteractiveGui() then
+			return
+		end
 		openTerminalRemote:FireServer({ action = "request_shell" })
 	end)
 end
@@ -7269,25 +8307,25 @@ if player.Character ~= nil then
 	bindCharacter(player.Character :: Model)
 end
 
--- ===== Welcome banner (Indonesian) =====
+-- ===== Welcome banner (Indonesian, PC controls) =====
 appendLines({
-	'&lt;font color="#00FF66"&gt;[NetSim Terminal] Selamat datang, teknisi.&lt;/font&gt;',
-	'&lt;font color="#8B949E"&gt;Ketik &lt;b&gt;help&lt;/b&gt; untuk daftar perintah. Panah atas/bawah = riwayat, Tab = autocomplete, enter = kirim.&lt;/font&gt;',
+	'<font color="#00FF66">[NetSim Terminal] Selamat datang, teknisi.</font>',
+	'<font color="#8B949E">Ketik <b>help</b> untuk daftar perintah. [~] / [F2] / klik X = tutup | Tab = autocomplete | Up/Down = riwayat | Ctrl+L = clear.</font>',
 })
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="LocalScript" referent="RBX30">
 <Properties>
 <string name="Name">NOCMonitorClient</string>
 <bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	NOCMonitorClient (LocalScript, StarterPlayer/StarterPlayerScripts)
 	Mengisi 3 monitor SurfaceGui di NOC Desk milik plot pemain:
 	- TopologyMonitor : kartu node device + garis edge (midpoint + atan2 rotation),
-	  klik node -&gt; popup info + tombol "Putus semua kabel" (CableActionRemote).
-	- TicketMonitor   : daftar kontrak (Accept -&gt; ContractActionRemote) + checklist objectives.
+	  klik node -> popup info + tombol "Putus semua kabel" (CableActionRemote).
+	- TicketMonitor   : daftar kontrak (Accept -> ContractActionRemote) + checklist objectives.
 	- TelemetryMonitor: Saldo, Reputasi, Uptime, Daya, Suhu rata-rata, Hari/Jam + banner storm.
 
 	Catatan tipe: mirror manual dari ReplicatedStorage/Shared/NetworkTypes (module type-only
@@ -7297,9 +8335,12 @@ appendLines({
 	Semua teks GUI Bahasa Indonesia; komentar kode Bahasa Inggris.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared")
 local NetworkUtils = require(sharedFolder:WaitForChild("NetworkUtils"))
 
@@ -7367,6 +8408,7 @@ type FacilitySnapshot = {
 -- ===== State =====
 type MonitorRef = {
 	part: BasePart,
+	surfaceGui: SurfaceGui,
 	root: Frame,
 }
 
@@ -7385,7 +8427,7 @@ local stormBanner: Frame? = nil
 local MONITOR_NAMES = { "TopologyMonitor", "TicketMonitor", "TelemetryMonitor" }
 
 local OBJECTIVES: { { key: string, label: string } } = {
-	{ key = "cableWired", label = "Kabel switch -&gt; router &amp; server" },
+	{ key = "cableWired", label = "Kabel switch -> router & server" },
 	{ key = "ipSetStarter", label = "Set IP server starter" },
 	{ key = "osInstalledStarter", label = "Install OS server starter" },
 	{ key = "pingGateway", label = "Ping gateway" },
@@ -7437,19 +8479,45 @@ local function makeTitle(parent: Instance, text: string): TextLabel
 end
 
 -- ===== Monitor discovery =====
-local function findMonitorPart(plot: Instance, name: string): (BasePart?, Frame?)
+-- Moves each monitor's SurfaceGui into PlayerGui with Adornee = part so
+-- TextButtons inside the SurfaceGui receive mouse clicks in Roblox.
+local function findMonitorPart(plot: Instance, name: string): (BasePart?, SurfaceGui?, Frame?)
 	for _, desc in ipairs(plot:GetDescendants()) do
 		if desc.Name == name and desc:IsA("BasePart") then
-			local surfaceGui = desc:FindFirstChild("SurfaceGui")
-			if surfaceGui ~= nil then
-				local root = surfaceGui:FindFirstChild("Root")
+			local part = desc :: BasePart
+			-- Check if we already moved this part's SurfaceGui into PlayerGui
+			for _, child in ipairs(playerGui:GetChildren()) do
+				if child:IsA("SurfaceGui") and child.Adornee == part then
+					local root = child:FindFirstChild("Root")
+					if root ~= nil and root:IsA("Frame") then
+						return part, child :: SurfaceGui, root :: Frame
+					end
+				end
+			end
+			local surfaceGui = part:FindFirstChild("SurfaceGui")
+			if surfaceGui ~= nil and surfaceGui:IsA("SurfaceGui") then
+				local sg = surfaceGui :: SurfaceGui
+				local root = sg:FindFirstChild("Root")
 				if root ~= nil and root:IsA("Frame") then
-					return desc :: BasePart, root :: Frame
+					sg.Name = "NetSimNOC_" .. name
+					sg.Adornee = part
+					sg.ResetOnSpawn = false
+					sg.Parent = playerGui
+					return part, sg, root :: Frame
 				end
 			end
 		end
 	end
-	return nil, nil
+	return nil, nil, nil
+end
+
+local function clearAllMonitorRefs()
+	for name, ref in pairs(monitorRefs) do
+		if ref.surfaceGui.Parent == playerGui then
+			ref.surfaceGui:Destroy()
+		end
+		monitorRefs[name] = nil :: any
+	end
 end
 
 local function resetContentCaches()
@@ -7479,14 +8547,17 @@ local function refreshMonitorRefs(plot: Instance)
 	-- Drop refs whose plot was destroyed (facility rebuild / reset data)
 	for name, ref in pairs(monitorRefs) do
 		if ref.part.Parent == nil or ref.root.Parent == nil then
+			if ref.surfaceGui.Parent == playerGui then
+				ref.surfaceGui:Destroy()
+			end
 			monitorRefs[name] = nil :: any
 		end
 	end
 	for _, name in ipairs(MONITOR_NAMES) do
 		if monitorRefs[name] == nil then
-			local part, root = findMonitorPart(plot, name)
-			if part ~= nil and root ~= nil then
-				monitorRefs[name] = { part = part, root = root }
+			local part, sg, root = findMonitorPart(plot, name)
+			if part ~= nil and sg ~= nil and root ~= nil then
+				monitorRefs[name] = { part = part, surfaceGui = sg, root = root }
 			end
 		end
 	end
@@ -7504,7 +8575,7 @@ local function buildTopology(ref: MonitorRef)
 	canvas.BackgroundTransparency = 1
 	canvas.Parent = root
 
-	local surfaceGui = ref.part:FindFirstChild("SurfaceGui")
+	local surfaceGui = ref.surfaceGui
 	local pps = 60
 	if surfaceGui ~= nil and surfaceGui:IsA("SurfaceGui") then
 		pps = surfaceGui.PixelsPerStud
@@ -7568,7 +8639,7 @@ local function openNodePopup(dev: SnapDevice)
 		dev.temperatureC or 0,
 		dev.loadPercent or 0,
 		dev.vmCount or 0,
-		if #dev.peers &gt; 0 then table.concat(dev.peers, ", ") else "tidak ada"
+		if #dev.peers > 0 then table.concat(dev.peers, ", ") else "tidak ada"
 	)
 	local info = Instance.new("TextLabel")
 	info.Name = "PopupInfo"
@@ -7718,13 +8789,13 @@ local function updateTopology(snap: FacilitySnapshot)
 			for _, peerName in ipairs(dev.peers) do
 				local b = nodeByName[peerName]
 				if b ~= nil and b.name ~= a.name then
-					local pairKey = if a.id &lt; b.id then a.id .. "|" .. b.id else b.id .. "|" .. a.id
+					local pairKey = if a.id < b.id then a.id .. "|" .. b.id else b.id .. "|" .. a.id
 					if not seenEdges[pairKey] then
 						seenEdges[pairKey] = true
 						local dx = (b.cx - a.cx) * topoCanvasW
 						local dy = (b.cy - a.cy) * topoCanvasH
 						local len = math.sqrt(dx * dx + dy * dy)
-						if len &gt; 8 then
+						if len > 8 then
 							local edge = Instance.new("Frame")
 							edge.Name = "Edge_" .. pairKey
 							edge.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -7748,7 +8819,7 @@ end
 -- ===== TicketMonitor =====
 local function buildTickets(ref: MonitorRef)
 	local root = ref.root
-	makeTitle(root, "KONTRAK &amp; OBJECTIVES")
+	makeTitle(root, "KONTRAK & OBJECTIVES")
 
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "TicketsList"
@@ -8009,7 +9080,7 @@ local function updateTelemetry(snap: FacilitySnapshot)
 	setValue("uptime", string.format("%.1f%%", snap.uptimePercent or 0), COLOR_TEXT)
 	setValue("power", NetworkUtils.FormatWatts(snap.powerWatts or 0), COLOR_YELLOW)
 	local tempC = snap.avgTempC or 0
-	setValue("temp", string.format("%.1f °C", tempC), if tempC &gt; 75 then COLOR_RED else COLOR_TEXT)
+	setValue("temp", string.format("%.1f °C", tempC), if tempC > 75 then COLOR_RED else COLOR_TEXT)
 	setValue("clock", string.format("Hari %d  -  %s", snap.day or 1, snap.clockText or "--:--"), COLOR_TEXT)
 
 	if stormBanner ~= nil then
@@ -8045,11 +9116,11 @@ stateSyncRemote.OnClientEvent:Connect(function(payload: any)
 		return
 	end
 	local snap = payload :: FacilitySnapshot
-	if type(snap.plotIndex) ~= "number" or snap.plotIndex &lt; 1 then
+	if type(snap.plotIndex) ~= "number" or snap.plotIndex < 1 then
 		return
 	end
 	if snap.plotIndex ~= lastPlotIndex then
-		monitorRefs = {}
+		clearAllMonitorRefs()
 		resetContentCaches()
 		lastPlotIndex = snap.plotIndex
 	end
@@ -8077,14 +9148,14 @@ stateSyncRemote.OnClientEvent:Connect(function(payload: any)
 		end
 	end
 end)
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="LocalScript" referent="RBX31">
 <Properties>
 <string name="Name">CatalogAndBuilderClient</string>
 <bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	CatalogAndBuilderClient (LocalScript, StarterPlayer/StarterPlayerScripts)
 	Hardware Store (tombol keyboard B / tombol "STORE [B]" di HUD via BindableEvent
@@ -8095,8 +9166,8 @@ end)
 	dan panel kanan "PANDUAN BUILD".
 
 	Buy behavior (CONTRACT.md Section 3, PurchaseHardwareRemote):
-	- Component -&gt; FireServer(itemId, "buy")
-	- Placeable (Rack/Network/Server) -&gt; FireServer(itemId, "prepare") lalu ghost mode:
+	- Component -> FireServer(itemId, "buy")
+	- Placeable (Rack/Network/Server) -> FireServer(itemId, "prepare") lalu ghost mode:
 	  RenderStepped mouse raycast (player:GetMouse(), TargetFilter=ghost), snap 2-grid
 	  relatif PLOT_POSITIONS[ownPlotIndex], validasi lokal = bounds + furniture zones
 	  (radius + max(halfX,halfZ) dari ModelFactory.ComputeFootprint; overlap device
@@ -8163,18 +9234,18 @@ type GhostState = {
 local ghost: GhostState? = nil
 
 -- Forward declarations (mutually recursive helpers, assigned further below)
-local selectCategory: (string) -&gt; ()
-local rebuildItems: () -&gt; ()
-local onBuy: (def: any) -&gt; ()
-local startGhost: (itemId: string) -&gt; ()
-local exitGhost: (cancel: boolean) -&gt; ()
-local updateGhost: () -&gt; ()
-local toggleStore: () -&gt; ()
+local selectCategory: (string) -> ()
+local rebuildItems: () -> ()
+local onBuy: (def: any) -> ()
+local startGhost: (itemId: string) -> ()
+local exitGhost: (cancel: boolean) -> ()
+local updateGhost: () -> ()
+local toggleStore: () -> ()
 
 -- ===== Helpers =====
 local function plotOrigin(): Vector3?
 	local idx = lastPlotIndex
-	if idx == nil or idx &lt; 1 or idx &gt; #PlotConstants.PLOT_POSITIONS then
+	if idx == nil or idx < 1 or idx > #PlotConstants.PLOT_POSITIONS then
 		return nil
 	end
 	return PlotConstants.PLOT_POSITIONS[idx]
@@ -8227,9 +9298,10 @@ local storeWindow = Instance.new("Frame")
 storeWindow.Name = "StoreWindow"
 storeWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 storeWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
-storeWindow.Size = UDim2.new(0, 620, 0, 420)
+storeWindow.Size = UDim2.new(0, 740, 0, 470)
 storeWindow.BackgroundColor3 = COLOR_BG
 storeWindow.BorderSizePixel = 0
+storeWindow.Active = true -- absorb mouse clicks on PC so tools/ClickDetectors behind do not trigger
 storeWindow.Visible = false
 storeWindow.Parent = storeGui
 local windowCorner = Instance.new("UICorner")
@@ -8263,8 +9335,8 @@ titleLabel.Text = "TOKO HARDWARE"
 titleLabel.Parent = titleBar
 
 local subLabel = Instance.new("TextLabel")
-subLabel.Size = UDim2.new(0, 200, 1, 0)
-subLabel.Position = UDim2.new(1, -224, 0, 0)
+subLabel.Size = UDim2.new(0, 220, 1, 0)
+subLabel.Position = UDim2.new(1, -294, 0, 0)
 subLabel.BackgroundTransparency = 1
 subLabel.Font = Enum.Font.Gotham
 subLabel.TextSize = 11
@@ -8275,13 +9347,15 @@ subLabel.Parent = titleBar
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.Name = "CloseButton"
-closeBtn.Size = UDim2.new(0, 28, 0, 26)
-closeBtn.Position = UDim2.new(1, -34, 0, 4)
-closeBtn.BackgroundColor3 = COLOR_BORDER
+closeBtn.Size = UDim2.new(0, 60, 0, 26)
+closeBtn.Position = UDim2.new(1, -66, 0, 4)
+closeBtn.BackgroundColor3 = Color3.fromRGB(145, 40, 48)
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 13
-closeBtn.TextColor3 = COLOR_RED
-closeBtn.Text = "X"
+closeBtn.TextSize = 12
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Text = "X [B]"
+closeBtn.Modal = true -- frees PC mouse cursor in First-Person / ShiftLock
+closeBtn.Active = true
 closeBtn.Parent = titleBar
 local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 6)
@@ -8332,7 +9406,7 @@ end
 
 -- Middle column: item list
 local itemsHeader = Instance.new("TextLabel")
-itemsHeader.Size = UDim2.new(0, 296, 0, 16)
+itemsHeader.Size = UDim2.new(0, 380, 0, 16)
 itemsHeader.Position = UDim2.new(0, 136, 0, 40)
 itemsHeader.BackgroundTransparency = 1
 itemsHeader.Font = Enum.Font.GothamBold
@@ -8345,24 +9419,24 @@ itemsHeader.Parent = storeWindow
 local itemsScroll = Instance.new("ScrollingFrame")
 itemsScroll.Name = "ItemsScroll"
 itemsScroll.Position = UDim2.new(0, 136, 0, 60)
-itemsScroll.Size = UDim2.new(0, 296, 1, -84)
+itemsScroll.Size = UDim2.new(0, 380, 1, -84)
 itemsScroll.BackgroundTransparency = 1
 itemsScroll.BorderSizePixel = 0
-itemsScroll.ScrollBarThickness = 5
+itemsScroll.ScrollBarThickness = 6
 itemsScroll.ScrollBarImageColor3 = COLOR_BORDER
 itemsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 itemsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 itemsScroll.Parent = storeWindow
 local itemsLayout = Instance.new("UIListLayout")
 itemsLayout.FillDirection = Enum.FillDirection.Vertical
-itemsLayout.Padding = UDim.new(0, 4)
+itemsLayout.Padding = UDim.new(0, 5)
 itemsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 itemsLayout.Parent = itemsScroll
 
 -- Status label (transient feedback, e.g. saldo tidak cukup)
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Name = "StatusLabel"
-statusLabel.Size = UDim2.new(0, 296, 0, 16)
+statusLabel.Size = UDim2.new(0, 380, 0, 16)
 statusLabel.Position = UDim2.new(0, 136, 1, -20)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Font = Enum.Font.Gotham
@@ -8385,38 +9459,63 @@ local function showStatus(message: string)
 	end)
 end
 
--- Right column: build guide (static)
+-- Right column: build guide (static, PC-oriented)
 local guideHeader = Instance.new("TextLabel")
-guideHeader.Size = UDim2.new(0, 172, 0, 16)
-guideHeader.Position = UDim2.new(0, 440, 0, 40)
+guideHeader.Size = UDim2.new(0, 208, 0, 16)
+guideHeader.Position = UDim2.new(0, 524, 0, 40)
 guideHeader.BackgroundTransparency = 1
 guideHeader.Font = Enum.Font.GothamBold
 guideHeader.TextSize = 11
 guideHeader.TextXAlignment = Enum.TextXAlignment.Left
 guideHeader.TextColor3 = COLOR_BLUE
-guideHeader.Text = "PANDUAN BUILD"
+guideHeader.Text = "PANDUAN BUILD (PC)"
 guideHeader.Parent = storeWindow
 
 local guideBody = Instance.new("TextLabel")
 guideBody.Name = "BuildGuide"
-guideBody.Size = UDim2.new(0, 172, 1, -66)
-guideBody.Position = UDim2.new(0, 440, 0, 60)
+guideBody.Size = UDim2.new(0, 208, 1, -68)
+guideBody.Position = UDim2.new(0, 524, 0, 60)
 guideBody.BackgroundColor3 = COLOR_CARD
 guideBody.BorderSizePixel = 0
 guideBody.Font = Enum.Font.Gotham
-guideBody.TextSize = 11
+guideBody.TextSize = 12
 guideBody.TextWrapped = true
 guideBody.TextXAlignment = Enum.TextXAlignment.Left
 guideBody.TextYAlignment = Enum.TextYAlignment.Top
 guideBody.TextColor3 = COLOR_TEXT
-guideBody.Text = "Chassis -&gt; Mobo -&gt; CPU -&gt; RAM -&gt; Storage -&gt; PSU\n\n- Nyalakan bench (switch merah)\n- Console: install-os\n- stress-test\n- Ship otomatis saat stress-test lulus? (gunakan laptop console)"
+guideBody.Text = "Urutan Rakit Workbench:\nChassis -> Mobo -> CPU -> RAM -> Storage -> PSU\n\nLangkah PC:\n- Klik saklar merah di bench\n- Dekati bench + tekan [E] (pegang laptop)\n- Terminal: install-os ubuntu-22.04\n- Terminal: stress-test\n- Terminal: ship (kirim ke dock)\n\nKontrol Placement:\n[Klik Kiri] Pasang\n[R] Putar 90 deg\n[Klik Kanan / Esc] Batal"
 guideBody.Parent = storeWindow
+local guideCorner = Instance.new("UICorner")
+guideCorner.CornerRadius = UDim.new(0, 6)
+guideCorner.Parent = guideBody
 local guidePadding = Instance.new("UIPadding")
-guidePadding.PaddingLeft = UDim.new(0, 8)
-guidePadding.PaddingTop = UDim.new(0, 6)
-guidePadding.PaddingRight = UDim.new(0, 8)
-guidePadding.PaddingBottom = UDim.new(0, 6)
+guidePadding.PaddingLeft = UDim.new(0, 10)
+guidePadding.PaddingTop = UDim.new(0, 8)
+guidePadding.PaddingRight = UDim.new(0, 10)
+guidePadding.PaddingBottom = UDim.new(0, 8)
 guidePadding.Parent = guideBody
+
+-- PC ghost placement bottom control bar (visible only while placing)
+local ghostBanner = Instance.new("TextLabel")
+ghostBanner.Name = "GhostBanner"
+ghostBanner.AnchorPoint = Vector2.new(0.5, 1)
+ghostBanner.Position = UDim2.new(0.5, 0, 1, -46)
+ghostBanner.Size = UDim2.new(0, 540, 0, 30)
+ghostBanner.BackgroundColor3 = COLOR_BG
+ghostBanner.BackgroundTransparency = 0.12
+ghostBanner.Font = Enum.Font.GothamBold
+ghostBanner.TextSize = 13
+ghostBanner.TextColor3 = COLOR_YELLOW
+ghostBanner.Text = "[PLACEMENT PC]  Klik Kiri: Pasang  |  [R]: Putar 90 deg  |  Klik Kanan / [Esc]: Batal"
+ghostBanner.Visible = false
+ghostBanner.Parent = storeGui
+local ghostBannerCorner = Instance.new("UICorner")
+ghostBannerCorner.CornerRadius = UDim.new(0, 8)
+ghostBannerCorner.Parent = ghostBanner
+local ghostBannerStroke = Instance.new("UIStroke")
+ghostBannerStroke.Color = COLOR_BORDER
+ghostBannerStroke.Thickness = 1
+ghostBannerStroke.Parent = ghostBanner
 
 -- ===== Category selection + item rows =====
 type ItemRow = {
@@ -8428,7 +9527,7 @@ local currentRows: { ItemRow } = {}
 local function updateAffordability()
 	local balance = lastBalance
 	for _, row in ipairs(currentRows) do
-		local poor = balance ~= nil and balance &lt; (row.def.price or 0)
+		local poor = balance ~= nil and balance < (row.def.price or 0)
 		row.buyBtn.BackgroundColor3 = if poor then COLOR_BUY_POOR else COLOR_BUY_OK
 	end
 end
@@ -8457,7 +9556,7 @@ onBuy = function(def: any)
 		purchaseRemote:FireServer(def.id, "buy")
 		showStatus("Komponen dibeli: " .. tostring(def.name) .. " (pasang di bench)")
 	else
-		if lastBalance ~= nil and lastBalance &lt; (def.price or 0) then
+		if lastBalance ~= nil and lastBalance < (def.price or 0) then
 			showStatus("Saldo tidak cukup untuk " .. tostring(def.name))
 			return
 		end
@@ -8551,10 +9650,13 @@ rebuildItems = function()
 	updateAffordability()
 end
 
-closeBtn.MouseButton1Click:Connect(function()
+local function closeStore()
 	storeWindow.Visible = false
 	storeVisible = false
-end)
+end
+
+closeBtn.MouseButton1Down:Connect(closeStore)
+closeBtn.MouseButton1Click:Connect(closeStore)
 
 local function setStoreVisible(visible: boolean)
 	if ghost ~= nil and visible then
@@ -8575,6 +9677,7 @@ exitGhost = function(cancel: boolean)
 		return
 	end
 	ghost = nil
+	ghostBanner.Visible = false
 	if g.connRender.Connected then
 		g.connRender:Disconnect()
 	end
@@ -8596,7 +9699,7 @@ updateGhost = function()
 	local mouse = player:GetMouse()
 	local hit = mouse.Target
 	if hit ~= nil then
-		local hitPos = hit.Position
+		local hitPos = mouse.Hit.Position
 		local origin = plotOrigin()
 		if origin ~= nil then
 			local snap = PlotConstants.SNAP_GRID
@@ -8608,13 +9711,13 @@ updateGhost = function()
 
 			-- Local validity: placement bounds + furniture zones (server revalidates overlap etc.)
 			local bounds = PlotConstants.PLACEMENT_BOUNDS
-			local valid = sx &gt;= bounds.minX and sx &lt;= bounds.maxX and sz &gt;= bounds.minZ and sz &lt;= bounds.maxZ
+			local valid = sx >= bounds.minX and sx <= bounds.maxX and sz >= bounds.minZ and sz <= bounds.maxZ
 			if valid then
 				local maxHalf = math.max(g.halfX, g.halfZ)
 				for _, zone in ipairs(PlotConstants.FURNITURE_ZONES) do
 					local dx = sx - zone.position.X
 					local dz = sz - zone.position.Z
-					if math.sqrt(dx * dx + dz * dz) &lt; zone.radius + maxHalf then
+					if math.sqrt(dx * dx + dz * dz) < zone.radius + maxHalf then
 						valid = false
 						break
 					end
@@ -8684,7 +9787,7 @@ startGhost = function(itemId: string)
 			exitGhost(true)
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
 			if g.valid then
-				purchaseRemote:FireServer(g.itemId, "place", g.snappedCF, g.rotY)
+				purchaseRemote:FireServer(g.itemId, "place", g.snappedCF, math.rad(g.rotY))
 				exitGhost(false)
 			end
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -8709,12 +9812,13 @@ startGhost = function(itemId: string)
 	player:GetMouse().TargetFilter = model
 	model:PivotTo(startCF)
 
+	ghostBanner.Visible = true
 	setStoreVisible(false)
 end
 
--- ===== Input: key B toggles store =====
-UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-	if gameProcessed then
+-- ===== Input: key B toggles store (works anytime no TextBox is focused) =====
+UserInputService.InputBegan:Connect(function(input: InputObject, _gameProcessed: boolean)
+	if UserInputService:GetFocusedTextBox() ~= nil then
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.B then
@@ -8730,14 +9834,14 @@ toggleBindable.Event:Connect(function()
 	toggleStore()
 end)
 
--- ===== Snapshot: keep plot index + balance for ghost validation &amp; affordability =====
+-- ===== Snapshot: keep plot index + balance for ghost validation & affordability =====
 stateSyncRemote.OnClientEvent:Connect(function(payload: any)
 	if type(payload) ~= "table" then
 		return
 	end
 	local plotIndex = payload.plotIndex
 	local balance = payload.balance
-	if type(plotIndex) == "number" and plotIndex &gt;= 1 then
+	if type(plotIndex) == "number" and plotIndex >= 1 then
 		lastPlotIndex = plotIndex
 	end
 	if type(balance) == "number" then
@@ -8748,14 +9852,14 @@ end)
 
 -- Initial category render
 selectCategory("Rack")
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="LocalScript" referent="RBX32">
 <Properties>
 <string name="Name">HudClient</string>
 <bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	HudClient (LocalScript, StarterPlayer/StarterPlayerScripts)
 	HUD pemain:
@@ -8764,7 +9868,7 @@ selectCategory("Rack")
 	- Tombol "STORE [B]" kiri-atas: memicu BindableEvent "NetSimToggleStore" yang dibuat
 	  oleh CatalogAndBuilderClient untuk membuka/menutup jendela store.
 	- Tombol "RESET DATA" kanan-atas (di bawah panel): konfirmasi 2 klik dalam 4 detik
-	  -&gt; ResetDataRemote:FireServer().
+	  -> ResetDataRemote:FireServer().
 	- Hint bawah-tengah: tips berputar tiap 8 detik; pesan {action="hint"} dari
 	  OpenTerminalEvent tampil 4 detik dengan prioritas.
 
@@ -8807,7 +9911,7 @@ gui.ResetOnSpawn = false
 gui.DisplayOrder = 50
 gui.Parent = playerGui
 
--- Top-left: STORE [B] button
+-- Top-left: PC quick buttons (STORE [B] + TERMINAL [~])
 local storeBtn = Instance.new("TextButton")
 storeBtn.Name = "StoreButton"
 storeBtn.Size = UDim2.new(0, 110, 0, 30)
@@ -8818,6 +9922,7 @@ storeBtn.TextSize = 13
 storeBtn.TextColor3 = COLOR_GREEN
 storeBtn.Text = "STORE [B]"
 storeBtn.AutoButtonColor = true
+storeBtn.Active = true
 storeBtn.Parent = gui
 local storeCorner = Instance.new("UICorner")
 storeCorner.CornerRadius = UDim.new(0, 6)
@@ -8826,6 +9931,26 @@ local storeStroke = Instance.new("UIStroke")
 storeStroke.Color = COLOR_BORDER
 storeStroke.Thickness = 1
 storeStroke.Parent = storeBtn
+
+local termBtn = Instance.new("TextButton")
+termBtn.Name = "TerminalButton"
+termBtn.Size = UDim2.new(0, 128, 0, 30)
+termBtn.Position = UDim2.new(0, 130, 0, 12)
+termBtn.BackgroundColor3 = COLOR_CARD
+termBtn.Font = Enum.Font.GothamBold
+termBtn.TextSize = 13
+termBtn.TextColor3 = Color3.fromRGB(88, 166, 255)
+termBtn.Text = "TERMINAL [~]"
+termBtn.AutoButtonColor = true
+termBtn.Active = true
+termBtn.Parent = gui
+local termCorner = Instance.new("UICorner")
+termCorner.CornerRadius = UDim.new(0, 6)
+termCorner.Parent = termBtn
+local termStroke = Instance.new("UIStroke")
+termStroke.Color = COLOR_BORDER
+termStroke.Thickness = 1
+termStroke.Parent = termBtn
 
 -- Top-right: stats panel
 local panel = Instance.new("Frame")
@@ -8836,6 +9961,7 @@ panel.Size = UDim2.new(0, 212, 0, 152)
 panel.BackgroundColor3 = COLOR_BG
 panel.BackgroundTransparency = 0.15
 panel.BorderSizePixel = 0
+panel.Active = true
 panel.Parent = gui
 local panelCorner = Instance.new("UICorner")
 panelCorner.CornerRadius = UDim.new(0, 10)
@@ -8964,13 +10090,13 @@ hintLabel.TextTruncate = Enum.TextTruncate.AtEnd
 hintLabel.Text = ""
 hintLabel.Parent = gui
 
--- ===== Hint system: rotating tips + priority server hints =====
+-- ===== Hint system: rotating PC tips + priority server hints =====
 local TIPS = {
-	"Tekan [B] untuk Hardware Store",
-	"Equip laptop, klik untuk Terminal SSH",
-	"Dekati device + ProximityPrompt = kabel console",
-	"Dua-klik port untuk kabel LAN",
-	"Klik port terhubung = putus",
+	"Tekan [~] atau [F2] untuk buka / tutup Terminal (klik X [~] juga bisa)",
+	"Tekan [B] untuk buka / tutup Hardware Store",
+	"Pegang Laptop [1] lalu dekati device + tekan [E] = Kabel Console",
+	"Klik 2 port berbeda untuk kabel LAN | Klik port terhubung = cabut",
+	"Mode placement: [R] Putar 90 deg | Klik Kiri = Pasang | Klik Kanan/[Esc] = Batal",
 }
 local tipIndex = 1
 local priorityActive = false
@@ -9024,17 +10150,27 @@ resetBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- ===== STORE [B] button -&gt; BindableEvent created by CatalogAndBuilderClient =====
+-- ===== STORE [B] & TERMINAL [~] buttons -> BindableEvents =====
 task.spawn(function()
 	local toggleBindable = playerGui:WaitForChild("NetSimToggleStore", 60) :: any
 	if toggleBindable ~= nil and toggleBindable:IsA("BindableEvent") then
-		storeBtn.MouseButton1Click:Connect(function()
+		storeBtn.MouseButton1Down:Connect(function()
 			toggleBindable:Fire()
 		end)
 	else
-		-- CatalogAndBuilderClient missing: hide the button rather than leave it dead
 		storeBtn.Visible = false
 		warn("[HudClient] BindableEvent NetSimToggleStore tidak ditemukan; tombol STORE disembunyikan")
+	end
+end)
+
+task.spawn(function()
+	local toggleTerm = playerGui:WaitForChild("NetSimToggleTerminal", 60) :: any
+	if toggleTerm ~= nil and toggleTerm:IsA("BindableEvent") then
+		termBtn.MouseButton1Down:Connect(function()
+			toggleTerm:Fire()
+		end)
+	else
+		termBtn.Visible = false
 	end
 end)
 
@@ -9069,26 +10205,26 @@ stateSyncRemote.OnClientEvent:Connect(function(payload: any)
 	setValue("uptime", string.format("%.1f%%", payload.uptimePercent or 0), COLOR_TEXT)
 	setValue("power", NetworkUtils.FormatWatts(payload.powerWatts or 0), COLOR_YELLOW)
 	local tempC = payload.avgTempC or 0
-	setValue("temp", string.format("%.1f °C", tempC), if tempC &gt; 75 then COLOR_RED else COLOR_TEXT)
+	setValue("temp", string.format("%.1f °C", tempC), if tempC > 75 then COLOR_RED else COLOR_TEXT)
 	setValue("clock", string.format("Hari %d  -  %s", payload.day or 1, payload.clockText or "--:--"), COLOR_TEXT)
 end)
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 <Item class="LocalScript" referent="RBX33">
 <Properties>
 <string name="Name">AudioAndEffectsClient</string>
 <bool name="Disabled">false</bool>
-<ProtectedString name="Source">--!strict
+<ProtectedString name="Source"><![CDATA[--!strict
 --[[
 	AudioAndEffectsClient (LocalScript, StarterPlayer/StarterPlayerScripts)
 	Bank SFX client-side memakai asset bawaan rbxasset:// saja (tanpa aset eksternal):
-	- plug  -&gt; rbxasset://sounds/snap.mp3                (volume 0.6)
-	- key   -&gt; rbxasset://sounds/electronicpingshort.wav (pitch 1.6, volume 0.35)
-	- error -&gt; rbxasset://sounds/electronicpingshort.wav (pitch 0.6, volume 0.5)
-	- cash  -&gt; rbxasset://sounds/electronicpingshort.wav (pitch 1.2, volume 0.5)
+	- plug  -> rbxasset://sounds/snap.mp3                (volume 0.6)
+	- key   -> rbxasset://sounds/electronicpingshort.wav (pitch 1.6, volume 0.35)
+	- error -> rbxasset://sounds/electronicpingshort.wav (pitch 0.6, volume 0.5)
+	- cash  -> rbxasset://sounds/electronicpingshort.wav (pitch 1.2, volume 0.5)
 
-	PlaySFXRemote.OnClientEvent(name) -&gt; mainkan sound yang cocok (clone + Play agar
+	PlaySFXRemote.OnClientEvent(name) -> mainkan sound yang cocok (clone + Play agar
 	overlap aman). Blip ketikan: TextBox "InputBox" di ScreenGui "NetSimTerminal"
 	(dibuat TerminalClient) di-watch GetPropertyChangedSignal("Text"), throttle 80ms.
 	Di-binding lewat ChildAdded PlayerGui + scan awal + DescendantAdded.
@@ -9174,7 +10310,7 @@ local function bindTextBox(box: TextBox)
 	box:SetAttribute("NetSimSfxHooked", true)
 	box:GetPropertyChangedSignal("Text"):Connect(function()
 		local now = os.clock()
-		if now - lastBlipTime &lt; BLIP_THROTTLE_SECONDS then
+		if now - lastBlipTime < BLIP_THROTTLE_SECONDS then
 			return
 		end
 		lastBlipTime = now
@@ -9215,17 +10351,22 @@ playerGui.ChildAdded:Connect(function(child: Instance)
 	end
 end)
 scanPlayerGui()
-</ProtectedString>
+]]></ProtectedString>
 </Properties>
 </Item>
 </Item>
 </Item>
-<Item class="StarterGui" referent="RBX34">
+<Item class="StarterPack" referent="RBX34">
+<Properties>
+<string name="Name">StarterPack</string>
+</Properties>
+</Item>
+<Item class="StarterGui" referent="RBX35">
 <Properties>
 <string name="Name">StarterGui</string>
 </Properties>
 </Item>
-<Item class="Players" referent="RBX35">
+<Item class="Players" referent="RBX36">
 <Properties>
 <string name="Name">Players</string>
 </Properties>

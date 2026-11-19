@@ -50,7 +50,7 @@ gui.ResetOnSpawn = false
 gui.DisplayOrder = 50
 gui.Parent = playerGui
 
--- Top-left: STORE [B] button
+-- Top-left: PC quick buttons (STORE [B] + TERMINAL [~])
 local storeBtn = Instance.new("TextButton")
 storeBtn.Name = "StoreButton"
 storeBtn.Size = UDim2.new(0, 110, 0, 30)
@@ -61,6 +61,7 @@ storeBtn.TextSize = 13
 storeBtn.TextColor3 = COLOR_GREEN
 storeBtn.Text = "STORE [B]"
 storeBtn.AutoButtonColor = true
+storeBtn.Active = true
 storeBtn.Parent = gui
 local storeCorner = Instance.new("UICorner")
 storeCorner.CornerRadius = UDim.new(0, 6)
@@ -69,6 +70,26 @@ local storeStroke = Instance.new("UIStroke")
 storeStroke.Color = COLOR_BORDER
 storeStroke.Thickness = 1
 storeStroke.Parent = storeBtn
+
+local termBtn = Instance.new("TextButton")
+termBtn.Name = "TerminalButton"
+termBtn.Size = UDim2.new(0, 128, 0, 30)
+termBtn.Position = UDim2.new(0, 130, 0, 12)
+termBtn.BackgroundColor3 = COLOR_CARD
+termBtn.Font = Enum.Font.GothamBold
+termBtn.TextSize = 13
+termBtn.TextColor3 = Color3.fromRGB(88, 166, 255)
+termBtn.Text = "TERMINAL [~]"
+termBtn.AutoButtonColor = true
+termBtn.Active = true
+termBtn.Parent = gui
+local termCorner = Instance.new("UICorner")
+termCorner.CornerRadius = UDim.new(0, 6)
+termCorner.Parent = termBtn
+local termStroke = Instance.new("UIStroke")
+termStroke.Color = COLOR_BORDER
+termStroke.Thickness = 1
+termStroke.Parent = termBtn
 
 -- Top-right: stats panel
 local panel = Instance.new("Frame")
@@ -79,6 +100,7 @@ panel.Size = UDim2.new(0, 212, 0, 152)
 panel.BackgroundColor3 = COLOR_BG
 panel.BackgroundTransparency = 0.15
 panel.BorderSizePixel = 0
+panel.Active = true
 panel.Parent = gui
 local panelCorner = Instance.new("UICorner")
 panelCorner.CornerRadius = UDim.new(0, 10)
@@ -207,13 +229,13 @@ hintLabel.TextTruncate = Enum.TextTruncate.AtEnd
 hintLabel.Text = ""
 hintLabel.Parent = gui
 
--- ===== Hint system: rotating tips + priority server hints =====
+-- ===== Hint system: rotating PC tips + priority server hints =====
 local TIPS = {
-	"Tekan [B] untuk Hardware Store",
-	"Equip laptop, klik untuk Terminal SSH",
-	"Dekati device + ProximityPrompt = kabel console",
-	"Dua-klik port untuk kabel LAN",
-	"Klik port terhubung = putus",
+	"Tekan [~] atau [F2] untuk buka / tutup Terminal (klik X [~] juga bisa)",
+	"Tekan [B] untuk buka / tutup Hardware Store",
+	"Pegang Laptop [1] lalu dekati device + tekan [E] = Kabel Console",
+	"Klik 2 port berbeda untuk kabel LAN | Klik port terhubung = cabut",
+	"Mode placement: [R] Putar 90 deg | Klik Kiri = Pasang | Klik Kanan/[Esc] = Batal",
 }
 local tipIndex = 1
 local priorityActive = false
@@ -267,17 +289,27 @@ resetBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- ===== STORE [B] button -> BindableEvent created by CatalogAndBuilderClient =====
+-- ===== STORE [B] & TERMINAL [~] buttons -> BindableEvents =====
 task.spawn(function()
 	local toggleBindable = playerGui:WaitForChild("NetSimToggleStore", 60) :: any
 	if toggleBindable ~= nil and toggleBindable:IsA("BindableEvent") then
-		storeBtn.MouseButton1Click:Connect(function()
+		storeBtn.MouseButton1Down:Connect(function()
 			toggleBindable:Fire()
 		end)
 	else
-		-- CatalogAndBuilderClient missing: hide the button rather than leave it dead
 		storeBtn.Visible = false
 		warn("[HudClient] BindableEvent NetSimToggleStore tidak ditemukan; tombol STORE disembunyikan")
+	end
+end)
+
+task.spawn(function()
+	local toggleTerm = playerGui:WaitForChild("NetSimToggleTerminal", 60) :: any
+	if toggleTerm ~= nil and toggleTerm:IsA("BindableEvent") then
+		termBtn.MouseButton1Down:Connect(function()
+			toggleTerm:Fire()
+		end)
+	else
+		termBtn.Visible = false
 	end
 end)
 

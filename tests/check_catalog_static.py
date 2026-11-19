@@ -10,10 +10,12 @@ This script parses the source text and asserts, per addItem block:
 Run: python3 tests/check_catalog_static.py  (exit non-zero on failure)
 """
 
+import os
 import re
 import sys
 
-SRC = "/data/workspace/netsim/src/ReplicatedStorage/Shared/HardwareCatalog.luau"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src", "ReplicatedStorage", "Shared", "HardwareCatalog.luau")
 
 # (id, category, price, required spec keys) from CONTRACT.md HardwareCatalog section.
 # specs values checked where the contract pins them.

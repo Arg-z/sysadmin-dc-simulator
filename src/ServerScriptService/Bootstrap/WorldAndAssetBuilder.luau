@@ -73,31 +73,49 @@ end
 -- Lighting
 ---------------------------------------------------------------------
 
--- Dark data-center atmosphere: Future lighting for crisp neon LEDs, subtle
--- bloom for glow, mild color correction for contrast.
+-- Bright modern data-center lighting: Future lighting (set in .rbxlx), high
+-- indoor ambient + environment diffuse so metallic/plastic surfaces stay crisp
+-- and vibrant rather than dark, plus subtle bloom and clean atmosphere.
 function WorldAndAssetBuilder.SetupLighting()
-	Lighting.Technology = Enum.Technology.Future
-	Lighting.Brightness = 1.5
-	Lighting.Ambient = Color3.fromRGB(25, 30, 40)
-	Lighting.OutdoorAmbient = Color3.fromRGB(20, 25, 35)
-	Lighting.ClockTime = 14
+	-- Lighting.Technology is non-scriptable at runtime (configured in .rbxlx XML).
+	pcall(function()
+		Lighting.Technology = Enum.Technology.Future
+	end)
+	Lighting.Brightness = 2.4
+	Lighting.Ambient = Color3.fromRGB(135, 148, 168)
+	Lighting.OutdoorAmbient = Color3.fromRGB(145, 160, 185)
+	Lighting.EnvironmentDiffuseScale = 0.85
+	Lighting.EnvironmentSpecularScale = 0.5
+	Lighting.ClockTime = 11.5
 	Lighting.GlobalShadows = true
+	Lighting.ShadowSoftness = 0.4
 
 	if Lighting:FindFirstChild("DCBloom") == nil then
 		local bloom = Instance.new("BloomEffect")
 		bloom.Name = "DCBloom"
-		bloom.Intensity = 0.4
-		bloom.Size = 16
-		bloom.Threshold = 1.1
+		bloom.Intensity = 0.22
+		bloom.Size = 18
+		bloom.Threshold = 1.4
 		bloom.Parent = Lighting
 	end
 	if Lighting:FindFirstChild("DCColor") == nil then
 		local cc = Instance.new("ColorCorrectionEffect")
 		cc.Name = "DCColor"
-		cc.Brightness = 0.02
-		cc.Contrast = 0.08
-		cc.Saturation = 0.05
+		cc.Brightness = 0.04
+		cc.Contrast = 0.06
+		cc.Saturation = 0.12
 		cc.Parent = Lighting
+	end
+	if Lighting:FindFirstChild("DCAtmosphere") == nil then
+		local atmo = Instance.new("Atmosphere")
+		atmo.Name = "DCAtmosphere"
+		atmo.Density = 0.22
+		atmo.Offset = 0.15
+		atmo.Color = Color3.fromRGB(205, 222, 242)
+		atmo.Decay = Color3.fromRGB(170, 195, 225)
+		atmo.Glare = 0.15
+		atmo.Haze = 0.6
+		atmo.Parent = Lighting
 	end
 end
 
@@ -160,10 +178,16 @@ local function newPart(props: { [string]: any }): Part
 	p.Name = props.name or "Part"
 	p.Size = props.size or Vector3.new(1, 1, 1)
 	p.CFrame = props.cf or CFrame.new(0, 0, 0)
-	p.Color = props.color or Color3.fromRGB(120, 120, 125)
+	p.Color = props.color or Color3.fromRGB(190, 198, 210)
 	p.Material = props.material or Enum.Material.SmoothPlastic
 	p.Transparency = props.transparency or 0
 	p.CanCollide = if props.canCollide ~= nil then props.canCollide else true
+	if props.canQuery ~= nil then
+		p.CanQuery = props.canQuery
+	end
+	if props.castShadow ~= nil then
+		p.CastShadow = props.castShadow
+	end
 	p.Anchored = true
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
@@ -222,71 +246,380 @@ function WorldAndAssetBuilder.BuildFacility(session: any): { [string]: any }
 	cratesFolder.Name = "Crates"
 	cratesFolder.Parent = root
 
-	-- ===== Room geometry =====
-	-- Floor slab 66 x 0.5 x 66, top surface at y = floorTopY (0.5).
+	-- ===== Room geometry (bright Tier-4 enterprise data-center lab) =====
+	local fullW = halfX * 2 + 2 -- 66 studs
+	local fullD = halfZ * 2 + 2 -- 66 studs
+	local wallH = roomH -- 18 studs (proportional data-center hall)
+	local doorW = PlotConstants.ROOM.doorWidth -- 14
+	local doorH = PlotConstants.ROOM.doorHeight -- 10
+	local wainscotH = 3.5 -- lower architectural wall band height (waist/desk level)
+
+	-- Anti-static light raised floor slab (top at y = floorTopY = 0.5).
 	local floor = newPart({
 		name = "RoomFloor",
-		size = Vector3.new(halfX * 2 + 2, floorTopY, halfZ * 2 + 2),
+		size = Vector3.new(fullW, floorTopY, fullD),
 		cf = plotCF(0, floorTopY / 2, 0),
 		color = colors.floor,
-		material = Enum.Material.Metal,
+		material = Enum.Material.SmoothPlastic,
 	})
 	floor.Parent = facility
 
-	-- Walls, thickness 1, height 24 (y = 0 .. 24). The front (+Z) wall has a
-	-- door opening (width 14, height 12) -> two segments + lintel.
-	local wallH = roomH
-	local wallY = wallH / 2
-	local doorW = PlotConstants.ROOM.doorWidth
-	local doorH = PlotConstants.ROOM.doorHeight
-	local segW = (halfX * 2 + 2 - doorW) / 2 -- 26 studs per side segment
-	local wallDefs: { { size: Vector3, x: number, y: number, z: number } } = {
-		{ size = Vector3.new(halfX * 2 + 2, wallH, 1), x = 0, y = wallY, z = -halfZ - 0.5 }, -- back
-		{ size = Vector3.new(1, wallH, halfZ * 2 + 2), x = -halfX - 0.5, y = wallY, z = 0 }, -- left
-		{ size = Vector3.new(1, wallH, halfZ * 2 + 2), x = halfX + 0.5, y = wallY, z = 0 }, -- right
-		{ size = Vector3.new(segW, wallH, 1), x = -(doorW / 2 + segW / 2), y = wallY, z = halfZ + 0.5 }, -- front left
-		{ size = Vector3.new(segW, wallH, 1), x = doorW / 2 + segW / 2, y = wallY, z = halfZ + 0.5 }, -- front right
-		{ size = Vector3.new(doorW, wallH - doorH, 1), x = 0, y = doorH + (wallH - doorH) / 2, z = halfZ + 0.5 }, -- lintel
-	}
-	for i, def in ipairs(wallDefs) do
-		local wall = newPart({
-			name = "Wall_" .. tostring(i),
-			size = def.size,
-			cf = plotCF(def.x, def.y, def.z),
-			color = colors.wall,
-			material = Enum.Material.Concrete,
-		})
-		wall.Parent = facility
+	-- Decorative raised-floor tile grid lines (non-collidable, non-queryable).
+	for gx = -24, 24, 8 do
+		newPart({
+			name = "FloorGridX",
+			size = Vector3.new(0.14, 0.02, halfZ * 2 - 1),
+			cf = plotCF(gx, floorTopY + 0.01, 0),
+			color = colors.floorGrid,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+	end
+	for gz = -24, 24, 8 do
+		newPart({
+			name = "FloorGridZ",
+			size = Vector3.new(halfX * 2 - 1, 0.02, 0.14),
+			cf = plotCF(0, floorTopY + 0.01, gz),
+			color = colors.floorGrid,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
 	end
 
-	-- Ceiling slab above the walls.
-	local ceiling = newPart({
-		name = "Ceiling",
-		size = Vector3.new(halfX * 2 + 2, 0.5, halfZ * 2 + 2),
-		cf = plotCF(0, roomH + 0.25, 0),
-		color = colors.trim,
-		material = Enum.Material.Concrete,
-	})
-	ceiling.Parent = facility
+	-- Central cold-aisle walkway + cyan LED guide rails from entrance to center.
+	newPart({
+		name = "WalkwayMat",
+		size = Vector3.new(8.5, 0.03, 46),
+		cf = plotCF(0, floorTopY + 0.015, 9),
+		color = Color3.fromRGB(168, 184, 204),
+		canCollide = false,
+		canQuery = false,
+		castShadow = false,
+	}).Parent = facility
+	for _, side in ipairs({ -4.35, 4.35 }) do
+		newPart({
+			name = "WalkwayLED",
+			size = Vector3.new(0.18, 0.04, 46),
+			cf = plotCF(side, floorTopY + 0.02, 9),
+			color = colors.accentCyan,
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+	end
 
-	-- 6 ceiling LED panels (8 x 0.15 x 2) with downward SurfaceLight.
-	for _, lx in ipairs({ -16, 0, 16 }) do
-		for _, lz in ipairs({ -10, 10 }) do
+	-- Floor zone pads (visual wayfinding per station; CanQuery=false so placement hits RoomFloor).
+	local zonePads: { { name: string, pos: Vector3, size: Vector3, color: Color3, border: Color3 } } = {
+		{
+			name = "ZonePad_Rack",
+			pos = Vector3.new(-21, floorTopY + 0.018, -22),
+			size = Vector3.new(15, 0.03, 15),
+			color = Color3.fromRGB(184, 208, 232),
+			border = Color3.fromRGB(56, 152, 236),
+		},
+		{
+			name = "ZonePad_Workbench",
+			pos = Vector3.new(18, floorTopY + 0.018, -12),
+			size = Vector3.new(14, 0.03, 11),
+			color = Color3.fromRGB(228, 214, 192),
+			border = Color3.fromRGB(235, 168, 52),
+		},
+		{
+			name = "ZonePad_NOC",
+			pos = Vector3.new(18, floorTopY + 0.018, 16),
+			size = Vector3.new(17, 0.03, 12),
+			color = Color3.fromRGB(178, 194, 216),
+			border = Color3.fromRGB(72, 130, 224),
+		},
+	}
+	for _, zp in ipairs(zonePads) do
+		newPart({
+			name = zp.name,
+			size = zp.size,
+			cf = plotCF(zp.pos.X, zp.pos.Y, zp.pos.Z),
+			color = zp.color,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+		-- crisp front accent bar on each zone pad
+		newPart({
+			name = zp.name .. "_Trim",
+			size = Vector3.new(zp.size.X, 0.04, 0.25),
+			cf = plotCF(zp.pos.X, floorTopY + 0.025, zp.pos.Z + zp.size.Z / 2),
+			color = zp.border,
+			material = Enum.Material.Neon,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		}).Parent = facility
+	end
+
+	-- Helper: builds a two-tone solid wall section (wainscot + silver dado + upper white).
+	local function addSolidWall(namePrefix: string, sizeX: number, sizeZ: number, cx: number, cz: number, yLow: number, yHigh: number)
+		local lowerTop = math.min(wainscotH, yHigh)
+		if yLow < lowerTop then
+			local h = lowerTop - yLow
+			newPart({
+				name = namePrefix .. "_Low",
+				size = Vector3.new(sizeX, h, sizeZ),
+				cf = plotCF(cx, yLow + h / 2, cz),
+				color = colors.wallLower,
+			}).Parent = facility
+		end
+		if yHigh > lowerTop then
+			local h = yHigh - lowerTop
+			newPart({
+				name = namePrefix .. "_High",
+				size = Vector3.new(sizeX, h, sizeZ),
+				cf = plotCF(cx, lowerTop + h / 2, cz),
+				color = colors.wall,
+			}).Parent = facility
+		end
+	end
+
+	-- Back wall (-Z): solid two-tone with dado rail & cyan LED strip.
+	addSolidWall("Wall_Back", fullW, 1, 0, -halfZ - 0.5, 0, wallH)
+	newPart({
+		name = "Dado_Back",
+		size = Vector3.new(fullW - 2, 0.28, 0.16),
+		cf = plotCF(0, wainscotH, -halfZ + 0.08),
+		color = colors.trim,
+		canCollide = false,
+	}).Parent = facility
+	newPart({
+		name = "LEDStrip_Back",
+		size = Vector3.new(fullW - 4, 0.14, 0.1),
+		cf = plotCF(0, wainscotH + 0.22, -halfZ + 0.06),
+		color = colors.accentCyan,
+		material = Enum.Material.Neon,
+		canCollide = false,
+	}).Parent = facility
+
+	-- Right wall (+X): solid two-tone (houses AC unit) with dado rail & cyan LED strip.
+	addSolidWall("Wall_Right", 1, fullD, halfX + 0.5, 0, 0, wallH)
+	newPart({
+		name = "Dado_Right",
+		size = Vector3.new(0.16, 0.28, fullD - 2),
+		cf = plotCF(halfX - 0.08, wainscotH, 0),
+		color = colors.trim,
+		canCollide = false,
+	}).Parent = facility
+	newPart({
+		name = "LEDStrip_Right",
+		size = Vector3.new(0.1, 0.14, fullD - 4),
+		cf = plotCF(halfX - 0.06, wainscotH + 0.22, 0),
+		color = colors.accentCyan,
+		material = Enum.Material.Neon,
+		canCollide = false,
+	}).Parent = facility
+
+	-- Left wall (-X): panoramic observation glass window (z = -18..18, y = 3.5..12.5) for daylight.
+	local lx = -halfX - 0.5
+	addSolidWall("Wall_Left_North", 1, 15, lx, -25.5, 0, wallH) -- z = -33..-18
+	addSolidWall("Wall_Left_South", 1, 15, lx, 25.5, 0, wallH) -- z = 18..33
+	addSolidWall("Wall_Left_Sill", 1, 36, lx, 0, 0, 3.5)
+	addSolidWall("Wall_Left_Header", 1, 36, lx, 0, 12.5, wallH)
+	newPart({
+		name = "Window_Left_Glass",
+		size = Vector3.new(0.25, 9, 36),
+		cf = plotCF(lx, 8.0, 0),
+		color = colors.glass,
+		material = Enum.Material.Glass,
+		transparency = 0.65,
+		castShadow = false,
+	}).Parent = facility
+	-- Window frame mullions (horizontal sill/top + vertical dividers).
+	for _, my in ipairs({ 3.65, 12.35 }) do
+		newPart({
+			name = "Window_Left_Bar",
+			size = Vector3.new(1.15, 0.35, 36.2),
+			cf = plotCF(lx, my, 0),
+			color = colors.frame,
+		}).Parent = facility
+	end
+	for _, mz in ipairs({ -18, -6, 6, 18 }) do
+		newPart({
+			name = "Window_Left_Mullion",
+			size = Vector3.new(1.15, 9, 0.45),
+			cf = plotCF(lx, 8.0, mz),
+			color = colors.frame,
+		}).Parent = facility
+	end
+
+	-- Front wall (+Z): open glass-framed entrance (doorW=14, doorH=10) + side display windows.
+	local fz = halfZ + 0.5
+	-- Center lintel above doorway
+	addSolidWall("Wall_Front_Lintel", doorW, 1, 0, fz, doorH, wallH)
+	-- Left and right front wings with windows (x = +-11..+-25, y = 3.5..10.5)
+	for _, dir in ipairs({ -1, 1 }) do
+		local tag = if dir < 0 then "L" else "R"
+		addSolidWall("Wall_Front_Inner_" .. tag, 4, 1, dir * 9, fz, 0, wallH) -- 7..11
+		addSolidWall("Wall_Front_Outer_" .. tag, 8, 1, dir * 29, fz, 0, wallH) -- 25..33
+		addSolidWall("Wall_Front_Sill_" .. tag, 14, 1, dir * 18, fz, 0, 3.5) -- 11..25
+		addSolidWall("Wall_Front_Top_" .. tag, 14, 1, dir * 18, fz, 10.5, wallH)
+		newPart({
+			name = "Window_Front_Glass_" .. tag,
+			size = Vector3.new(14, 7, 0.25),
+			cf = plotCF(dir * 18, 7.0, fz),
+			color = colors.glass,
+			material = Enum.Material.Glass,
+			transparency = 0.65,
+			castShadow = false,
+		}).Parent = facility
+		for _, wy in ipairs({ 3.65, 10.35 }) do
+			newPart({
+				name = "Window_Front_Bar_" .. tag,
+				size = Vector3.new(14.3, 0.35, 1.15),
+				cf = plotCF(dir * 18, wy, fz),
+				color = colors.frame,
+			}).Parent = facility
+		end
+		newPart({
+			name = "Window_Front_Mullion_" .. tag,
+			size = Vector3.new(0.4, 7, 1.15),
+			cf = plotCF(dir * 18, 7.0, fz),
+			color = colors.frame,
+		}).Parent = facility
+	end
+
+	-- Entrance portal frame (sleek slate aluminum pillars + glowing cyan lintel bar).
+	for _, side in ipairs({ -1, 1 }) do
+		newPart({
+			name = "DoorPillar",
+			size = Vector3.new(0.9, doorH + 0.6, 1.5),
+			cf = plotCF(side * (doorW / 2 + 0.35), (doorH + 0.6) / 2, fz),
+			color = colors.frame,
+		}).Parent = facility
+	end
+	newPart({
+		name = "DoorHeader",
+		size = Vector3.new(doorW + 1.6, 1.2, 1.6),
+		cf = plotCF(0, doorH + 0.5, fz),
+		color = colors.frame,
+	}).Parent = facility
+	newPart({
+		name = "DoorHeaderLED",
+		size = Vector3.new(doorW + 0.6, 0.2, 1.68),
+		cf = plotCF(0, doorH + 0.05, fz),
+		color = colors.accentCyan,
+		material = Enum.Material.Neon,
+		canCollide = false,
+	}).Parent = facility
+
+	-- Exterior corner trim columns + roof fascia band for clean outside silhouette.
+	for _, cx in ipairs({ -halfX - 0.5, halfX + 0.5 }) do
+		for _, cz in ipairs({ -halfZ - 0.5, halfZ + 0.5 }) do
+			newPart({
+				name = "CornerColumn",
+				size = Vector3.new(1.5, wallH + 0.6, 1.5),
+				cf = plotCF(cx, (wallH + 0.6) / 2, cz),
+				color = colors.frame,
+			}).Parent = facility
+		end
+	end
+
+	-- Ceiling perimeter with a central 24x24 glass skylight atrium so daylight fills the lab.
+	local skyHalf = 12
+	local sideBand = (fullW - skyHalf * 2) / 2 -- 21 studs
+	local ceilingDefs: { { size: Vector3, x: number, z: number } } = {
+		{ size = Vector3.new(fullW, 0.6, sideBand), x = 0, z = -(skyHalf + sideBand / 2) },
+		{ size = Vector3.new(fullW, 0.6, sideBand), x = 0, z = skyHalf + sideBand / 2 },
+		{ size = Vector3.new(sideBand, 0.6, skyHalf * 2), x = -(skyHalf + sideBand / 2), z = 0 },
+		{ size = Vector3.new(sideBand, 0.6, skyHalf * 2), x = skyHalf + sideBand / 2, z = 0 },
+	}
+	for i, cdef in ipairs(ceilingDefs) do
+		newPart({
+			name = "Ceiling_" .. tostring(i),
+			size = cdef.size,
+			cf = plotCF(cdef.x, roomH + 0.3, cdef.z),
+			color = colors.wall,
+		}).Parent = facility
+	end
+	-- Skylight glass pane + architectural crossbeams.
+	newPart({
+		name = "SkylightGlass",
+		size = Vector3.new(skyHalf * 2, 0.25, skyHalf * 2),
+		cf = plotCF(0, roomH + 0.35, 0),
+		color = colors.glass,
+		material = Enum.Material.Glass,
+		transparency = 0.72,
+		castShadow = false,
+	}).Parent = facility
+	for _, bx in ipairs({ -skyHalf, 0, skyHalf }) do
+		newPart({
+			name = "SkylightBeamX",
+			size = Vector3.new(0.6, 0.75, skyHalf * 2 + 0.6),
+			cf = plotCF(bx, roomH + 0.25, 0),
+			color = colors.frame,
+		}).Parent = facility
+	end
+	for _, bz in ipairs({ -skyHalf, 0, skyHalf }) do
+		newPart({
+			name = "SkylightBeamZ",
+			size = Vector3.new(skyHalf * 2 + 0.6, 0.75, 0.6),
+			cf = plotCF(0, roomH + 0.25, bz),
+			color = colors.frame,
+		}).Parent = facility
+	end
+
+	-- Overhead industrial cable ladder trays + yellow fiber raceway (y = 15.2).
+	local trayY = 15.2
+	local trayDefs: { { size: Vector3, x: number, z: number, color: Color3 } } = {
+		{ size = Vector3.new(44, 0.25, 2.2), x = -2, z = -20, color = colors.trim }, -- back main trunk
+		{ size = Vector3.new(44, 0.2, 0.7), x = -2, z = -20, color = colors.accentAmber }, -- yellow fiber raceway
+		{ size = Vector3.new(2.2, 0.25, 36), x = 18, z = -2, color = colors.trim }, -- workbench to NOC trunk
+		{ size = Vector3.new(0.7, 0.2, 36), x = 18, z = -2, color = colors.accentAmber },
+	}
+	for i, tdef in ipairs(trayDefs) do
+		newPart({
+			name = "CableTray_" .. tostring(i),
+			size = tdef.size,
+			cf = plotCF(tdef.x, trayY, tdef.z),
+			color = tdef.color,
+			canCollide = false,
+			castShadow = false,
+		}).Parent = facility
+	end
+
+	-- 6 high-output ceiling LED fixtures with wide SurfaceLight + PointLight fill.
+	for _, lx in ipairs({ -20, 0, 20 }) do
+		for _, lz in ipairs({ -18, 18 }) do
+			local housing = newPart({
+				name = "LightHousing",
+				size = Vector3.new(9.2, 0.25, 2.6),
+				cf = plotCF(lx, roomH - 0.12, lz),
+				color = colors.frame,
+				canCollide = false,
+				castShadow = false,
+			})
+			housing.Parent = facility
 			local panel = newPart({
 				name = "LightPanel",
-				size = Vector3.new(8, 0.15, 2),
-				cf = plotCF(lx, roomH - 0.08, lz),
+				size = Vector3.new(8.6, 0.16, 2.1),
+				cf = plotCF(lx, roomH - 0.26, lz),
 				color = colors.lightPanel,
 				material = Enum.Material.Neon,
 				canCollide = false,
+				castShadow = false,
 			})
 			panel.Parent = facility
 			local light = Instance.new("SurfaceLight")
 			light.Face = Enum.NormalId.Bottom
-			light.Range = 30
-			light.Brightness = 1.1
-			light.Angle = 140
+			light.Range = 48
+			light.Brightness = 2.2
+			light.Angle = 150
+			light.Color = Color3.fromRGB(242, 248, 255)
 			light.Parent = panel
+			local fill = Instance.new("PointLight")
+			fill.Range = 44
+			fill.Brightness = 0.85
+			fill.Color = Color3.fromRGB(236, 244, 255)
+			fill.Shadows = false
+			fill.Parent = panel
 		end
 	end
 

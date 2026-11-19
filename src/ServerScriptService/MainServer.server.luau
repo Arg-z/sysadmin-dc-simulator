@@ -124,8 +124,12 @@ local function buildSession(player: Player)
 	-- laptop langsung ke backpack (StarterPack mengurus respawn berikutnya)
 	local backpack = player:FindFirstChildOfClass("Backpack")
 	if backpack then
-		local laptop = ModelFactory.BuildLaptop()
-		laptop.Parent = backpack
+		local hasLaptop = backpack:FindFirstChild("TechnicianLaptop") ~= nil
+			or (player.Character ~= nil and player.Character:FindFirstChild("TechnicianLaptop") ~= nil)
+		if not hasLaptop then
+			local laptop = ModelFactory.BuildLaptop()
+			laptop.Parent = backpack
+		end
 	end
 
 	-- load save (Apply memulihkan device, kabel, workbench, tiket, uang)
@@ -148,6 +152,13 @@ local function buildSession(player: Player)
 	end
 
 	ShiftAndEconomyManager.ForceSync(session)
+	-- Follow-up sync once client LocalScripts finish initializing
+	task.delay(1.5, function()
+		local live = SessionManager.GetSession(player)
+		if live == session then
+			ShiftAndEconomyManager.ForceSync(live)
+		end
+	end)
 end
 
 local function rebuildSession(player: Player)

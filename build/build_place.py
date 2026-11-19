@@ -28,8 +28,9 @@ import sys
 from xml.sax.saxutils import escape
 import xml.etree.ElementTree as ET
 
-SRC = "/data/workspace/netsim/src"
-OUT = "/data/workspace/netsim/build/NetworkSimulator.rbxlx"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
+OUT = os.path.join(ROOT, "build", "NetworkSimulator.rbxlx")
 
 passed = 0
 failed = 0
@@ -90,7 +91,7 @@ def load_source(rel):
     with open(path, "rb") as f:
         raw = f.read()
     try:
-        text = raw.decode("utf-8")
+        text = raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
     except UnicodeDecodeError as e:
         print(f"FAIL  source {rel}: invalid UTF-8 ({e})")
         sys.exit(1)
@@ -114,14 +115,14 @@ def color3uint8(r, g, b):
     return (0xFF << 24) | (r << 16) | (g << 8) | b
 
 
-def coord3d(name, x, y, z):
+def cframe_prop(name, x, y, z):
     return (
-        f'<Coordinate3D name="{name}">'
+        f'<CoordinateFrame name="{name}">'
         f"<X>{x}</X><Y>{y}</Y><Z>{z}</Z>"
         "<R00>1</R00><R01>0</R01><R02>0</R02>"
         "<R10>0</R10><R11>1</R11><R12>0</R12>"
         "<R20>0</R20><R21>0</R21><R22>1</R22>"
-        "</Coordinate3D>"
+        "</CoordinateFrame>"
     )
 
 
@@ -170,8 +171,12 @@ class Builder:
 
 def emit_script(b, cls, name, source_text):
     b.open_item(cls, name)
-    b.prop('<bool name="Disabled">false</bool>')
-    b.prop(f'<ProtectedString name="Source">{escape(source_text)}</ProtectedString>')
+    if cls in ("Script", "LocalScript"):
+        b.prop('<bool name="Disabled">false</bool>')
+    if "]]>" not in source_text:
+        b.prop(f'<ProtectedString name="Source"><![CDATA[{source_text}]]></ProtectedString>')
+    else:
+        b.prop(f'<ProtectedString name="Source">{escape(source_text)}</ProtectedString>')
     b.close_item()
 
 
@@ -189,31 +194,38 @@ def script_node(cls, name, rel, sources):
 
 def build_xml(sources):
     b = Builder()
-    b.raw('<?xml version="1.0" encoding="utf-8"?>')
-    b.raw('<roblox version="4">')
+    b.raw(
+        '<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" '
+        'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+        'xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" '
+        'version="4">'
+    )
+    b.raw("<External>null</External>")
+    b.raw("<External>nil</External>")
 
     # ---------- Workspace ----------
     b.open_item("Workspace", "Workspace")
     b.close_props()
     b.open_item("Part", "Baseplate")
     b.prop(vector3("size", 512, 20, 512))
-    b.prop(coord3d("CFrame", 0, -10, 0))
+    b.prop(cframe_prop("CFrame", 0, -10, 0))
     b.prop('<bool name="Anchored">true</bool>')
     b.prop('<bool name="Locked">true</bool>')
     b.prop('<token name="shape">1</token>')
-    b.prop(f'<Color3uint8 name="Color3uint8">{color3uint8(88, 89, 91)}</Color3uint8>')
+    b.prop(f'<Color3uint8 name="Color3uint8">{color3uint8(172, 182, 196)}</Color3uint8>')
     b.close_item()
     b.open_item("SpawnLocation", "SpawnLocation")
     b.prop(vector3("size", 12, 1, 12))
-    b.prop(coord3d("CFrame", 0, 0.5, 40))
+    b.prop(cframe_prop("CFrame", 0, 0.5, 40))
     b.prop('<bool name="Anchored">true</bool>')
     b.prop('<token name="shape">1</token>')
-    b.prop(f'<Color3uint8 name="Color3uint8">{color3uint8(70, 160, 100)}</Color3uint8>')
+    b.prop(f'<Color3uint8 name="Color3uint8">{color3uint8(56, 189, 148)}</Color3uint8>')
     b.close_item()
     b.close_item()
 
-    # ---------- Lighting (empty properties) ----------
+    # ---------- Lighting (Technology=Future set here; non-scriptable at runtime) ----------
     b.open_item("Lighting", "Lighting")
+    b.prop('<token name="Technology">4</token>')
     b.close_item()
 
     # ---------- ReplicatedStorage ----------
@@ -235,10 +247,16 @@ def build_xml(sources):
     # ---------- StarterPlayer ----------
     b.open_item("StarterPlayer", "StarterPlayer")
     b.close_props()
-    emit_folder(b, "StarterPlayerScripts", [script_node(c, n, s, sources) for c, n, s in CLIENT_SCRIPTS])
+    b.open_item("StarterPlayerScripts", "StarterPlayerScripts")
+    b.close_props()
+    for c, n, s in CLIENT_SCRIPTS:
+        emit_script(b, c, n, sources[s])
+    b.close_item()
     b.close_item()
 
-    # ---------- StarterGui / Players ----------
+    # ---------- StarterPack / StarterGui / Players ----------
+    b.open_item("StarterPack", "StarterPack")
+    b.close_item()
     b.open_item("StarterGui", "StarterGui")
     b.close_item()
     b.open_item("Players", "Players")
@@ -318,21 +336,36 @@ def validate(xml_text, sources):
                 want.add((c, n2))
     for cls, nm, _ in CLIENT_SCRIPTS:
         want.add((cls, nm))
+    want.add(("StarterPlayerScripts", "StarterPlayerScripts"))
     got = set(seen)
     check(f"V4: all {len(want)} expected scripts/folders present with correct classes",
           want <= got, f"missing={sorted(want - got)} extra={sorted(got - want)}")
 
     disabled_bad = []
     for item in root.iter("Item"):
-        if item.get("class") not in ("Script", "LocalScript", "ModuleScript"):
+        if item.get("class") not in ("Script", "LocalScript"):
             continue
         props = item.find("Properties")
         d = props.find("bool[@name='Disabled']") if props is not None else None
         if d is None or d.text != "false":
             nm = props.find("string[@name='Name']").text if props is not None else "?"
             disabled_bad.append(nm)
-    check("V4b: every Script/LocalScript/ModuleScript has Disabled=false", not disabled_bad,
+    check("V4b: every Script/LocalScript has Disabled=false", not disabled_bad,
           str(disabled_bad))
+
+    bad_c3d = list(root.iter("Coordinate3D"))
+    good_cf = list(root.iter("CoordinateFrame"))
+    check("V5: uses valid CoordinateFrame tags (zero Coordinate3D)",
+          len(bad_c3d) == 0 and len(good_cf) >= 2,
+          f"Coordinate3D={len(bad_c3d)} CoordinateFrame={len(good_cf)}")
+
+    lighting_items = [it for it in root.iter("Item") if it.get("class") == "Lighting"]
+    tech_ok = False
+    if lighting_items:
+        p = lighting_items[0].find("Properties")
+        t = p.find("token[@name='Technology']") if p is not None else None
+        tech_ok = t is not None and t.text == "4"
+    check("V6: Lighting.Technology=4 (Future) set in XML", tech_ok)
 
 
 def main():
