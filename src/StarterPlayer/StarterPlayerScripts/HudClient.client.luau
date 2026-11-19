@@ -16,6 +16,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -252,10 +253,11 @@ end
 local objPanel = Instance.new("Frame")
 objPanel.Name = "ObjectivesPanel"
 objPanel.Position = UDim2.new(0, 12, 0, 50)
-objPanel.Size = UDim2.new(0, 240, 0, 190)
+objPanel.Size = UDim2.new(0, 224, 0, 182)
 objPanel.BackgroundColor3 = COLOR_BG
-objPanel.BackgroundTransparency = 0.15
+objPanel.BackgroundTransparency = 0.4
 objPanel.BorderSizePixel = 0
+objPanel.Visible = false
 objPanel.Parent = gui
 local objPanelCorner = Instance.new("UICorner")
 objPanelCorner.CornerRadius = UDim.new(0, 10)
@@ -265,17 +267,39 @@ objPanelStroke.Color = COLOR_BORDER
 objPanelStroke.Thickness = 1
 objPanelStroke.Parent = objPanel
 
-local objTitle = Instance.new("TextLabel")
+local objTitle = Instance.new("TextButton")
 objTitle.Name = "ObjectivesTitle"
-objTitle.Size = UDim2.new(1, -12, 0, 14)
+objTitle.Size = UDim2.new(1, -12, 0, 16)
 objTitle.Position = UDim2.new(0, 8, 0, 4)
 objTitle.BackgroundTransparency = 1
 objTitle.Font = Enum.Font.GothamBold
 objTitle.TextSize = 11
 objTitle.TextXAlignment = Enum.TextXAlignment.Left
 objTitle.TextColor3 = COLOR_GREY
-objTitle.Text = "OBJECTIVES"
+objTitle.Text = "OBJECTIVES  [O]  (click to hide)"
+objTitle.AutoButtonColor = false
 objTitle.Parent = objPanel
+
+-- Collapsed pill: the checklist starts hidden so it does not cover the lab.
+local objPill = Instance.new("TextButton")
+objPill.Name = "ObjectivesPill"
+objPill.Position = UDim2.new(0, 12, 0, 50)
+objPill.Size = UDim2.new(0, 150, 0, 26)
+objPill.BackgroundColor3 = COLOR_CARD
+objPill.BackgroundTransparency = 0.2
+objPill.Font = Enum.Font.GothamBold
+objPill.TextSize = 12
+objPill.TextColor3 = COLOR_GREY
+objPill.Text = "OBJECTIVES [O]"
+objPill.AutoButtonColor = true
+objPill.Parent = gui
+local objPillCorner = Instance.new("UICorner")
+objPillCorner.CornerRadius = UDim.new(0, 6)
+objPillCorner.Parent = objPill
+local objPillStroke = Instance.new("UIStroke")
+objPillStroke.Color = COLOR_BORDER
+objPillStroke.Thickness = 1
+objPillStroke.Parent = objPill
 
 local objList = Instance.new("Frame")
 objList.Name = "ObjectivesList"
@@ -304,10 +328,33 @@ for _, objDef in ipairs(OBJECTIVES) do
 	objectiveRows[objDef.key] = row
 end
 
+local objectivesOpen = false
+local function setObjectivesOpen(open: boolean)
+	objectivesOpen = open
+	objPanel.Visible = open
+	objPill.Visible = not open
+end
+objTitle.MouseButton1Click:Connect(function()
+	setObjectivesOpen(false)
+end)
+objPill.MouseButton1Click:Connect(function()
+	setObjectivesOpen(true)
+end)
+UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
+	if gameProcessed or UserInputService:GetFocusedTextBox() ~= nil then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.O then
+		setObjectivesOpen(not objectivesOpen)
+	end
+end)
+setObjectivesOpen(false)
+
 -- ===== Hint system: rotating PC tips + priority server hints =====
 local TIPS = {
 	"Press [~] or [F2] to open / close Terminal (or click X [~])",
 	"Press [B] to open / close the Hardware Store",
+	"Press [O] to show / hide the objectives checklist (top-left)",
 	"Stand in front of the NOC Desk + press [E] for 3-Monitor Workstation View",
 	"Equip TechnicianLaptop [1] + press [E] near a device = Console Cable",
 	"Click two different ports to wire a LAN cable | Click a wired port to unplug",

@@ -368,10 +368,12 @@ function ModelFactory.BuildDeviceModel(itemId: string, deviceId: string): (Model
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "ConsolePrompt"
-	prompt.ActionText = "Connect Console Cable"
+	prompt.ActionText = "Console"
 	prompt.ObjectText = defv.name
 	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = 10
+	-- Small close-range card, lifted so it does not cover RJ45 clicks.
+	prompt.MaxActivationDistance = 7
+	prompt.UIOffset = Vector3.new(0, 44, 0)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = consolePart
 
