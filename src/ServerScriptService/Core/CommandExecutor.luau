@@ -43,12 +43,20 @@ local HEX_BLUE = "#58A6FF"
 local HEX_RED = "#FF5555"
 local HEX_GREY = "#8B949E"
 
+-- Roblox RichText documents rgb(r, g, b); some clients treat hex
+-- #RRGGBB as an invalid color and fall back to plain text.
+local function hexToRgbCss(hex: string): string
+	local r = tonumber(string.sub(hex, 2, 3), 16) or 0
+	local g = tonumber(string.sub(hex, 4, 5), 16) or 0
+	local b = tonumber(string.sub(hex, 6, 7), 16) or 0
+	return string.format("rgb(%d, %d, %d)", r, g, b)
+end
 local function rich(hex: string, text: string): string
 	local payload = text
 	if Utils ~= nil then
 		payload = Utils.EscapeRich(text)
 	end
-	return string.format('<font color="%s">%s</font>', hex, payload)
+	return string.format('<font color="%s">%s</font>', hexToRgbCss(hex), payload)
 end
 
 local function g(text: string): string -- green

@@ -477,14 +477,14 @@ inputBox.FocusLost:Connect(function(enterPressed: boolean)
 
 	-- Local echo of the typed command (escaped before embedding in RichText)
 	appendLines({
-		string.format('<font color="#58A6FF">&gt; %s</font>', NetworkUtils.EscapeRich(raw)),
+		string.format('<font color="rgb(88, 166, 255)">&gt; %s</font>', NetworkUtils.EscapeRich(raw)),
 	})
 
 	local ok, result = pcall(function(): any
 		return (executeRemote :: any):InvokeServer(raw)
 	end)
 	if not ok then
-		appendLines({ '<font color="#FF5555">[terminal] failed to send command to server</font>' })
+		appendLines({ '<font color="rgb(255, 85, 85)">[terminal] failed to send command to server</font>' })
 	else
 		local lines = (result :: any).lines
 		if type(lines) == "table" then
@@ -607,8 +607,10 @@ if player.Character ~= nil then
 	bindCharacter(player.Character :: Model)
 end
 
+-- Re-assert RichText: some client paths drop it if set only at creation.
+outputLabel.RichText = true
 -- ===== Welcome banner (English, PC controls) =====
 appendLines({
-	'<font color="#00FF66">[NetSim Terminal] Welcome, SysAdmin.</font>',
-	'<font color="#8B949E">Type <b>help</b> for available commands. [~] / [F2] / click X = close | Tab = autocomplete | Up/Down = history | Ctrl+L = clear.</font>',
+	'<font color="rgb(0, 255, 102)">[NetSim Terminal] Welcome, SysAdmin.</font>',
+	'<font color="rgb(139, 148, 158)">Type <b>help</b> for available commands. [~] / [F2] / click X = close | Tab = autocomplete | Up/Down = history | Ctrl+L = clear.</font>',
 })
