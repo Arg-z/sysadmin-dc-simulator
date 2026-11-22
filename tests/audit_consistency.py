@@ -4,7 +4,7 @@
 Checks (each printed as PASS/FAIL, exit non-zero if any FAIL):
   A. Every require(...) path resolves to an existing file in the virtual rbxlx tree.
   B. Exactly one binder per remote, in the contract owner file; no duplicates.
-  C. WorldAndAssetBuilder.REMOTE_DEFS == exactly the 10 contract Section 3 names.
+  C. WorldAndAssetBuilder.REMOTE_DEFS == exactly the 11 contract Section 3 names.
   D. Every remote referenced (FindFirstChild/WaitForChild/FireClient/FireServer) exists in REMOTE_DEFS.
   E. SessionManager.CreateSession includes every CONTRACT Section 4 field
      (incl. workbench.cpuCores) and exact starter values.
@@ -126,6 +126,7 @@ CONTRACT_REMOTES = {
     "StateSyncRemote": "RemoteEvent",
     "PlaySFXRemote": "RemoteEvent",
     "ResetDataRemote": "RemoteEvent",
+    "SaveGameRemote": "RemoteFunction",
 }
 
 # src-relative source file -> instance path tuple (rbxlx layout)
@@ -187,7 +188,7 @@ def audit_remote_defs():
         return
     names = re.findall(r'name\s*=\s*"(\w+)"', block)
     classes = dict(re.findall(r'name\s*=\s*"(\w+)",\s*class\s*=\s*"(\w+)"', block))
-    check("C: REMOTE_DEFS count == 10", len(names) == 10, f"got {len(names)}: {names}")
+    check("C: REMOTE_DEFS count == 11", len(names) == 11, f"got {len(names)}: {names}")
     check("C: REMOTE_DEFS names == contract Section 3 set", set(names) == set(CONTRACT_REMOTES.keys()),
           f"missing={set(CONTRACT_REMOTES) - set(names)} extra={set(names) - set(CONTRACT_REMOTES)}")
     check("C: REMOTE_DEFS classes match contract",
@@ -262,7 +263,7 @@ def audit_remote_references():
             if var in assigns:
                 used.setdefault(assigns[var], set()).add(rel)
     unknown = sorted(set(used.keys()) - set(CONTRACT_REMOTES.keys()))
-    check("D: every referenced remote name is one of the 10 contract remotes", not unknown,
+    check("D: every referenced remote name is one of the 11 contract remotes", not unknown,
           f"unknown={unknown}")
     for name in sorted(used):
         check(f"D: remote '{name}' referenced (valid, {len(used[name])} file(s))", name in CONTRACT_REMOTES)

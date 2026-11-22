@@ -118,6 +118,7 @@ Folder `ReplicatedStorage.Remotes`:
 | StateSyncRemote | RemoteEvent | server->client `FacilitySnapshot` (every 5s) |
 | PlaySFXRemote | RemoteEvent | server->client `name: string` ("plug"|"key"|"error"|"cash") |
 | ResetDataRemote | RemoteEvent | client->server `()` (wipe save + rebuild session; confirm handled client-side) |
+| SaveGameRemote | RemoteFunction | client->server `()` -> `ok, message` (Tab menu manual save; DataPersistenceManager.Save) |
 
 ## 4. Session table (SessionManager.CreateSession must include ALL)
 
@@ -175,7 +176,7 @@ PlotConstants; occupy occupiedSlots incl. uSize range; rack.totalPowerWatts += w
 - Successful ping from starter bare-metal to 192.168.1.1 sets session.flags.pingGateway=true
 
 ### AGENT B — WorldAndAssetBuilder
-- `EnsureRemotes() -> Folder` (exact 10 remotes incl. ContractActionRemote; idempotent)
+- `EnsureRemotes() -> Folder` (exact 11 remotes incl. ContractActionRemote + SaveGameRemote; idempotent)
 - `SetupLighting()` (Technology Future, Brightness 1.5, Ambient (25,30,40), OutdoorAmbient (20,25,35), BloomEffect DCBloom 0.4/16/1.1, ColorCorrectionEffect DCColor 0.02/0.08/0.05)
 - `EnsurePlotsFolder() -> Folder`; `UpdateFans(dt)`; `ClearFansOfRoot(root)`
 - `BuildFacility(session) -> facility refs` (see Section 5; uses PlotConstants positions; all parts anchored; door on +Z)
